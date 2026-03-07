@@ -9,7 +9,7 @@ import type { AgentState } from "./lib/types";
 
 export function App() {
   const [selectedAgent, setSelectedAgent] = useState<AgentState | null>(null);
-  const { sessions, agents, handleMessage } = useSessions();
+  const { sessions, agents, saiyanTargets, handleMessage } = useSessions();
   const { connected, send } = useWebSocket(handleMessage);
 
   const onSelectAgent = useCallback((agent: AgentState) => {
@@ -36,7 +36,7 @@ export function App() {
       <UniverseBg />
       <div className="relative z-10">
         <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} />
-        <RoomGrid sessions={sessions} agents={agents} onSelectAgent={onSelectAgent} />
+        <RoomGrid sessions={sessions} agents={agents} saiyanTargets={saiyanTargets} onSelectAgent={onSelectAgent} />
       </div>
       {selectedAgent && (
         <TerminalModal
@@ -44,7 +44,8 @@ export function App() {
           send={send}
           onClose={() => setSelectedAgent(null)}
           onNavigate={onNavigate}
-          siblingCount={siblings.length}
+          onSelectSibling={onSelectAgent}
+          siblings={siblings}
         />
       )}
     </div>

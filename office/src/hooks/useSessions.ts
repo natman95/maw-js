@@ -20,6 +20,8 @@ export function useSessions() {
   // Track content hashes for change detection
   const hashHistory = useRef<Record<string, { prev: number; curr: number; unchangedCount: number }>>({});
   const lastSoundTime = useRef(0);
+  const [saiyanTargets, setSaiyanTargets] = useState<Set<string>>(new Set());
+  const saiyanTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const handleMessage = useCallback((data: any) => {
     if (data.type === "sessions") {
@@ -104,6 +106,16 @@ export function useSessions() {
                     lastSoundTime.current = now;
                     playSaiyanSound();
                   }
+                  // 10s saiyan burst animation
+                  clearTimeout(saiyanTimers.current[target]);
+                  setSaiyanTargets(prev => new Set(prev).add(target));
+                  saiyanTimers.current[target] = setTimeout(() => {
+                    setSaiyanTargets(prev => {
+                      const next = new Set(prev);
+                      next.delete(target);
+                      return next;
+                    });
+                  }, 10000);
                 }
                 return { ...p, [target]: { preview, status } };
               });
@@ -136,5 +148,5 @@ export function useSessions() {
       })
     ), [sessions, captureData]);
 
-  return { sessions, agents, handleMessage };
+  return { sessions, agents, saiyanTargets, handleMessage };
 }

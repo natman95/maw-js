@@ -17,13 +17,38 @@ interface TerminalModalProps {
   send: (msg: object) => void;
   onClose: () => void;
   onNavigate: (dir: -1 | 1) => void;
-  siblingCount: number;
+  onSelectSibling: (agent: AgentState) => void;
+  siblings: AgentState[];
 }
 
-export function TerminalModal({ agent, send, onClose, onNavigate, siblingCount }: TerminalModalProps) {
+function cleanName(name: string) {
+  return name.replace(/-oracle$/, "").replace(/-/g, " ");
+}
+
+const STATUS_DOT: Record<string, string> = {
+  busy: "#ffa726",
+  ready: "#4caf50",
+  idle: "#555",
+};
+
+export function TerminalModal({ agent, send, onClose, onNavigate, onSelectSibling, siblings }: TerminalModalProps) {
   const [content, setContent] = useState("");
   const [inputBuf, setInputBuf] = useState("");
   const termRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Auto-focus on open + refocus when clicking anywhere inside
+  useEffect(() => {
+    wrapperRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    const refocus = () => { setTimeout(() => el.focus(), 0); };
+    el.addEventListener("mousedown", refocus);
+    return () => el.removeEventListener("mousedown", refocus);
+  }, []);
 
   useEffect(() => {
     send({ type: "subscribe", target: agent.target });
@@ -50,6 +75,12 @@ export function TerminalModal({ agent, send, onClose, onNavigate, siblingCount }
     // Alt+Arrow to navigate between agents in same room
     if (e.altKey && e.key === "ArrowLeft") { e.preventDefault(); onNavigate(-1); return; }
     if (e.altKey && e.key === "ArrowRight") { e.preventDefault(); onNavigate(1); return; }
+    // Alt+1-9 to jump to sibling by index
+    if (e.altKey && e.key >= "1" && e.key <= "9") {
+      const idx = parseInt(e.key) - 1;
+      if (idx < siblings.length) { e.preventDefault(); onSelectSibling(siblings[idx]); }
+      return;
+    }
     if (e.key === "Enter") {
       e.preventDefault();
       if (inputBuf) { send({ type: "send", target: agent.target, text: inputBuf }); setInputBuf(""); }
@@ -70,7 +101,7 @@ export function TerminalModal({ agent, send, onClose, onNavigate, siblingCount }
     if (text) setInputBuf((b) => b + text);
   }, []);
 
-  const displayName = agent.name.replace(/-oracle$/, "").replace(/-/g, " ");
+  const displayName = cleanName(agent.name);
 
   return (
     <div
@@ -79,35 +110,47 @@ export function TerminalModal({ agent, send, onClose, onNavigate, siblingCount }
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
       tabIndex={0}
-      ref={(el) => el?.focus()}
+      ref={wrapperRef}
     >
       <div className="w-[90vw] max-w-[900px] h-[80vh] bg-[#0a0a0f] border border-white/[0.06] rounded-xl flex flex-col overflow-hidden shadow-2xl">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-[#0e0e18] border-b border-white/[0.06]">
-          <div className="flex gap-1.5">
+        <div className="flex items-center gap-3 px-4 py-2 bg-[#0e0e18] border-b border-white/[0.06]">
+          <div className="flex gap-1.5 shrink-0">
             <button onClick={onClose} className="w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-110 cursor-pointer" />
             <span className="w-3 h-3 rounded-full bg-[#febc2e]" />
             <span className="w-3 h-3 rounded-full bg-[#28c840]" />
           </div>
 
-          {/* Nav arrows */}
-          {siblingCount > 1 && (
-            <button onClick={() => onNavigate(-1)} className="text-white/25 hover:text-white/60 text-sm cursor-pointer px-1">&larr;</button>
-          )}
-          <span className="text-xs text-white/60 font-mono font-bold">
-            {displayName}
-          </span>
-          {siblingCount > 1 && (
-            <button onClick={() => onNavigate(1)} className="text-white/25 hover:text-white/60 text-sm cursor-pointer px-1">&rarr;</button>
-          )}
+          {/* Agent tab bar */}
+          <div className="flex items-center gap-0.5 overflow-x-auto scrollbar-none mx-2">
+            {siblings.map((s, i) => {
+              const active = s.target === agent.target;
+              return (
+                <button
+                  key={s.target}
+                  onClick={() => onSelectSibling(s)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-mono whitespace-nowrap cursor-pointer transition-all ${
+                    active
+                      ? "bg-white/10 text-white/90"
+                      : "text-white/35 hover:text-white/60 hover:bg-white/[0.04]"
+                  }`}
+                >
+                  <span
+                    className="w-1.5 h-1.5 rounded-full shrink-0"
+                    style={{ background: STATUS_DOT[s.status] || "#555" }}
+                  />
+                  {i < 9 && (
+                    <span className="text-[9px] text-white/20">{i + 1}</span>
+                  )}
+                  {cleanName(s.name)}
+                </button>
+              );
+            })}
+          </div>
 
-          <span className="text-[10px] text-white/25 font-mono">
-            {agent.target}
-          </span>
-
-          <div className="ml-auto flex items-center gap-3">
-            {siblingCount > 1 && (
-              <span className="text-[9px] text-white/20 tracking-wider">Alt+←→</span>
+          <div className="ml-auto flex items-center gap-3 shrink-0">
+            {siblings.length > 1 && (
+              <span className="text-[9px] text-white/20 tracking-wider">Alt+1-{Math.min(9, siblings.length)}</span>
             )}
             <button onClick={onClose} className="text-white/20 hover:text-white/50 text-lg cursor-pointer">
               &times;

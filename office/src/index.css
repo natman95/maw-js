@@ -23,5 +23,25 @@ body {
 @keyframes sparkle { 0% { opacity: 0; transform: scale(0); } 50% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(0); } }
 @keyframes room-pulse { 0%, 100% { stroke-opacity: 0.2; } 50% { stroke-opacity: 0.5; } }
 
+/* Saiyan burst (10s power-up) */
+@keyframes saiyan-pillar {
+  0% { opacity: 0.3; transform: scaleY(0); transform-origin: bottom; }
+  30% { opacity: 0.15; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(1); }
+}
+@keyframes saiyan-ring {
+  0% { r: 20; opacity: 0.5; stroke-width: 3; }
+  100% { r: 80; opacity: 0; stroke-width: 0.5; }
+}
+@keyframes saiyan-glow {
+  0% { r: 50; opacity: 0.15; }
+  20% { r: 60; opacity: 0.08; }
+  100% { r: 40; opacity: 0; }
+}
+@keyframes saiyan-particle {
+  0% { cy: 30; opacity: 0.8; r: 2; }
+  100% { cy: -80; opacity: 0; r: 0.5; }
+}
+
 /* Terminal modal slide up */
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
