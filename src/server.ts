@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { serveStatic } from "hono/bun";
 import { listSessions, capture, sendKeys } from "./ssh";
 import type { ServerWebSocket } from "bun";
 
@@ -28,6 +29,13 @@ app.get("/", (c) => c.body(html.stream(), { headers: { "Content-Type": "text/htm
 
 const dashboardHtml = Bun.file(import.meta.dir + "/dashboard.html");
 app.get("/dashboard", (c) => c.body(dashboardHtml.stream(), { headers: { "Content-Type": "text/html" } }));
+
+// Serve React office app (built by vite to dist-office/)
+app.get("/office", serveStatic({ root: "./dist-office", path: "/index.html" }));
+app.get("/office/*", serveStatic({
+  root: "./",
+  rewriteRequestPath: (p) => p.replace(/^\/office/, "/dist-office"),
+}));
 
 app.onError((err, c) => c.json({ error: err.message }, 500));
 
