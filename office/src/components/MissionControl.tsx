@@ -502,13 +502,10 @@ export const MissionControl = memo(function MissionControl({
         })}
       </svg>
 
-      {/* Joystick — bottom left */}
-      <div className="absolute bottom-4 left-6 z-10">
-        <Joystick onPan={onJoystickPan} />
-      </div>
-
-      {/* Zoom controls */}
+      {/* Controls — bottom right: pan + zoom in one cluster */}
       <div className="absolute bottom-4 right-6 flex flex-col items-center gap-1">
+        <Joystick onPan={onJoystickPan} />
+        <div className="w-6 border-t border-white/[0.06] my-0.5" />
         <button onClick={() => setZoom((z) => Math.min(3, z + 0.05))}
           className="w-8 h-8 rounded-lg bg-black/50 backdrop-blur border border-white/10 text-white/70 hover:text-white hover:bg-white/10 text-lg font-bold cursor-pointer">+</button>
         <button onClick={resetView}
@@ -585,14 +582,15 @@ export const MissionControl = memo(function MissionControl({
         </div>
       )}
 
-      {/* Pinned Preview Card — click to type, fullscreen to expand */}
+      {/* Pinned Preview Card — centered on screen */}
       {pinnedPreview && (
         <div
           ref={pinnedRef}
           className="absolute z-40 pointer-events-auto"
           style={{
-            left: pinnedPreview.pos.x,
-            top: pinnedPreview.pos.y,
+            left: "50%",
+            top: 20,
+            transform: "translateX(-50%)",
             maxWidth: 420,
             animation: "fadeSlideIn 0.15s ease-out",
           }}

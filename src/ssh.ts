@@ -67,6 +67,11 @@ export async function selectWindow(target: string, host?: string): Promise<void>
 }
 
 export async function sendKeys(target: string, text: string, host?: string): Promise<void> {
+  // Raw escape → send as tmux key name (no Enter appended)
+  if (text === "\x1b") {
+    await ssh(`tmux send-keys -t '${target}' Escape`, host);
+    return;
+  }
   if (text.startsWith("/")) {
     // Slash commands: send char by char for interactive tools (Claude Code, etc.)
     for (const ch of text) {

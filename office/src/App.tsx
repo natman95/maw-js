@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useSessions } from "./hooks/useSessions";
 import { UniverseBg } from "./components/UniverseBg";
@@ -6,6 +6,7 @@ import { StatusBar } from "./components/StatusBar";
 import { RoomGrid } from "./components/RoomGrid";
 import { TerminalModal } from "./components/TerminalModal";
 import { MissionControl } from "./components/MissionControl";
+import { ShortcutOverlay } from "./components/ShortcutOverlay";
 import { unlockAudio, isAudioUnlocked } from "./lib/sounds";
 import type { AgentState } from "./lib/types";
 
@@ -45,6 +46,36 @@ export function App() {
   useAudioUnlock();
   const route = useHashRoute();
   const [selectedAgent, setSelectedAgent] = useState<AgentState | null>(null);
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // "?" key opens shortcut overlay (only when no input is focused)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "?" && !(e.target instanceof HTMLInputElement)) {
+        setShowShortcuts(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  // Triple-tap to open shortcuts (mobile)
+  const tapCount = useRef(0);
+  const tapTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    const handler = () => {
+      tapCount.current++;
+      clearTimeout(tapTimer.current);
+      if (tapCount.current >= 3) {
+        tapCount.current = 0;
+        setShowShortcuts(true);
+      } else {
+        tapTimer.current = setTimeout(() => { tapCount.current = 0; }, 400);
+      }
+    };
+    window.addEventListener("touchend", handler);
+    return () => { window.removeEventListener("touchend", handler); clearTimeout(tapTimer.current); };
+  }, []);
   const { sessions, agents, saiyanTargets, handleMessage } = useSessions();
   const { connected, send } = useWebSocket(handleMessage);
 
@@ -93,6 +124,7 @@ export function App() {
           onSelectAgent={onSelectAgent}
         />
         {terminalModal}
+        {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
       </div>
     );
   }
@@ -105,6 +137,7 @@ export function App() {
         <RoomGrid sessions={sessions} agents={agents} saiyanTargets={saiyanTargets} onSelectAgent={onSelectAgent} />
       </div>
       {terminalModal}
+      {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
     </div>
   );
 }

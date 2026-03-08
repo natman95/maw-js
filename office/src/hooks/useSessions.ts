@@ -70,7 +70,7 @@ export function useSessions() {
               const lines = text.split("\n").filter((l: string) => l.trim());
               const bottom = lines.slice(-5).join("\n");
               const hasPrompt = bottom.includes("\u276f"); // ❯
-              const hasBusySign = /[∴✢]/.test(bottom) || /● \w+\(/.test(bottom); // Thinking/tool calls
+              const hasBusySign = /[∴✢⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◑◒◓⣾⣽⣻⢿⡿⣟⣯⣷]/.test(bottom) || /● \w+\(/.test(bottom) || /\b(Read|Edit|Write|Bash|Grep|Glob|Agent)\b/.test(bottom); // Thinking/tool calls/Claude Code tools
 
               // Determine status (slower transitions to avoid flicker)
               let status: PaneStatus;

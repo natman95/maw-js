@@ -52,16 +52,20 @@ export const HoverPreviewCard = memo(function HoverPreviewCard({
   const displayName = agent.name.replace(/-oracle$/, "").replace(/-/g, " ");
   const statusColor = STATUS_COLORS[agent.status] || "#666";
 
-  // Auto-focus input when pinned
+  // Auto-focus input when pinned (double-tap focus for mobile keyboard)
   useEffect(() => {
     if (pinned) {
-      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      inputRef.current?.focus();
+      const t = setTimeout(() => {
+        inputRef.current?.focus();
+        inputRef.current?.click();
+      }, 50);
       return () => clearTimeout(t);
     }
   }, [pinned, agent.target]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Escape") { e.preventDefault(); onClose?.(); return; }
+    if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); onClose?.(); return; }
     if (e.key === "Enter") {
       e.preventDefault();
       if (inputBuf && send) {
@@ -113,7 +117,12 @@ export const HoverPreviewCard = memo(function HoverPreviewCard({
         height: "calc(100vh - 120px)",
         maxHeight: 700,
       }}
-      onClick={() => { if (pinned) inputRef.current?.focus(); }}
+      onMouseDown={(e) => {
+        if (pinned && e.target !== inputRef.current) {
+          e.preventDefault();
+          inputRef.current?.focus();
+        }
+      }}
     >
       {/* Header with big avatar */}
       <div
@@ -321,14 +330,51 @@ export const HoverPreviewCard = memo(function HoverPreviewCard({
             onKeyDown={handleKeyDown}
             className="flex-1 bg-transparent text-white/90 outline-none caret-cyan-400 font-mono text-xs"
             style={{ caretColor: "#22d3ee" }}
+            inputMode="text"
+            enterKeyHint="send"
             spellCheck={false}
             autoComplete="off"
+            autoFocus
             placeholder="type command..."
           />
+          <button
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (inputBuf && send) {
+                send({ type: "send", target: agent.target, text: inputBuf });
+                setInputBuf("");
+              }
+              inputRef.current?.focus();
+            }}
+            className="shrink-0 px-4 py-2 rounded-lg bg-cyan-500 text-black text-xs font-bold cursor-pointer hover:bg-cyan-400 active:bg-cyan-600 transition-colors shadow-lg shadow-cyan-500/20"
+          >
+            SEND
+          </button>
         </div>
       ) : (
         <div className="px-3 py-2 bg-[#0e0e18] border-t border-white/[0.06] font-mono text-[9px] text-white/30 truncate">
           {agent.preview || "..."}
+        </div>
+      )}
+
+      {/* Shortcut hints — always visible when pinned */}
+      {pinned && (
+        <div className="flex items-center justify-center gap-3 px-3 py-1.5 bg-[#08080c] border-t border-white/[0.04] font-mono text-[8px] text-white/20">
+          <span><kbd className="text-white/30">Enter</kbd> send</span>
+          <span><kbd className="text-white/30">⌃Enter</kbd> fullscreen</span>
+          <span><kbd className="text-white/30">Esc</kbd> close</span>
+          <button
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              send?.({ type: "send", target: agent.target, text: "\x1b" });
+              inputRef.current?.focus();
+            }}
+            className="px-2 py-0.5 rounded bg-white/[0.06] border border-white/[0.08] text-[9px] text-white/40 hover:text-white/80 hover:bg-white/10 cursor-pointer transition-colors"
+          >
+            Esc→tmux
+          </button>
         </div>
       )}
     </div>
