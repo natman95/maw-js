@@ -481,12 +481,19 @@ export const HoverPreviewCard = memo(function HoverPreviewCard({
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              if (inputBuf && send) {
+              if (!send) return;
+              if (streamingRef.current) {
+                addEvent?.(agent.target, "command", inputBuf);
+                send({ type: "send", target: agent.target, text: "\r" });
+                streamingRef.current = false;
+              } else if (inputBuf) {
                 addEvent?.(agent.target, "command", inputBuf);
                 send({ type: "send", target: agent.target, text: inputBuf });
-                setInputBuf("");
-                prevInputRef.current = "";
+              } else {
+                send({ type: "send", target: agent.target, text: "\r" });
               }
+              setInputBuf("");
+              prevInputRef.current = "";
               inputRef.current?.focus();
             }}
             className="shrink-0 px-4 py-2 rounded-lg bg-cyan-500 text-black text-xs font-bold cursor-pointer hover:bg-cyan-400 active:bg-cyan-600 transition-colors shadow-lg shadow-cyan-500/20"

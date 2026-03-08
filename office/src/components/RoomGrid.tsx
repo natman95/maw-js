@@ -24,7 +24,7 @@ export const RoomGrid = memo(function RoomGrid({ sessions, agents, saiyanTargets
   const busyCount = agents.filter(a => a.status === "busy").length;
 
   return (
-    <div className="max-w-[960px] mx-auto px-8 pt-8 pb-12">
+    <div className="max-w-[1200px] mx-auto px-6 pt-8 pb-12">
       {/* Power bar */}
       <div className="flex items-center gap-3 mb-5 px-1">
         <span className="text-[10px] text-white/50 tracking-widest uppercase">Power Level</span>
@@ -40,7 +40,7 @@ export const RoomGrid = memo(function RoomGrid({ sessions, agents, saiyanTargets
         <span className="text-[10px] text-white/50 tabular-nums">{busyCount}/{agents.length}</span>
       </div>
 
-      {/* Room grid */}
+      {/* Room grid — full width, 3 columns on wide screens */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {sessions.map((s) => {
           const style = roomStyle(s.name);

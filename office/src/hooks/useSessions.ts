@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { Session, AgentState, PaneStatus, AgentEvent } from "../lib/types";
 import { stripAnsi } from "../lib/ansi";
 import { playSaiyanSound } from "../lib/sounds";
+import { agentSortKey } from "../lib/constants";
 
 // Simple string hash
 function hash(s: string): number {
@@ -144,8 +145,8 @@ export function useSessions() {
   }, []);
 
   // Derive flat agent list (memoized to prevent re-renders)
-  const agents: AgentState[] = useMemo(() =>
-    sessions.flatMap((s) =>
+  const agents: AgentState[] = useMemo(() => {
+    const list = sessions.flatMap((s) =>
       s.windows.map((w) => {
         const key = `${s.name}:${w.index}`;
         const cd = captureData[key];
@@ -159,7 +160,10 @@ export function useSessions() {
           status: cd?.status || "idle",
         };
       })
-    ), [sessions, captureData]);
+    );
+    list.sort((a, b) => agentSortKey(a.name) - agentSortKey(b.name));
+    return list;
+  }, [sessions, captureData]);
 
   return { sessions, agents, saiyanTargets, eventLog, addEvent, handleMessage };
 }

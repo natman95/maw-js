@@ -24,6 +24,18 @@ export function roomStyle(sessionName: string) {
   return FALLBACK_ROOMS[Math.abs(h) % FALLBACK_ROOMS.length];
 }
 
+// Preferred agent display order (lower = first, unlisted = 999)
+export const AGENT_ORDER: Record<string, number> = {
+  "neo-oracle": 0,
+  "nexus-oracle": 1,
+  "hermes-oracle": 2,
+  "pulse-oracle": 3,
+};
+
+export function agentSortKey(name: string): number {
+  return AGENT_ORDER[name] ?? 999;
+}
+
 // Agent capsule colors (deterministic by name hash)
 export const AGENT_COLORS = [
   "#ff6b6b", "#4ecdc4", "#45b7d1", "#96ceb4", "#ffa07a",

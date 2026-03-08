@@ -2,7 +2,7 @@ import { memo, useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { AgentAvatar } from "./AgentAvatar";
 import { HoverPreviewCard } from "./HoverPreviewCard";
 import { Joystick } from "./Joystick";
-import { roomStyle } from "../lib/constants";
+import { roomStyle, agentColor } from "../lib/constants";
 import type { AgentState, Session, AgentEvent } from "../lib/types";
 
 interface MissionControlProps {
@@ -86,12 +86,13 @@ export const MissionControl = memo(function MissionControl({
     return { x, y };
   }, [svgToScreen]);
 
-  // Show preview card on hover — anchored to agent's SVG position
+  // Show preview card on hover — anchored to agent's SVG position (skip when pinned)
   const showPreview = useCallback((agent: AgentState, room: { label: string; accent: string }, svgX: number, svgY: number) => {
+    if (pinnedPreview) return; // don't show hover when a card is pinned
     clearTimeout(hoverTimeout.current);
     const pos = calcCardPos(svgX, svgY);
     setHoverPreview({ agent, room, pos });
-  }, [calcCardPos]);
+  }, [calcCardPos, pinnedPreview]);
 
   const hidePreview = useCallback(() => {
     hoverTimeout.current = setTimeout(() => setHoverPreview(null), 300);
@@ -105,18 +106,7 @@ export const MissionControl = memo(function MissionControl({
   const readyCount = agents.filter((a) => a.status === "ready").length;
   const idleCount = agents.filter((a) => a.status === "idle").length;
 
-  // Mouse wheel zoom
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const delta = e.deltaY > 0 ? -0.05 : 0.05;
-      setZoom((z) => Math.max(0.5, Math.min(3, z + delta)));
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, []);
+  // Disable mouse wheel zoom entirely — use +/- buttons instead
 
   // Pan with middle mouse or drag
   const onMouseDown = useCallback((e: React.MouseEvent) => {
@@ -182,14 +172,20 @@ export const MissionControl = memo(function MissionControl({
   }, []);
 
   // Click agent → pin preview card (not fullscreen modal)
+  // If already pinned, just log event + sound — don't open another popup
   const onAgentClick = useCallback(
     (agent: AgentState, svgX: number, svgY: number, room: { label: string; accent: string }) => {
+      if (pinnedPreview) {
+        // Already have a pinned card — just add event badge, no new popup
+        addEvent(agent.target, "command", `clicked ${agent.name}`);
+        return;
+      }
       const pos = calcCardPos(svgX, svgY);
       setPinnedPreview({ agent, room, pos, svgX, svgY });
       setHoverPreview(null); // hide hover
       send({ type: "subscribe", target: agent.target });
     },
-    [calcCardPos, send]
+    [calcCardPos, send, pinnedPreview, addEvent]
   );
 
   // Fullscreen → close pin first, then open modal (so focus transfers cleanly)
@@ -206,6 +202,24 @@ export const MissionControl = memo(function MissionControl({
   }, []);
 
   const pinnedRef = useRef<HTMLDivElement>(null);
+
+  // Animate pinned card from hover position to center
+  const [pinnedAnimPos, setPinnedAnimPos] = useState<{ left: number; top: number } | null>(null);
+  useEffect(() => {
+    if (pinnedPreview) {
+      // Start at hover position
+      setPinnedAnimPos({ left: pinnedPreview.pos.x, top: pinnedPreview.pos.y });
+      // Transition to center on next frame
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const containerW = containerRef.current?.getBoundingClientRect().width || 800;
+          setPinnedAnimPos({ left: (containerW - 420) / 2, top: 20 });
+        });
+      });
+    } else {
+      setPinnedAnimPos(null);
+    }
+  }, [pinnedPreview]);
 
   // Click outside pinned card to close
   useEffect(() => {
@@ -527,50 +541,63 @@ export const MissionControl = memo(function MissionControl({
           className="w-8 h-8 rounded-lg bg-black/50 backdrop-blur border border-white/10 text-white/70 hover:text-white hover:bg-white/10 text-lg font-bold cursor-pointer">−</button>
       </div>
 
-      {/* Saiyan auto-popup cards — prefer right, left only at edge */}
-      {[...saiyanCards.entries()].map(([target, card]) => {
-        const pos = calcCardPos(card.svgX, card.svgY);
-        // Don't show if hover preview is for the same agent
-        if (hoverPreview?.agent.target === target) return null;
-        return (
-          <div
-            key={`saiyan-${target}`}
-            className="absolute z-20 pointer-events-auto"
-            style={{
-              left: pos.x,
-              top: pos.y,
-              maxWidth: 420,
-              animation: "fadeSlideIn 0.2s ease-out",
-            }}
-            onClick={() => {
-              // Dismiss on click
-              setSaiyanCards(prev => {
-                const next = new Map(prev);
-                next.delete(target);
-                return next;
-              });
-            }}
-          >
-            {/* Saiyan order badge */}
+      {/* Saiyan toast notifications — top-right, small face + name like blockchain tx */}
+      <div className="absolute top-3 right-3 z-50 flex flex-col gap-2 pointer-events-none" style={{ maxWidth: 220 }}>
+        {[...saiyanCards.entries()].map(([target, card]) => {
+          const color = agentColor(card.agent.name);
+          const displayName = card.agent.name.replace(/-oracle$/, "").replace(/-/g, " ");
+          return (
             <div
-              className="absolute -top-3 -left-3 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold z-10 border-2"
+              key={`toast-${target}`}
+              className="flex items-center gap-3 px-3 py-2 rounded-xl pointer-events-auto cursor-pointer"
               style={{
-                background: card.room.accent,
-                borderColor: "#0a0a0f",
-                color: "#0a0a0f",
-                boxShadow: `0 0 12px ${card.room.accent}`,
+                background: "rgba(8,8,16,0.92)",
+                border: `1px solid ${card.room.accent}40`,
+                backdropFilter: "blur(12px)",
+                boxShadow: `0 0 20px ${card.room.accent}15`,
+                animation: "fadeSlideIn 0.25s ease-out",
+              }}
+              onClick={() => {
+                // Click toast → pin that agent's card
+                const pos = calcCardPos(card.svgX, card.svgY);
+                setPinnedPreview({ agent: card.agent, room: card.room, pos, svgX: card.svgX, svgY: card.svgY });
+                setHoverPreview(null);
+                send({ type: "subscribe", target: card.agent.target });
+                // Dismiss toast
+                setSaiyanCards(prev => { const next = new Map(prev); next.delete(target); return next; });
               }}
             >
-              {card.order}
+              {/* Mini chibi face */}
+              <svg width={36} height={36} viewBox="-24 -34 48 68">
+                <circle cx={0} cy={-10} r={20} fill={color} stroke="#fff" strokeWidth={2} />
+                {/* Eyes */}
+                <circle cx={-7} cy={-12} r={4.5} fill="#fff" />
+                <circle cx={7} cy={-12} r={4.5} fill="#fff" />
+                <circle cx={-6} cy={-12} r={2.5} fill="#222" />
+                <circle cx={8} cy={-12} r={2.5} fill="#222" />
+                <circle cx={-5} cy={-13.5} r={1} fill="#fff" />
+                <circle cx={9} cy={-13.5} r={1} fill="#fff" />
+                {/* Mouth */}
+                <path d="M -3 -5 Q 0 -2 3 -5" fill="none" stroke="#333" strokeWidth={1.2} strokeLinecap="round" />
+                {/* Hair */}
+                <ellipse cx={-4} cy={-28} rx={6} ry={4} fill={color} stroke="#fff" strokeWidth={1} />
+                <ellipse cx={4} cy={-29} rx={5} ry={3} fill={color} stroke="#fff" strokeWidth={1} />
+                {/* Status dot */}
+                <circle cx={16} cy={-28} r={4} fill="#fdd835" stroke="#1a1a1a" strokeWidth={1.5} />
+              </svg>
+              {/* Name + status */}
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-bold truncate" style={{ color: card.room.accent }}>
+                  {displayName}
+                </span>
+                <span className="text-[10px] text-white/50 truncate">
+                  {card.agent.preview?.slice(0, 30) || card.agent.status}
+                </span>
+              </div>
             </div>
-            <HoverPreviewCard
-              agent={card.agent}
-              roomLabel={card.room.label}
-              accent={card.room.accent}
-            />
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
       {/* Hover Preview Card — manual hover (hidden when pinned) */}
       {hoverPreview && !pinnedPreview && (
@@ -593,17 +620,16 @@ export const MissionControl = memo(function MissionControl({
         </div>
       )}
 
-      {/* Pinned Preview Card — centered on screen */}
-      {pinnedPreview && (
+      {/* Pinned Preview Card — slides from hover position to center */}
+      {pinnedPreview && pinnedAnimPos && (
         <div
           ref={pinnedRef}
           className="absolute z-40 pointer-events-auto"
           style={{
-            left: "50%",
-            top: 20,
-            transform: "translateX(-50%)",
+            left: pinnedAnimPos.left,
+            top: pinnedAnimPos.top,
             maxWidth: 420,
-            animation: "fadeSlideIn 0.15s ease-out",
+            transition: "left 0.3s ease-out, top 0.3s ease-out",
           }}
         >
           <HoverPreviewCard

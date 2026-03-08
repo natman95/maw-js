@@ -2,7 +2,6 @@
 process.env.MAW_CLI = "1";
 
 import { listSessions, findWindow, capture, sendKeys } from "./ssh";
-import { startServer } from "./server";
 
 const args = process.argv.slice(2);
 const cmd = args[0]?.toLowerCase();
@@ -90,6 +89,7 @@ if (!cmd || cmd === "--help" || cmd === "-h") {
   if (!args[1] || !args[2]) { console.error("usage: maw hey <agent> <message>"); process.exit(1); }
   await cmdSend(args[1], args.slice(2).join(" "));
 } else if (cmd === "serve") {
+  const { startServer } = await import("./server");
   startServer(args[1] ? +args[1] : 3456);
 } else {
   // Default: agent name
