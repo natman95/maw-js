@@ -89,6 +89,7 @@ export function App() {
           agents={agents}
           saiyanTargets={saiyanTargets}
           connected={connected}
+          send={send}
           onSelectAgent={onSelectAgent}
         />
         {terminalModal}

@@ -9,6 +9,7 @@ interface MissionControlProps {
   agents: AgentState[];
   saiyanTargets: Set<string>;
   connected: boolean;
+  send: (msg: object) => void;
   onSelectAgent: (agent: AgentState) => void;
 }
 
@@ -17,10 +18,12 @@ export const MissionControl = memo(function MissionControl({
   agents,
   saiyanTargets,
   connected,
+  send,
   onSelectAgent,
 }: MissionControlProps) {
   const [hoveredAgent, setHoveredAgent] = useState<string | null>(null);
   const [hoverPreview, setHoverPreview] = useState<{ agent: AgentState; room: { label: string; accent: string }; pos: { x: number; y: number } } | null>(null);
+  const [pinnedPreview, setPinnedPreview] = useState<{ agent: AgentState; room: { label: string; accent: string }; pos: { x: number; y: number }; svgX: number; svgY: number } | null>(null);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout>>();
 
   // Auto-popup cards for Saiyan agents — max 3 visible, 2s stagger, FIFO
@@ -162,10 +165,28 @@ export const MissionControl = memo(function MissionControl({
     });
   }, [sessions, sessionAgents]);
 
+  // Click agent → pin preview card (not fullscreen modal)
   const onAgentClick = useCallback(
-    (agent: AgentState) => onSelectAgent(agent),
-    [onSelectAgent]
+    (agent: AgentState, svgX: number, svgY: number, room: { label: string; accent: string }) => {
+      const pos = calcCardPos(svgX, svgY);
+      setPinnedPreview({ agent, room, pos, svgX, svgY });
+      setHoverPreview(null); // hide hover
+      send({ type: "subscribe", target: agent.target });
+    },
+    [calcCardPos, send]
   );
+
+  // Fullscreen → close pin, open modal
+  const onPinnedFullscreen = useCallback(() => {
+    if (pinnedPreview) {
+      onSelectAgent(pinnedPreview.agent);
+      setPinnedPreview(null);
+    }
+  }, [pinnedPreview, onSelectAgent]);
+
+  const onPinnedClose = useCallback(() => {
+    setPinnedPreview(null);
+  }, []);
 
   // Build lookup: agent target -> { svgX, svgY, room style }
   const agentPositions = useMemo(() => {
@@ -418,7 +439,7 @@ export const MissionControl = memo(function MissionControl({
                         preview={agent.preview}
                         accent={s.style.accent}
                         saiyan={saiyanTargets.has(agent.target)}
-                        onClick={() => onAgentClick(agent)}
+                        onClick={() => onAgentClick(agent, ax, ay, { label: s.style.label, accent: s.style.accent })}
                       />
                     </g>
                     {/* Agent name (below) */}
@@ -430,7 +451,7 @@ export const MissionControl = memo(function MissionControl({
                       fontFamily="'SF Mono', monospace"
                       opacity={isHovered ? 1 : 0.7}
                       style={{ transition: "all 0.2s", cursor: "pointer" }}
-                      onClick={() => onAgentClick(agent)}
+                      onClick={() => onAgentClick(agent, ax, ay, { label: s.style.label, accent: s.style.accent })}
                     >
                       {agent.name.replace(/-oracle$/, "").replace(/-/g, " ")}
                     </text>
@@ -517,8 +538,8 @@ export const MissionControl = memo(function MissionControl({
         );
       })}
 
-      {/* Hover Preview Card — manual hover */}
-      {hoverPreview && (
+      {/* Hover Preview Card — manual hover (hidden when pinned) */}
+      {hoverPreview && !pinnedPreview && (
         <div
           className="absolute z-30 pointer-events-auto"
           style={{
@@ -534,6 +555,29 @@ export const MissionControl = memo(function MissionControl({
             agent={hoverPreview.agent}
             roomLabel={hoverPreview.room.label}
             accent={hoverPreview.room.accent}
+          />
+        </div>
+      )}
+
+      {/* Pinned Preview Card — click to type, fullscreen to expand */}
+      {pinnedPreview && (
+        <div
+          className="absolute z-40 pointer-events-auto"
+          style={{
+            left: pinnedPreview.pos.x,
+            top: pinnedPreview.pos.y,
+            maxWidth: 420,
+            animation: "fadeSlideIn 0.15s ease-out",
+          }}
+        >
+          <HoverPreviewCard
+            agent={pinnedPreview.agent}
+            roomLabel={pinnedPreview.room.label}
+            accent={pinnedPreview.room.accent}
+            pinned
+            send={send}
+            onFullscreen={onPinnedFullscreen}
+            onClose={onPinnedClose}
           />
         </div>
       )}

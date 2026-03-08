@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { ansiToHtml } from "../lib/ansi";
 import { agentColor } from "../lib/constants";
 import type { AgentState } from "../lib/types";
@@ -7,6 +7,10 @@ interface HoverPreviewCardProps {
   agent: AgentState;
   roomLabel: string;
   accent: string;
+  pinned?: boolean;
+  send?: (msg: object) => void;
+  onFullscreen?: () => void;
+  onClose?: () => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -35,12 +39,42 @@ export const HoverPreviewCard = memo(function HoverPreviewCard({
   agent,
   roomLabel,
   accent,
+  pinned = false,
+  send,
+  onFullscreen,
+  onClose,
 }: HoverPreviewCardProps) {
   const [content, setContent] = useState("");
+  const [inputBuf, setInputBuf] = useState("");
   const termRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const color = agentColor(agent.name);
   const displayName = agent.name.replace(/-oracle$/, "").replace(/-/g, " ");
   const statusColor = STATUS_COLORS[agent.status] || "#666";
+
+  // Auto-focus input when pinned
+  useEffect(() => {
+    if (pinned) {
+      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [pinned, agent.target]);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Escape") { e.preventDefault(); onClose?.(); return; }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (inputBuf && send) {
+        send({ type: "send", target: agent.target, text: inputBuf });
+        setInputBuf("");
+      }
+    }
+    // F11 or Cmd+Enter for fullscreen
+    if (e.key === "F11" || (e.key === "Enter" && (e.metaKey || e.ctrlKey))) {
+      e.preventDefault();
+      onFullscreen?.();
+    }
+  }, [inputBuf, agent.target, send, onClose, onFullscreen]);
 
   // Poll terminal capture
   useEffect(() => {
@@ -233,7 +267,7 @@ export const HoverPreviewCard = memo(function HoverPreviewCard({
         <span className="mt-1 text-[9px] text-white/25 font-mono">{agent.target}</span>
       </div>
 
-      {/* Terminal preview */}
+      {/* Terminal header with fullscreen button */}
       <div className="flex items-center gap-2 px-3 py-1.5 bg-white/[0.02] border-b border-white/[0.04]">
         <span className="text-[9px] text-white/30 tracking-[2px] uppercase font-mono">Live Terminal</span>
         <span
@@ -244,6 +278,24 @@ export const HoverPreviewCard = memo(function HoverPreviewCard({
             animation: "agent-pulse 2s ease-in-out infinite",
           }}
         />
+        {pinned && onFullscreen && (
+          <button
+            onClick={onFullscreen}
+            className="ml-1 px-2 py-0.5 rounded text-[9px] text-white/40 hover:text-white/80 hover:bg-white/[0.06] cursor-pointer font-mono transition-colors"
+            title="Fullscreen (Ctrl+Enter)"
+          >
+            ⛶
+          </button>
+        )}
+        {pinned && onClose && (
+          <button
+            onClick={onClose}
+            className="px-1.5 py-0.5 rounded text-[9px] text-white/30 hover:text-white/60 hover:bg-white/[0.06] cursor-pointer transition-colors"
+            title="Close (Esc)"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       <div
@@ -253,10 +305,31 @@ export const HoverPreviewCard = memo(function HoverPreviewCard({
         dangerouslySetInnerHTML={{ __html: ansiToHtml(trimCapture(content)) }}
       />
 
-      {/* Bottom bar with preview line */}
-      <div className="px-3 py-2 bg-[#0e0e18] border-t border-white/[0.06] font-mono text-[9px] text-white/30 truncate">
-        {agent.preview || "..."}
-      </div>
+      {/* Bottom: input when pinned, preview text when hovering */}
+      {pinned && send ? (
+        <div
+          className="flex items-center gap-2 px-3 py-2 bg-[#0e0e18] border-t border-white/[0.06] font-mono text-xs cursor-text"
+          onClick={() => inputRef.current?.focus()}
+        >
+          <span className="text-cyan-400 font-semibold shrink-0">&#x276f;</span>
+          <input
+            ref={inputRef}
+            type="text"
+            value={inputBuf}
+            onChange={(e) => setInputBuf(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="flex-1 bg-transparent text-white/90 outline-none caret-cyan-400 font-mono text-xs"
+            style={{ caretColor: "#22d3ee" }}
+            spellCheck={false}
+            autoComplete="off"
+            placeholder="type command..."
+          />
+        </div>
+      ) : (
+        <div className="px-3 py-2 bg-[#0e0e18] border-t border-white/[0.06] font-mono text-[9px] text-white/30 truncate">
+          {agent.preview || "..."}
+        </div>
+      )}
     </div>
   );
 });
