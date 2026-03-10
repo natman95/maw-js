@@ -17,7 +17,7 @@ export async function cmdSpawn(oracle: string, opts: { name?: string; continue?:
   } catch { /* session doesn't exist — good */ }
 
   // Create session with main repo as first window
-  await ssh(`tmux new-session -d -s '${sessionName}' -n '${oracle}' -c '${repoPath}'`);
+  await ssh(`tmux new-session -d -s '${sessionName}' -n '${oracle}-oracle' -c '${repoPath}'`);
   console.log(`\x1b[32m+\x1b[0m ${oracle} → ${repoPath}`);
 
   // Add worktree windows
