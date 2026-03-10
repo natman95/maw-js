@@ -93,19 +93,31 @@ export const FleetGrid = memo(function FleetGrid({
   const [hoverPreview, setHoverPreview] = useState<PreviewInfo | null>(null);
   const hoverTimeout = useRef<ReturnType<typeof setTimeout>>();
 
+  /** Convert row element position to absolute coords within the scrollable container */
+  const rowToAbsPos = useCallback((rowEl: HTMLElement) => {
+    const container = containerRef.current;
+    if (!container) return { x: 0, y: 0 };
+    const containerRect = container.getBoundingClientRect();
+    const rowRect = rowEl.getBoundingClientRect();
+    const cardW = 420;
+    // Try right of content area, fallback to overlay on right side
+    const contentRight = containerRect.left + containerRect.width;
+    let x = rowRect.right - containerRect.left + 16;
+    // If card would go off viewport right, position it overlapping content on the right
+    if (containerRect.left + x + cardW > window.innerWidth) {
+      x = window.innerWidth - containerRect.left - cardW - 16;
+    }
+    // Y = row position + scroll offset (absolute within scrollable container)
+    const y = rowRect.top - containerRect.top + container.scrollTop;
+    return { x: Math.max(8, x), y: Math.max(8, y) };
+  }, []);
+
   const showPreview = useCallback((agent: AgentState, accent: string, label: string, rowEl: HTMLElement) => {
     if (pinnedPreview) return;
     clearTimeout(hoverTimeout.current);
-    const containerRect = containerRef.current?.getBoundingClientRect();
-    const rowRect = rowEl.getBoundingClientRect();
-    if (!containerRect) return;
-    const cardW = 420;
-    // Position to the right of the row, or left if no space
-    let x = rowRect.right - containerRect.left + 16;
-    if (x + cardW > containerRect.width) x = rowRect.left - containerRect.left - cardW - 16;
-    const y = rowRect.top - containerRect.top - 40;
-    setHoverPreview({ agent, accent, label, pos: { x: Math.max(8, x), y: Math.max(8, y) } });
-  }, []);
+    const pos = rowToAbsPos(rowEl);
+    setHoverPreview({ agent, accent, label, pos });
+  }, [rowToAbsPos, pinnedPreview]);
 
   const hidePreview = useCallback(() => {
     hoverTimeout.current = setTimeout(() => setHoverPreview(null), 300);
@@ -128,31 +140,26 @@ export const FleetGrid = memo(function FleetGrid({
 
   // Click agent row → pin preview card
   const onAgentClick = useCallback((agent: AgentState, accent: string, label: string, rowEl: HTMLElement) => {
-    if (pinnedPreview) {
-      // Already pinned — ignore clicks on other agents
-      return;
-    }
-    const containerRect = containerRef.current?.getBoundingClientRect();
-    const rowRect = rowEl.getBoundingClientRect();
-    if (!containerRect) return;
-    const cardW = 420;
-    let x = rowRect.right - containerRect.left + 16;
-    if (x + cardW > containerRect.width) x = rowRect.left - containerRect.left - cardW - 16;
-    const y = rowRect.top - containerRect.top - 40;
-    const pos = { x: Math.max(8, x), y: Math.max(8, y) };
+    if (pinnedPreview) return;
+    const pos = rowToAbsPos(rowEl);
     setPinnedPreview({ agent, accent, label, pos });
     setHoverPreview(null);
     send({ type: "subscribe", target: agent.target });
-  }, [pinnedPreview, send]);
+  }, [pinnedPreview, send, rowToAbsPos]);
 
-  // Animate pinned card from hover position to center
+  // Animate pinned card: start at hover viewport pos, slide to viewport center
   useEffect(() => {
     if (pinnedPreview) {
-      setPinnedAnimPos({ left: pinnedPreview.pos.x, top: pinnedPreview.pos.y });
+      // Convert absolute container pos → viewport pos for initial frame
+      const container = containerRef.current;
+      const containerRect = container?.getBoundingClientRect();
+      const startLeft = (containerRect?.left || 0) + pinnedPreview.pos.x;
+      const startTop = pinnedPreview.pos.y - (container?.scrollTop || 0) + (containerRect?.top || 0);
+      setPinnedAnimPos({ left: startLeft, top: startTop });
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const containerW = containerRef.current?.getBoundingClientRect().width || 800;
-          setPinnedAnimPos({ left: (containerW - 420) / 2, top: 20 });
+          const vw = window.innerWidth;
+          setPinnedAnimPos({ left: (vw - 420) / 2, top: 80 });
         });
       });
     } else {
@@ -460,11 +467,11 @@ export const FleetGrid = memo(function FleetGrid({
         </div>
       )}
 
-      {/* Pinned Preview Card — slides from hover position to center */}
+      {/* Pinned Preview Card — fixed viewport, slides from hover to center */}
       {pinnedPreview && pinnedAnimPos && (
         <div
           ref={pinnedRef}
-          className="absolute z-40 pointer-events-auto"
+          className="fixed z-40 pointer-events-auto"
           style={{
             left: pinnedAnimPos.left,
             top: pinnedAnimPos.top,
