@@ -183,9 +183,18 @@ async function cmdWake(oracle: string, opts: { task?: string; newWt?: string; pr
   return `${session}:${windowName}`;
 }
 
+const THAI_DAYS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
+
 function todayDate(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function todayLabel(): string {
+  const d = new Date();
+  const date = todayDate();
+  const day = THAI_DAYS[d.getDay()];
+  return `${date} (${day})`;
 }
 
 function timePeriod(): string {
@@ -205,20 +214,22 @@ const PERIODS = [
 
 async function findOrCreateDailyThread(repo: string): Promise<{ url: string; num: number; isNew: boolean }> {
   const date = todayDate();
-  const threadTitle = `📅 ${date} Daily Thread`;
+  const label = todayLabel();
+  const searchDate = `📅 ${date}`;
+  const threadTitle = `📅 ${label} Daily Thread`;
 
-  // Search for existing daily thread
+  // Search for existing daily thread (match by date only)
   const existing = (await ssh(
-    `gh issue list --repo ${repo} --search '${threadTitle} in:title' --state open --json number,url,title --limit 1`
+    `gh issue list --repo ${repo} --search '${searchDate} in:title' --state open --json number,url,title --limit 1`
   )).trim();
   const parsed = JSON.parse(existing || "[]");
-  if (parsed.length > 0 && parsed[0].title === threadTitle) {
+  if (parsed.length > 0 && parsed[0].title.includes(date)) {
     return { url: parsed[0].url, num: parsed[0].number, isNew: false };
   }
 
-  // Create new daily thread with body
+  // Create new daily thread with Thai day name
   const url = (await ssh(
-    `gh issue create --repo ${repo} -t '${threadTitle.replace(/'/g, "'\\''")}' -b 'Tasks for ${date}' -l daily-thread`
+    `gh issue create --repo ${repo} -t '${threadTitle.replace(/'/g, "'\\''")}' -b 'Tasks for ${label}' -l daily-thread`
   )).trim();
   const m = url.match(/\/(\d+)$/);
   const num = m ? +m[1] : 0;
