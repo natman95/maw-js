@@ -75,7 +75,7 @@ export async function cmdWakeAll(opts: { kill?: boolean } = {}) {
     await ssh(`tmux new-session -d -s '${sess.name}' -n '${first.name}' -c '${firstPath}'`);
 
     if (!sess.skip_command) {
-      await ssh(`tmux send-keys -t '${sess.name}:${first.name}' '${COMMAND}' Enter`);
+      try { await ssh(`tmux send-keys -t '${sess.name}:${first.name}' '${COMMAND}' Enter`); } catch { /* ok */ }
     }
     winCount++;
 
@@ -83,16 +83,19 @@ export async function cmdWakeAll(opts: { kill?: boolean } = {}) {
     for (let i = 1; i < sess.windows.length; i++) {
       const win = sess.windows[i];
       const winPath = `${GHQ_ROOT}/${win.repo}`;
-      await ssh(`tmux new-window -t '${sess.name}' -n '${win.name}' -c '${winPath}'`);
-
-      if (!sess.skip_command) {
-        await ssh(`tmux send-keys -t '${sess.name}:${win.name}' '${COMMAND}' Enter`);
+      try {
+        await ssh(`tmux new-window -t '${sess.name}' -n '${win.name}' -c '${winPath}'`);
+        if (!sess.skip_command) {
+          await ssh(`tmux send-keys -t '${sess.name}:${win.name}' '${COMMAND}' Enter`);
+        }
+        winCount++;
+      } catch {
+        // Window creation might fail (duplicate name, bad path)
       }
-      winCount++;
     }
 
     // Select first window
-    await ssh(`tmux select-window -t '${sess.name}:1'`);
+    try { await ssh(`tmux select-window -t '${sess.name}:1'`); } catch { /* ok */ }
     sessCount++;
     console.log(`  \x1b[32m●\x1b[0m ${sess.name} — ${sess.windows.length} windows`);
   }
