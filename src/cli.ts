@@ -112,7 +112,7 @@ async function cmdWake(oracle: string, opts: { task?: string; newWt?: string; pr
     // Spawn all existing worktree windows
     const allWt = await findWorktrees(parentDir, repoName);
     for (const wt of allWt) {
-      const wtWindowName = `${oracle}-${wt.name.replace(/^\d+-/, "")}`;
+      const wtWindowName = `${oracle}-${wt.name}`;
       await ssh(`tmux new-window -t '${session}' -n '${wtWindowName}' -c '${wt.path}'`);
       await new Promise(r => setTimeout(r, 300));
       await ssh(`tmux send-keys -t '${session}:${wtWindowName}' 'claude' Enter`);
