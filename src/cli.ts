@@ -74,8 +74,21 @@ async function findWorktrees(parentDir: string, repoName: string): Promise<{ pat
   });
 }
 
+// Oracle → tmux session mapping
+const SESSION_MAP: Record<string, string> = {
+  neo: "8-neo",
+  hermes: "7-hermes",
+  pulse: "9-pulse",
+  calliope: "10-calliope",
+};
+
 async function detectSession(oracle: string): Promise<string | null> {
   const sessions = await listSessions();
+  const mapped = SESSION_MAP[oracle];
+  if (mapped) {
+    const exists = sessions.find(s => s.name === mapped);
+    if (exists) return mapped;
+  }
   return sessions.find(s => /^\d+-/.test(s.name) && s.name.endsWith(`-${oracle}`))?.name
     || sessions.find(s => s.name === oracle)?.name
     || null;
@@ -89,7 +102,7 @@ async function cmdWake(oracle: string, opts: { task?: string; newWt?: string; pr
   // Detect or create tmux session
   let session = await detectSession(oracle);
   if (!session) {
-    session = oracle;
+    session = SESSION_MAP[oracle] || oracle;
     await ssh(`tmux new-session -d -s '${session}' -n '${oracle}' -c '${repoPath}'`);
     console.log(`\x1b[32m+\x1b[0m created session '${session}'`);
   }
