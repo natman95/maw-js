@@ -101,25 +101,19 @@ export const FleetGrid = memo(function FleetGrid({
     setInputBufs(prev => ({ ...prev, [target]: val }));
   }, []);
 
-  /** Get viewport-relative position for hover card — right-aligned with row, Y at row */
-  const rowToViewportPos = useCallback((rowEl: HTMLElement) => {
-    const rowRect = rowEl.getBoundingClientRect();
-    const cardW = 420;
-    // Right edge of card = right edge of row
-    let x = rowRect.right - cardW;
-    if (x < 8) x = 8;
-    // Y: row top (viewport coords)
-    const y = rowRect.top;
-    return { x, y };
-  }, []);
-
   // --- Hover callbacks ---
-  const showPreview = useCallback((agent: AgentState, accent: string, label: string, rowEl: HTMLElement) => {
+  const showPreview = useCallback((agent: AgentState, accent: string, label: string, e: React.MouseEvent) => {
     if (pinnedPreview) return;
     clearTimeout(hoverTimeout.current);
-    const pos = rowToViewportPos(rowEl);
-    setHoverPreview({ agent, accent, label, pos });
-  }, [rowToViewportPos, pinnedPreview]);
+    const rowRect = e.currentTarget.getBoundingClientRect();
+    const cardW = 420;
+    // Right-aligned with row
+    let x = rowRect.right - cardW;
+    if (x < 8) x = 8;
+    // Y follows mouse cursor
+    const y = e.clientY;
+    setHoverPreview({ agent, accent, label, pos: { x, y } });
+  }, [pinnedPreview]);
 
   const hidePreview = useCallback(() => {
     hoverTimeout.current = setTimeout(() => setHoverPreview(null), 300);
@@ -129,14 +123,18 @@ export const FleetGrid = memo(function FleetGrid({
     clearTimeout(hoverTimeout.current);
   }, []);
 
-  // Click agent row → pin preview card
-  const onAgentClick = useCallback((agent: AgentState, accent: string, label: string, rowEl: HTMLElement) => {
+  // Click agent row → pin preview card (start at mouse position)
+  const onAgentClick = useCallback((agent: AgentState, accent: string, label: string, e: React.MouseEvent) => {
     if (pinnedPreview) return;
-    const pos = rowToViewportPos(rowEl);
+    const rowRect = e.currentTarget.getBoundingClientRect();
+    const cardW = 420;
+    let x = rowRect.right - cardW;
+    if (x < 8) x = 8;
+    const pos = { x, y: e.clientY };
     setPinnedPreview({ agent, accent, label, pos });
     setHoverPreview(null);
     send({ type: "subscribe", target: agent.target });
-  }, [pinnedPreview, send, rowToViewportPos]);
+  }, [pinnedPreview, send]);
 
   // Animate pinned card: start at row viewport pos, slide to viewport center
   useEffect(() => {
@@ -343,17 +341,17 @@ export const FleetGrid = memo(function FleetGrid({
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = `${style.accent}10`;
-                        showPreview(agent, style.accent, vr.label, e.currentTarget);
+                        showPreview(agent, style.accent, vr.label, e);
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = isBusy ? `${style.accent}06` : "transparent";
                         hidePreview();
                       }}
-                      onClick={(e) => onAgentClick(agent, style.accent, vr.label, e.currentTarget)}
+                      onClick={(e) => onAgentClick(agent, style.accent, vr.label, e)}
                       role="button"
                       tabIndex={0}
                       aria-label={`${agent.name} - ${agent.status}`}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onAgentClick(agent, style.accent, vr.label, e.currentTarget as HTMLElement); } }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); } }}
                     >
                       {/* Avatar */}
                       <div className="w-14 h-14 flex-shrink-0" style={{ overflow: "visible" }}>
