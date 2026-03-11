@@ -25,6 +25,9 @@ export function useSessions() {
   const lastSoundTime = useRef(0);
   const [saiyanTargets, setSaiyanTargets] = useState<Set<string>>(new Set());
   const saiyanTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // Track which signal is driving Saiyan: "H" = hash, "F" = feed, "HF" = both
+  const saiyanSourceTimers = useRef<Record<string, { hash: number; feed: number }>>({});
+  const [saiyanSources, setSaiyanSources] = useState<Record<string, string>>({});
   const [eventLog, setEventLog] = useState<AgentEvent[]>([]);
   const MAX_EVENTS = 200;
 
@@ -44,18 +47,10 @@ export function useSessions() {
   // Feed-triggered Saiyan: map oracle name → tmux target for burst animation
   const agentsRef = useRef<AgentState[]>([]);
   const SAIYAN_FEED_EVENTS = new Set<FeedEventType>(["PreToolUse", "UserPromptSubmit", "SubagentStart"]);
-  const SAIYAN_FEED_DURATION = 8000; // 8s burst from feed events
+  const SAIYAN_DURATION = 10_000; // 10s from any signal (feed or hash)
 
-  const triggerFeedSaiyan = useCallback((event: FeedEvent) => {
-    if (!SAIYAN_FEED_EVENTS.has(event.event)) return;
-    // Find agent by oracle name — only match primary windows (ending with -oracle)
-    // e.g., feed oracle "hermes" → agent "hermes-oracle", NOT "hermes-bitkub"
-    const agent = agentsRef.current.find(a => a.name === `${event.oracle}-oracle`)
-      || agentsRef.current.find(a => a.name === event.oracle);
-    if (!agent) return;
-    const target = agent.target;
-
-    // Trigger Saiyan burst (with sound throttle)
+  // Unified Saiyan trigger — called by both feed events and hash polling
+  const extendSaiyan = useCallback((target: string, agentName: string, session: string, source: "H" | "F") => {
     const now = Date.now();
     if (now - lastSoundTime.current > 60000) {
       lastSoundTime.current = now;
@@ -64,16 +59,51 @@ export function useSessions() {
     clearTimeout(saiyanTimers.current[target]);
     setSaiyanTargets(prev => new Set(prev).add(target));
     saiyanTimers.current[target] = setTimeout(() => {
-      setSaiyanTargets(prev => {
-        const next = new Set(prev);
-        next.delete(target);
-        return next;
-      });
-    }, SAIYAN_FEED_DURATION);
-
-    // Also mark as busy in recent store
-    markBusy([{ target, name: agent.name, session: agent.session }]);
+      setSaiyanTargets(prev => { const n = new Set(prev); n.delete(target); return n; });
+      // Clear source tracking when Saiyan expires
+      setSaiyanSources(prev => { const n = { ...prev }; delete n[target]; return n; });
+      delete saiyanSourceTimers.current[target];
+    }, SAIYAN_DURATION);
+    // Track source: mark this source as active for 15s
+    const st = saiyanSourceTimers.current[target] || { hash: 0, feed: 0 };
+    if (source === "H") st.hash = now; else st.feed = now;
+    saiyanSourceTimers.current[target] = st;
+    // Compute display: both active within 15s?
+    const hashActive = now - st.hash < 15000;
+    const feedActive = now - st.feed < 15000;
+    const label = hashActive && feedActive ? "HF" : hashActive ? "H" : "F";
+    setSaiyanSources(prev => prev[target] === label ? prev : { ...prev, [target]: label });
+    markBusy([{ target, name: agentName, session }]);
   }, [markBusy]);
+
+  // Stop events immediately drop Saiyan (agent finished)
+  const SAIYAN_STOP_EVENTS = new Set<FeedEventType>(["Stop", "SessionEnd", "TaskCompleted"]);
+
+  const dropSaiyan = useCallback((target: string) => {
+    clearTimeout(saiyanTimers.current[target]);
+    setSaiyanTargets(prev => {
+      if (!prev.has(target)) return prev;
+      const n = new Set(prev); n.delete(target); return n;
+    });
+    setSaiyanSources(prev => { const n = { ...prev }; delete n[target]; return n; });
+    delete saiyanSourceTimers.current[target];
+  }, []);
+
+  const triggerFeedSaiyan = useCallback((event: FeedEvent) => {
+    // Strict: only match primary -oracle windows, never task windows like hermes-bitkub
+    const agent = agentsRef.current.find(a => a.name === `${event.oracle}-oracle`);
+    if (!agent) return;
+
+    // Stop events → immediately drop Saiyan
+    if (SAIYAN_STOP_EVENTS.has(event.event)) {
+      dropSaiyan(agent.target);
+      return;
+    }
+    // Activity events → extend Saiyan (source: Feed)
+    if (SAIYAN_FEED_EVENTS.has(event.event)) {
+      extendSaiyan(agent.target, agent.name, agent.session, "F");
+    }
+  }, [extendSaiyan, dropSaiyan]);
 
   const handleMessage = useCallback((data: any) => {
     if (data.type === "sessions") {
@@ -188,23 +218,10 @@ export function useSessions() {
                 if (existing && existing.status !== status) {
                   addEvent(target, "status", `${existing.status} → ${status}`);
                 }
-                // Play power-up sound on transition to busy (max once per 60s)
-                if (status === "busy" && existing?.status !== "busy") {
-                  const now = Date.now();
-                  if (now - lastSoundTime.current > 60000) {
-                    lastSoundTime.current = now;
-                    playSaiyanSound();
-                  }
-                  // 10s saiyan burst animation
-                  clearTimeout(saiyanTimers.current[target]);
-                  setSaiyanTargets(prev => new Set(prev).add(target));
-                  saiyanTimers.current[target] = setTimeout(() => {
-                    setSaiyanTargets(prev => {
-                      const next = new Set(prev);
-                      next.delete(target);
-                      return next;
-                    });
-                  }, 10000);
+                // Unified Saiyan: extend every poll while busy (source: Hash)
+                if (status === "busy") {
+                  const ag = agentsRef.current.find(a => a.target === target);
+                  if (ag) extendSaiyan(target, ag.name, ag.session, "H");
                 }
                 return { ...p, [target]: { preview, status } };
               });
@@ -244,5 +261,16 @@ export function useSessions() {
   // Compute active oracles from feed (memoized, 5min window)
   const feedActive = useMemo(() => activeOracles(feedEvents, 5 * 60_000), [feedEvents]);
 
-  return { sessions, agents, saiyanTargets, eventLog, addEvent, handleMessage, feedEvents, feedActive };
+  // Per-agent feed history: oracle name → last 5 events (most recent first)
+  const agentFeedLog = useMemo((): Map<string, FeedEvent[]> => {
+    const map = new Map<string, FeedEvent[]>();
+    for (let i = feedEvents.length - 1; i >= 0; i--) {
+      const e = feedEvents[i];
+      const arr = map.get(e.oracle) || [];
+      if (arr.length < 5) { arr.push(e); map.set(e.oracle, arr); }
+    }
+    return map;
+  }, [feedEvents]);
+
+  return { sessions, agents, saiyanTargets, saiyanSources, eventLog, addEvent, handleMessage, feedEvents, feedActive, agentFeedLog };
 }

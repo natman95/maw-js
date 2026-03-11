@@ -75,7 +75,7 @@ export function App() {
     return () => window.removeEventListener("keydown", handler, true);
   }, []);
 
-  const { sessions, agents, saiyanTargets, eventLog, addEvent, handleMessage, feedActive } = useSessions();
+  const { sessions, agents, saiyanTargets, saiyanSources, eventLog, addEvent, handleMessage, feedActive, agentFeedLog } = useSessions();
 
   // Sync muted state to sound module
   const muted = useFleetStore((s) => s.muted);
@@ -153,12 +153,14 @@ export function App() {
           sessions={sessions}
           agents={agents}
           saiyanTargets={saiyanTargets}
+          saiyanSources={saiyanSources}
           connected={connected}
           send={send}
           onSelectAgent={onSelectAgent}
           eventLog={eventLog}
           addEvent={addEvent}
           feedActive={feedActive}
+          agentFeedLog={agentFeedLog}
         />
         {terminalModal}
         {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}

@@ -2,6 +2,7 @@ import { memo, useCallback, useRef, useState } from "react";
 import { AgentAvatar } from "./AgentAvatar";
 import { MiniMonitor } from "./MiniMonitor";
 import type { AgentState } from "../lib/types";
+import type { FeedLogEntry } from "./FleetGrid";
 
 const isTouch = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
 
@@ -10,9 +11,11 @@ interface AgentRowProps {
   accent: string;
   roomLabel: string;
   saiyan: boolean;
+  saiyanSource?: string;
   isLast: boolean;
   agoLabel?: string;
-  feedActivity?: string | null;
+  featured?: boolean;
+  feedLog?: FeedLogEntry[] | null;
   observe: (el: HTMLElement | null, target: string) => void;
   showPreview: (agent: AgentState, accent: string, label: string, e: React.MouseEvent) => void;
   hidePreview: () => void;
@@ -26,9 +29,11 @@ export const AgentRow = memo(function AgentRow({
   accent,
   roomLabel,
   saiyan,
+  saiyanSource,
   isLast,
   agoLabel,
-  feedActivity,
+  featured,
+  feedLog,
   observe,
   showPreview,
   hidePreview,
@@ -81,14 +86,19 @@ export const AgentRow = memo(function AgentRow({
         aria-label={`${agent.name} - ${agent.status}`}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.preventDefault(); }}
       >
-        {/* Avatar */}
+        {/* Avatar — 2x when featured, pulse when saiyan */}
         <div
-          className="w-14 h-14 flex-shrink-0 cursor-pointer"
-          style={{ overflow: "visible" }}
+          className="flex-shrink-0 cursor-pointer"
+          style={{
+            overflow: "visible",
+            width: featured ? 96 : 56, height: featured ? 96 : 56,
+            transition: "width 0.3s, height 0.3s",
+            animation: saiyan ? "saiyanPulse 1.5s ease-in-out infinite" : "none",
+          }}
           onMouseEnter={isTouch ? undefined : (e) => showPreview(agent, accent, roomLabel, e)}
           onMouseLeave={isTouch ? undefined : () => hidePreview()}
         >
-          <svg viewBox="-40 -50 80 80" width={56} height={56} overflow="visible">
+          <svg viewBox="-40 -50 80 80" width={featured ? 96 : 56} height={featured ? 96 : 56} overflow="visible">
             <AgentAvatar
               name={agent.name}
               target={agent.target}
@@ -139,14 +149,31 @@ export const AgentRow = memo(function AgentRow({
                 SAIYAN
               </span>
             )}
+            {saiyan && saiyanSource && (
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded flex-shrink-0" style={{
+                background: saiyanSource === "HF" ? "rgba(139,92,246,0.2)" : saiyanSource === "F" ? "rgba(34,211,238,0.15)" : "rgba(251,191,36,0.12)",
+                color: saiyanSource === "HF" ? "#a78bfa" : saiyanSource === "F" ? "#22d3ee" : "#fbbf24",
+              }}>
+                {saiyanSource === "HF" ? "H+F" : saiyanSource === "F" ? "FEED" : "HASH"}
+              </span>
+            )}
           </div>
           <span className="text-[13px] truncate" style={{ color: "#64748B" }}>
             {agent.preview?.slice(0, 80) || "\u00a0"}
           </span>
-          {feedActivity && (
-            <span className="text-[11px] truncate" style={{ color: "#fbbf24", opacity: 0.7 }}>
-              {feedActivity}
-            </span>
+          {feedLog && feedLog.length > 0 && (
+            <div className="flex flex-col gap-0.5 mt-0.5">
+              {feedLog.slice(0, 3).map((entry, i) => {
+                const ago = Math.round((Date.now() - entry.ts) / 1000);
+                const agoStr = ago < 60 ? `${ago}s` : `${Math.floor(ago / 60)}m`;
+                return (
+                  <span key={i} className="text-[10px] truncate font-mono"
+                    style={{ color: "#fbbf24", opacity: i === 0 ? 0.8 : 0.4 - i * 0.1 }}>
+                    {entry.text} <span style={{ color: "rgba(255,255,255,0.12)" }}>{agoStr}</span>
+                  </span>
+                );
+              })}
+            </div>
           )}
         </div>
 

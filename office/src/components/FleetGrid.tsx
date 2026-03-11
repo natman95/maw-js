@@ -10,16 +10,20 @@ import { useFleetStore, RECENT_TTL_MS, type RecentEntry } from "../lib/store";
 import type { AgentState, Session, AgentEvent } from "../lib/types";
 import { describeActivity, type FeedEvent } from "../lib/feed";
 
+export type FeedLogEntry = { text: string; ts: number };
+
 interface FleetGridProps {
   sessions: Session[];
   agents: AgentState[];
   saiyanTargets: Set<string>;
+  saiyanSources: Record<string, string>;
   connected: boolean;
   send: (msg: object) => void;
   onSelectAgent: (agent: AgentState) => void;
   eventLog: AgentEvent[];
   addEvent: (target: string, type: AgentEvent["type"], detail: string) => void;
   feedActive?: Map<string, FeedEvent>;
+  agentFeedLog?: Map<string, FeedEvent[]>;
 }
 
 /** Track visible agent targets via IntersectionObserver */
@@ -79,7 +83,7 @@ function sortRooms(sessions: Session[], agentMap: Map<string, AgentState[]>, mod
 }
 
 export const FleetGrid = memo(function FleetGrid({
-  sessions, agents, saiyanTargets, connected, send, onSelectAgent, eventLog, addEvent, feedActive,
+  sessions, agents, saiyanTargets, saiyanSources, connected, send, onSelectAgent, eventLog, addEvent, feedActive, agentFeedLog,
 }: FleetGridProps) {
   const fps = useFps();
   const observe = useVisibleTargets(send);
@@ -187,21 +191,16 @@ export const FleetGrid = memo(function FleetGrid({
     return result;
   }, [sorted, sessionAgents, grouped]);
 
-  // Resolve feed activity for an agent by oracle name
-  // Only show feed activity on primary oracle windows (name ends with -oracle or exact match)
-  const getFeedActivity = useCallback((agentName: string): string | null => {
-    if (!feedActive) return null;
-    // "hermes-oracle" → "hermes", "hermes-bitkub" → no match
-    if (agentName.endsWith("-oracle")) {
-      const oracleName = agentName.replace(/-oracle$/, "");
-      const event = feedActive.get(oracleName);
-      if (event) return describeActivity(event);
-    }
-    // Direct name match (e.g., agent named "homekeeper" without suffix)
-    const event = feedActive.get(agentName);
-    if (event) return describeActivity(event);
-    return null;
-  }, [feedActive]);
+  // Resolve per-agent feed log — only primary oracle windows
+  // Strict: only show feed log on primary -oracle windows
+  const getAgentFeedLog = useCallback((agentName: string): FeedLogEntry[] | null => {
+    if (!agentFeedLog) return null;
+    if (!agentName.endsWith("-oracle")) return null; // skip task windows like hermes-bitkub
+    const oracleName = agentName.replace(/-oracle$/, "");
+    const events = agentFeedLog.get(oracleName);
+    if (!events || events.length === 0) return null;
+    return events.map(e => ({ text: describeActivity(e), ts: e.ts }));
+  }, [agentFeedLog]);
 
   const busyAgents = useMemo(() => agents.filter(a => a.status === "busy"), [agents]);
   const busyCount = busyAgents.length;
@@ -285,6 +284,7 @@ export const FleetGrid = memo(function FleetGrid({
         busyAgents={busyAgents}
         recentlyActive={recentlyActive}
         saiyanTargets={saiyanTargets}
+        recentMap={recentMap}
         showPreview={showPreview}
         hidePreview={hidePreview}
         onAgentClick={onAgentClick}
@@ -323,8 +323,8 @@ export const FleetGrid = memo(function FleetGrid({
                   : { target: entry.target, name: entry.name, session: entry.session, windowIndex: 0, active: false, preview: "", status: "idle" };
                 return (
                   <AgentRow key={`recent-${entry.target}`} agent={agent} accent={rs.accent} roomLabel={rs.label}
-                    saiyan={saiyanTargets.has(entry.target)} isLast={i === recentlyActive.length - 1}
-                    agoLabel={agoLabel} feedActivity={getFeedActivity(agent.name)}
+                    saiyan={saiyanTargets.has(entry.target)} saiyanSource={saiyanSources[entry.target]} isLast={i === recentlyActive.length - 1}
+                    featured={i === 0} agoLabel={agoLabel} feedLog={getAgentFeedLog(agent.name)}
                     observe={observe} showPreview={showPreview} hidePreview={hidePreview} onAgentClick={onAgentClick}
                     send={send} onSendDone={onSendDone} />
                 );
@@ -357,8 +357,8 @@ export const FleetGrid = memo(function FleetGrid({
                 <div className="flex flex-col">
                   {vr.agents.map((agent, i) => (
                     <AgentRow key={agent.target} agent={agent} accent={style.accent} roomLabel={vr.label}
-                      saiyan={saiyanTargets.has(agent.target)} isLast={i === vr.agents.length - 1}
-                      feedActivity={getFeedActivity(agent.name)}
+                      saiyan={saiyanTargets.has(agent.target)} saiyanSource={saiyanSources[agent.target]} isLast={i === vr.agents.length - 1}
+                      feedLog={getAgentFeedLog(agent.name)}
                       observe={observe} showPreview={showPreview} hidePreview={hidePreview} onAgentClick={onAgentClick}
                       send={send} onSendDone={onSendDone} />
                   ))}

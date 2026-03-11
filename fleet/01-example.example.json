@@ -1,7 +1,0 @@
-{
-  "name": "01-my-team",
-  "windows": [
-    { "name": "main-oracle", "repo": "your-org/your-repo" },
-    { "name": "feature-wt", "repo": "your-org/your-repo.wt-1-feature" }
-  ]
-}

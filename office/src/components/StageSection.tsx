@@ -8,25 +8,62 @@ interface StageSectionProps {
   busyAgents: AgentState[];
   recentlyActive: (AgentState | RecentEntry)[];
   saiyanTargets: Set<string>;
+  recentMap: Record<string, RecentEntry>;
   showPreview: (agent: AgentState, accent: string, label: string, e: React.MouseEvent) => void;
   hidePreview: () => void;
   onAgentClick: (agent: AgentState, accent: string, label: string, e: React.MouseEvent) => void;
+}
+
+/** Ghost shrinks from 2x → 1x over SHRINK_MS after going inactive */
+const SHRINK_MS = 60_000; // 60s to fully shrink
+const SIZE_BIG = 112;
+const SIZE_SMALL = 56;
+
+function ghostSize(lastBusy: number): number {
+  const elapsed = Date.now() - lastBusy;
+  if (elapsed <= 0) return SIZE_BIG;
+  if (elapsed >= SHRINK_MS) return SIZE_SMALL;
+  // Linear interpolation: big → small
+  const t = elapsed / SHRINK_MS;
+  return Math.round(SIZE_BIG - (SIZE_BIG - SIZE_SMALL) * t);
 }
 
 export const StageSection = memo(function StageSection({
   busyAgents,
   recentlyActive,
   saiyanTargets,
+  recentMap,
   showPreview,
   hidePreview,
   onAgentClick,
 }: StageSectionProps) {
-  // Ghost agents: recent but not busy, shown greyed out on stage (dedup by name)
+  // Active performers: busy OR saiyan-active (covers long-think where hash poll misses busy)
+  const activeAgents = useMemo(() => {
+    const seenNames = new Set<string>();
+    const result: AgentState[] = [];
+    // First add all busy agents
+    for (const a of busyAgents) {
+      if (!seenNames.has(a.name)) { seenNames.add(a.name); result.push(a); }
+    }
+    // Then add saiyan targets that aren't already included (feed-detected activity)
+    for (const entry of recentlyActive) {
+      if (seenNames.has(entry.name)) continue;
+      if (!saiyanTargets.has(entry.target)) continue;
+      seenNames.add(entry.name);
+      if ("status" in entry) result.push(entry as AgentState);
+      else result.push({ target: entry.target, name: entry.name, session: entry.session, windowIndex: 0, active: false, preview: "", status: "busy" });
+    }
+    // Sort by most recently active first (leftmost)
+    result.sort((a, b) => (recentMap[b.target]?.lastBusy || 0) - (recentMap[a.target]?.lastBusy || 0));
+    return result;
+  }, [busyAgents, recentlyActive, saiyanTargets, recentMap]);
+
+  // Ghost agents: recent but not active, shown greyed out on stage (dedup by name)
   const ghostAgents = useMemo(() => {
-    const busyNames = new Set(busyAgents.map(a => a.name));
+    const activeNames = new Set(activeAgents.map(a => a.name));
     const seenNames = new Set<string>();
     return recentlyActive
-      .filter(e => !busyNames.has(e.name))
+      .filter(e => !activeNames.has(e.name))
       .filter(e => {
         if (seenNames.has(e.name)) return false;
         seenNames.add(e.name);
@@ -37,11 +74,11 @@ export const StageSection = memo(function StageSection({
         if ("status" in e) return e as AgentState;
         return { target: e.target, name: e.name, session: e.session, windowIndex: 0, active: false, preview: "", status: "idle" as const };
       });
-  }, [busyAgents, recentlyActive]);
+  }, [activeAgents, recentlyActive]);
 
-  if (busyAgents.length === 0 && ghostAgents.length === 0) return null;
+  if (activeAgents.length === 0 && ghostAgents.length === 0) return null;
 
-  const hasBusy = busyAgents.length > 0;
+  const hasBusy = activeAgents.length > 0;
 
   return (
     <div className="max-w-5xl mx-auto px-6 lg:px-8 pt-6 pb-2">
@@ -96,7 +133,7 @@ export const StageSection = memo(function StageSection({
               color: hasBusy ? "#fbbf24" : "#64748B",
             }}
           >
-            {busyAgents.length}
+            {activeAgents.length}
           </span>
           <div className="ml-auto flex items-center gap-1.5">
             {[...Array(5)].map((_, i) => (
@@ -124,25 +161,25 @@ export const StageSection = memo(function StageSection({
             }}
           />
 
-          {/* Active performers */}
-          {busyAgents.map((agent) => {
+          {/* Active performers — 2x size */}
+          {activeAgents.map((agent) => {
             const rs = roomStyle(agent.session);
             const isSaiyan = saiyanTargets.has(agent.target);
             const displayName = agent.name.replace(/-oracle$/, "").replace(/-/g, " ");
             return (
               <div
                 key={`stage-${agent.target}`}
-                className="relative flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl cursor-pointer transition-all duration-200 hover:scale-110 hover:-translate-y-1"
-                style={{ minWidth: 76 }}
+                className="relative flex flex-col items-center gap-2 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 hover:scale-110 hover:-translate-y-1"
+                style={{ minWidth: 120 }}
                 onMouseEnter={(e) => showPreview(agent, rs.accent, rs.label, e)}
                 onMouseLeave={() => hidePreview()}
                 onClick={(e) => onAgentClick(agent, rs.accent, rs.label, e)}
               >
                 <div
-                  className="absolute -top-1 left-1/2 -translate-x-1/2 w-12 h-16 pointer-events-none"
-                  style={{ background: `radial-gradient(ellipse at 50% 0%, ${rs.accent}12 0%, transparent 70%)` }}
+                  className="absolute -top-2 left-1/2 -translate-x-1/2 w-24 h-28 pointer-events-none"
+                  style={{ background: `radial-gradient(ellipse at 50% 0%, ${rs.accent}15 0%, transparent 70%)` }}
                 />
-                <svg viewBox="-40 -50 80 80" width={56} height={56} overflow="visible">
+                <svg viewBox="-40 -50 80 80" width={112} height={112} overflow="visible">
                   <AgentAvatar
                     name={agent.name}
                     target={agent.target}
@@ -153,30 +190,35 @@ export const StageSection = memo(function StageSection({
                     onClick={() => {}}
                   />
                 </svg>
-                <span className="text-[10px] font-semibold truncate max-w-[76px] text-center" style={{ color: rs.accent }}>
+                <span className="text-[12px] font-semibold truncate max-w-[120px] text-center" style={{ color: rs.accent }}>
                   {displayName}
                 </span>
                 {isSaiyan && (
-                  <span className="text-[8px] font-mono px-1.5 py-0.5 rounded bg-amber-400/20 text-amber-400">⚡</span>
+                  <span className="text-[9px] font-mono px-2 py-0.5 rounded bg-amber-400/20 text-amber-400">⚡</span>
                 )}
               </div>
             );
           })}
 
-          {/* Ghost agents — greyed out recent performers */}
+          {/* Ghost agents — start big, shrink over 60s */}
           {ghostAgents.map((agent) => {
             const rs = roomStyle(agent.session);
             const displayName = agent.name.replace(/-oracle$/, "").replace(/-/g, " ");
+            const lastBusy = recentMap[agent.target]?.lastBusy || 0;
+            const size = ghostSize(lastBusy);
+            const t = Math.min(1, (Date.now() - lastBusy) / SHRINK_MS); // 0=just left, 1=fully shrunk
+            const opacity = 0.6 - t * 0.3; // 0.6 → 0.3
+            const grayscale = 0.3 + t * 0.4; // 0.3 → 0.7
             return (
               <div
                 key={`ghost-${agent.target}`}
-                className="relative flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl cursor-pointer transition-all duration-200 hover:scale-105 hover:opacity-60"
-                style={{ minWidth: 76, opacity: 0.3, filter: "grayscale(0.7)" }}
+                className="relative flex flex-col items-center gap-1.5 px-3 py-3 rounded-xl cursor-pointer hover:scale-105 hover:opacity-60"
+                style={{ minWidth: size > 80 ? 120 : 76, opacity, filter: `grayscale(${grayscale})`, transition: "all 2s ease-out" }}
                 onMouseEnter={(e) => showPreview(agent, rs.accent, rs.label, e)}
                 onMouseLeave={() => hidePreview()}
                 onClick={(e) => onAgentClick(agent, rs.accent, rs.label, e)}
               >
-                <svg viewBox="-40 -50 80 80" width={56} height={56} overflow="visible">
+                <svg viewBox="-40 -50 80 80" width={size} height={size} overflow="visible" style={{ transition: "width 2s ease-out, height 2s ease-out" }}>
                   <AgentAvatar
                     name={agent.name}
                     target={agent.target}
@@ -187,7 +229,7 @@ export const StageSection = memo(function StageSection({
                     onClick={() => {}}
                   />
                 </svg>
-                <span className="text-[10px] font-semibold truncate max-w-[76px] text-center" style={{ color: "#64748B" }}>
+                <span className="font-semibold truncate text-center" style={{ color: "#64748B", fontSize: size > 80 ? 12 : 10, maxWidth: size > 80 ? 120 : 76, transition: "all 2s ease-out" }}>
                   {displayName}
                 </span>
               </div>
