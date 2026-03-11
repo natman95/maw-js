@@ -10,6 +10,7 @@ import { FleetGrid } from "./components/FleetGrid";
 import { OverviewGrid } from "./components/OverviewGrid";
 import { ShortcutOverlay } from "./components/ShortcutOverlay";
 import { JumpOverlay } from "./components/JumpOverlay";
+import { CommandBar } from "./components/CommandBar";
 import { unlockAudio, isAudioUnlocked } from "./lib/sounds";
 import type { AgentState } from "./lib/types";
 
@@ -115,6 +116,8 @@ export function App() {
     />
   );
 
+  const commandBar = <CommandBar agents={agents} send={send} connected={connected} />;
+
   if (route === "overview") {
     return (
       <div className="relative min-h-screen" style={{ background: "#020208" }}>
@@ -132,6 +135,7 @@ export function App() {
         {terminalModal}
         {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
         {jumpOverlay}
+        {commandBar}
       </div>
     );
   }
@@ -155,6 +159,7 @@ export function App() {
         {terminalModal}
         {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
         {jumpOverlay}
+        {commandBar}
       </div>
     );
   }
@@ -178,6 +183,7 @@ export function App() {
         {terminalModal}
         {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
         {jumpOverlay}
+        {commandBar}
       </div>
     );
   }
