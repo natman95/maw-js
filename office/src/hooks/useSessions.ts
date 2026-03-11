@@ -218,11 +218,8 @@ export function useSessions() {
                 if (existing && existing.status !== status) {
                   addEvent(target, "status", `${existing.status} → ${status}`);
                 }
-                // Unified Saiyan: extend every poll while busy (source: Hash)
-                if (status === "busy") {
-                  const ag = agentsRef.current.find(a => a.target === target);
-                  if (ag) extendSaiyan(target, ag.name, ag.session, "H");
-                }
+                // Hash no longer triggers Saiyan — feed events only
+                // Hash still detects busy status for the badge
                 return { ...p, [target]: { preview, status } };
               });
             } catch {}
