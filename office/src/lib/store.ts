@@ -14,6 +14,11 @@ interface FleetStore {
   markBusy: (agents: { target: string; name: string; session: string }[]) => void;
   pruneRecent: () => void;
 
+  // Slept agents (Ctrl+C'd from UI — grey + collapsed until wake/busy)
+  sleptTargets: string[];
+  markSlept: (target: string) => void;
+  clearSlept: (target: string) => void;
+
   // UI preferences
   sortMode: "active" | "name";
   setSortMode: (mode: "active" | "name") => void;
@@ -55,6 +60,14 @@ export const useFleetStore = create<FleetStore>()(
         return changed ? { recentMap: next } : s;
       }),
 
+      sleptTargets: [],
+      markSlept: (target) => set((s) => ({
+        sleptTargets: s.sleptTargets.includes(target) ? s.sleptTargets : [...s.sleptTargets, target],
+      })),
+      clearSlept: (target) => set((s) => ({
+        sleptTargets: s.sleptTargets.filter(t => t !== target),
+      })),
+
       sortMode: "active",
       setSortMode: (mode) => set({ sortMode: mode }),
       grouped: true,
@@ -77,6 +90,7 @@ export const useFleetStore = create<FleetStore>()(
         grouped: s.grouped,
         collapsed: s.collapsed,
         muted: s.muted,
+        sleptTargets: s.sleptTargets,
       }),
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as Record<string, unknown>;

@@ -91,7 +91,7 @@ export const FleetGrid = memo(function FleetGrid({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // --- Zustand store ---
-  const { recentMap, markBusy, pruneRecent, sortMode, setSortMode, grouped, toggleGrouped, collapsed, toggleCollapsed } = useFleetStore();
+  const { recentMap, markBusy, pruneRecent, sortMode, setSortMode, grouped, toggleGrouped, collapsed, toggleCollapsed, sleptTargets } = useFleetStore();
   const isCollapsed = useCallback((key: string) => collapsed.includes(key), [collapsed]);
 
   // Sync busy agents to store
@@ -341,6 +341,7 @@ export const FleetGrid = memo(function FleetGrid({
                   <AgentRow key={`recent-${entry.target}`} agent={agent} accent={rs.accent} roomLabel={rs.label}
                     saiyan={saiyanTargets.has(entry.target)} saiyanSource={saiyanSources[entry.target]} isLast={i === recentlyActive.length - 1}
                     featured={i === 0} agoLabel={agoLabel} feedLog={getAgentFeedLog(agent.name)}
+                    slept={sleptTargets.includes(entry.target)}
                     observe={observe} showPreview={showPreview} hidePreview={hidePreview} onAgentClick={onAgentClick}
                     send={send} onSendDone={onSendDone} />
                 );
@@ -391,6 +392,7 @@ export const FleetGrid = memo(function FleetGrid({
                     <AgentRow key={agent.target} agent={agent} accent={style.accent} roomLabel={vr.label}
                       saiyan={saiyanTargets.has(agent.target)} saiyanSource={saiyanSources[agent.target]} isLast={i === vr.agents.length - 1}
                       feedLog={getAgentFeedLog(agent.name)}
+                      slept={sleptTargets.includes(agent.target)}
                       observe={observe} showPreview={showPreview} hidePreview={hidePreview} onAgentClick={onAgentClick}
                       send={send} onSendDone={onSendDone} />
                   ))}

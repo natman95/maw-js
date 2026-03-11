@@ -17,6 +17,7 @@ interface AgentRowProps {
   agoLabel?: string;
   featured?: boolean;
   feedLog?: FeedLogEntry[] | null;
+  slept?: boolean;
   observe: (el: HTMLElement | null, target: string) => void;
   showPreview: (agent: AgentState, accent: string, label: string, e: React.MouseEvent) => void;
   hidePreview: () => void;
@@ -35,6 +36,7 @@ export const AgentRow = memo(function AgentRow({
   agoLabel,
   featured,
   feedLog,
+  slept,
   observe,
   showPreview,
   hidePreview,
@@ -72,6 +74,43 @@ export const AgentRow = memo(function AgentRow({
       onSendDone?.(agent, accent, roomLabel);
     }, 400);
   }, [text, agent.target, send, onSendDone, agent, accent, roomLabel]);
+
+  // Slept: compact greyed-out row
+  if (slept) {
+    return (
+      <div ref={(el) => observe(el, agent.target)}>
+        <div
+          className="flex items-center gap-4 px-6 py-2 transition-all duration-300 cursor-pointer hover:bg-white/[0.03]"
+          style={{
+            borderBottom: !isLast ? "1px solid rgba(255,255,255,0.03)" : "none",
+            opacity: 0.35,
+          }}
+          onClick={(e) => onAgentClick(agent, accent, roomLabel, e)}
+          role="button" tabIndex={0}
+          aria-label={`${agent.name} - sleeping`}
+        >
+          <div className="flex-shrink-0" style={{ width: 28, height: 28 }}>
+            <svg viewBox="-40 -50 80 80" width={28} height={28} overflow="visible" style={{ filter: "grayscale(1)" }}>
+              <AgentAvatar name={agent.name} target={agent.target} status="idle" preview="" accent="#666" saiyan={false} onClick={() => {}} />
+            </svg>
+          </div>
+          <span className="text-[13px] font-medium text-white/40 truncate flex-1">{displayName}</span>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-md" style={{ background: "rgba(255,255,255,0.04)", color: "#64748B" }}>sleeping</span>
+          {send && (
+            <button
+              className="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer transition-all active:scale-90"
+              style={{ background: "rgba(34,197,94,0.15)", opacity: 1 }}
+              onClick={(e) => { e.stopPropagation(); send({ type: "wake", target: agent.target, command: guessCommand(agent.name) }); }}
+              title="Wake"
+              aria-label={`Wake ${displayName}`}
+            >
+              <svg width={14} height={14} viewBox="0 0 24 24" fill="#22c55e"><polygon points="8,5 19,12 8,19" /></svg>
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div ref={(el) => observe(el, agent.target)}>

@@ -43,6 +43,8 @@ export function useSessions() {
   }, []);
 
   const markBusy = useFleetStore((s) => s.markBusy);
+  const markSlept = useFleetStore((s) => s.markSlept);
+  const clearSlept = useFleetStore((s) => s.clearSlept);
 
   // Feed-triggered Saiyan: map oracle name → tmux target for burst animation
   const agentsRef = useRef<AgentState[]>([]);
@@ -141,6 +143,9 @@ export function useSessions() {
         }
         return next;
       });
+    } else if (data.type === "action-ok") {
+      if (data.action === "sleep") markSlept(data.target);
+      else if (data.action === "wake" || data.action === "spawn") clearSlept(data.target);
     }
   }, []);
 
@@ -218,6 +223,8 @@ export function useSessions() {
                 if (existing && existing.status !== status) {
                   addEvent(target, "status", `${existing.status} → ${status}`);
                 }
+                // Clear slept state when agent becomes busy again
+                if (status === "busy") clearSlept(target);
                 // Hash no longer triggers Saiyan — feed events only
                 // Hash still detects busy status for the badge
                 return { ...p, [target]: { preview, status } };
