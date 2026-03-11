@@ -157,26 +157,26 @@ export function useSessions() {
               const hasPrompt = bottom.includes("\u276f"); // ❯
               const hasBusySign = /[∴✢⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏◐◑◒◓⣾⣽⣻⢿⡿⣟⣯⣷]/.test(bottom) || /● \w+\(/.test(bottom) || /\b(Read|Edit|Write|Bash|Grep|Glob|Agent)\b/.test(bottom); // Thinking/tool calls/Claude Code tools
 
-              // Determine status (slower transitions to avoid flicker)
+              // Determine status — only "busy" if explicit indicator found
               let status: PaneStatus;
               if (hasBusySign) {
-                // Explicit busy indicator always wins
+                // Explicit busy indicator always wins (spinners, tool names)
                 status = "busy";
-              } else if (hasPrompt && entry.unchangedCount >= 2) {
-                // Prompt visible + content stable for 2+ polls → ready
+              } else if (hasPrompt) {
+                // Prompt visible → ready (regardless of recent changes)
                 status = "ready";
               } else if (entry.prev === 0) {
-                // First poll
-                status = hasPrompt ? "ready" : "idle";
-              } else if (entry.unchangedCount <= 3) {
-                // Changed recently (within ~15s) → busy
+                // First poll, no prompt visible
+                status = "idle";
+              } else if (entry.unchangedCount <= 2) {
+                // Content changed recently + no prompt → likely busy
                 status = "busy";
-              } else if (entry.unchangedCount <= 8) {
-                // Cooling down → ready
+              } else if (entry.unchangedCount <= 6) {
+                // Cooling down, no prompt visible
                 status = "ready";
               } else {
-                // Stable for long → check prompt for ready vs idle
-                status = hasPrompt ? "ready" : "idle";
+                // Stable for long, no prompt
+                status = "idle";
               }
 
               const preview = (lines[lines.length - 1] || "").slice(0, 120);
