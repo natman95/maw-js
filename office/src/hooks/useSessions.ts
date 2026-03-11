@@ -101,8 +101,8 @@ export function useSessions() {
       dropSaiyan(agent.target);
       return;
     }
-    // Activity events → extend Saiyan (source: Feed)
-    if (SAIYAN_FEED_EVENTS.has(event.event)) {
+    // Activity events → extend Saiyan only if agent is actually busy
+    if (SAIYAN_FEED_EVENTS.has(event.event) && agent.status === "busy") {
       extendSaiyan(agent.target, agent.name, agent.session, "F");
     }
   }, [extendSaiyan, dropSaiyan]);
