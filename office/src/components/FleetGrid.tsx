@@ -182,6 +182,19 @@ export const FleetGrid = memo(function FleetGrid({
     for (const a of ra) send({ type: "stop", target: a.target });
   }, [sessionAgents, send]);
 
+  const wakeAll = useCallback(() => {
+    for (const a of agents) {
+      if (a.status === "idle") send({ type: "wake", target: a.target, command: guessCommand(a.name) });
+    }
+  }, [agents, send]);
+
+  const sleepAll = useCallback(() => {
+    if (!confirm("Sleep all busy agents?")) return;
+    for (const a of agents) {
+      if (a.status === "busy") send({ type: "sleep", target: a.target });
+    }
+  }, [agents, send]);
+
   const sorted = useMemo(() => sortRooms(sessions, sessionAgents, sortMode), [sessions, sessionAgents, sortMode]);
 
   type VRoom = { key: string; label: string; accent: string; floor: string; agents: AgentState[]; hasBusy: boolean; busyCount: number };
@@ -283,6 +296,23 @@ export const FleetGrid = memo(function FleetGrid({
               <span className="text-white/30">{idleCount} idle</span>
             </span>
           )}
+          <span className="text-white/10">|</span>
+          <div className="flex items-center gap-2">
+            {idleCount > 0 && (
+              <button className="px-3 py-1.5 text-[10px] font-mono font-bold rounded-lg cursor-pointer transition-all active:scale-95"
+                style={{ background: "rgba(34,197,94,0.15)", color: "#22c55e", border: "1px solid rgba(34,197,94,0.2)" }}
+                onClick={wakeAll} title="Wake all idle agents">
+                Wake All
+              </button>
+            )}
+            {busyCount > 0 && (
+              <button className="px-3 py-1.5 text-[10px] font-mono font-bold rounded-lg cursor-pointer transition-all active:scale-95"
+                style={{ background: "rgba(251,191,36,0.1)", color: "#fbbf24", border: "1px solid rgba(251,191,36,0.15)" }}
+                onClick={sleepAll} title="Sleep all busy agents">
+                Sleep All
+              </button>
+            )}
+          </div>
           <span className="text-white/10">|</span>
           <div className="flex items-center rounded-lg overflow-hidden border border-white/[0.08]">
             <button className="px-3 py-1 text-[10px] font-mono cursor-pointer transition-colors duration-150"
