@@ -131,6 +131,13 @@ export const FleetGrid = memo(function FleetGrid({
     send({ type: "subscribe", target: agent.target });
   }, [pinnedPreview, send]);
 
+  // After sending via mic input, open pinned preview to watch the result
+  const onSendDone = useCallback((agent: AgentState, accent: string, label: string) => {
+    setPinnedPreview({ agent, accent, label, pos: { x: window.innerWidth / 2, y: window.innerHeight / 2 } });
+    setHoverPreview(null);
+    send({ type: "subscribe", target: agent.target });
+  }, [send]);
+
   useEffect(() => {
     if (pinnedPreview) {
       setPinnedAnimPos({
@@ -285,7 +292,7 @@ export const FleetGrid = memo(function FleetGrid({
                     saiyan={saiyanTargets.has(entry.target)} isLast={i === recentlyActive.length - 1}
                     agoLabel={agoLabel}
                     observe={observe} showPreview={showPreview} hidePreview={hidePreview} onAgentClick={onAgentClick}
-                    send={send} />
+                    send={send} onSendDone={onSendDone} />
                 );
               })}
             </div>
@@ -318,7 +325,7 @@ export const FleetGrid = memo(function FleetGrid({
                     <AgentRow key={agent.target} agent={agent} accent={style.accent} roomLabel={vr.label}
                       saiyan={saiyanTargets.has(agent.target)} isLast={i === vr.agents.length - 1}
                       observe={observe} showPreview={showPreview} hidePreview={hidePreview} onAgentClick={onAgentClick}
-                      send={send} />
+                      send={send} onSendDone={onSendDone} />
                   ))}
                 </div>
               )}

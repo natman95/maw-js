@@ -17,6 +17,7 @@ interface AgentRowProps {
   hidePreview: () => void;
   onAgentClick: (agent: AgentState, accent: string, label: string, e: React.MouseEvent) => void;
   send?: (msg: object) => void;
+  onSendDone?: (agent: AgentState, accent: string, roomLabel: string) => void;
 }
 
 export const AgentRow = memo(function AgentRow({
@@ -31,6 +32,7 @@ export const AgentRow = memo(function AgentRow({
   hidePreview,
   onAgentClick,
   send,
+  onSendDone,
 }: AgentRowProps) {
   const isBusy = agent.status === "busy";
   const displayName = agent.name.replace(/-oracle$/, "").replace(/-/g, " ");
@@ -56,8 +58,12 @@ export const AgentRow = memo(function AgentRow({
     setTimeout(() => send({ type: "send", target: agent.target, text: "\r" }), 50);
     setText("");
     setSent(true);
-    setTimeout(() => { setSent(false); setInputOpen(false); }, 800);
-  }, [text, agent.target, send]);
+    setTimeout(() => {
+      setSent(false);
+      setInputOpen(false);
+      onSendDone?.(agent, accent, roomLabel);
+    }, 400);
+  }, [text, agent.target, send, onSendDone, agent, accent, roomLabel]);
 
   return (
     <div ref={(el) => observe(el, agent.target)}>
