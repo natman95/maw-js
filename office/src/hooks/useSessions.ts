@@ -5,6 +5,7 @@ import { playSaiyanSound } from "../lib/sounds";
 import { agentSortKey } from "../lib/constants";
 import { useFleetStore } from "../lib/store";
 import { activeOracles, describeActivity, type FeedEvent, type FeedEventType } from "../lib/feed";
+import type { AskType } from "../lib/types";
 
 const BUSY_TIMEOUT = 15_000; // 15s without feed → ready
 const IDLE_TIMEOUT = 60_000; // 60s without feed → idle
@@ -25,6 +26,8 @@ export function useSessions() {
 
   // Oracle feed state
   const [feedEvents, setFeedEvents] = useState<FeedEvent[]>([]);
+  const feedEventsRef = useRef<FeedEvent[]>([]);
+  feedEventsRef.current = feedEvents;
   const MAX_FEED = 100;
 
   const addEvent = useCallback((target: string, type: AgentEvent["type"], detail: string) => {
@@ -79,17 +82,19 @@ export function useSessions() {
   }, []);
 
   // --- Feed-based status tracking ---
-  // oracle name → last feed timestamp
+  // target → last feed timestamp, target → last event type
   const feedLastSeen = useRef<Record<string, number>>({});
+  const feedLastEvent = useRef<Record<string, FeedEventType>>({});
 
   const FEED_BUSY_EVENTS = new Set<FeedEventType>(["PreToolUse", "PostToolUse", "UserPromptSubmit", "SubagentStart", "PostToolUseFailure"]);
   const FEED_STOP_EVENTS = new Set<FeedEventType>(["Stop", "SessionEnd", "TaskCompleted", "Notification"]);
 
   /** Resolve feed event → agent. Uses project field for worktree-aware matching. */
   const resolveAgentFromFeed = useCallback((event: FeedEvent): AgentState | undefined => {
-    // project like "hermes-oracle.wt-1-bitkub" → window name "hermes-bitkub"
+    // project like "hermes-oracle.wt-1-bitkub" or "homelab-wt-statusline" → window name "hermes-bitkub" / "homekeeper-statusline"
     const project = event.project;
-    const wtMatch = project.match(/\.wt-\d+-(.+)$/);
+    // Match both formats: ".wt-N-name" (old) and "-wt-name" (new, no digit)
+    const wtMatch = project.match(/[.-]wt-(?:\d+-)?(.+)$/);
     if (wtMatch) {
       const windowName = `${event.oracle}-${wtMatch[1]}`;
       const agent = agentsRef.current.find(a => a.name === windowName);
@@ -104,6 +109,8 @@ export function useSessions() {
     if (!agent) return;
 
     const target = agent.target;
+
+    feedLastEvent.current[target] = event.event;
 
     if (FEED_BUSY_EVENTS.has(event.event)) {
       feedLastSeen.current[target] = Date.now();
@@ -136,7 +143,10 @@ export function useSessions() {
           const existing = prev[agent.target];
           if (!existing) continue;
 
-          if (existing.status === "busy" && lastSeen > 0 && now - lastSeen > BUSY_TIMEOUT) {
+          // Don't decay busy→ready if agent is in a tool call (PreToolUse without PostToolUse)
+          const lastEvt = feedLastEvent.current[agent.target];
+          const inToolCall = lastEvt === "PreToolUse" || lastEvt === "SubagentStart";
+          if (existing.status === "busy" && lastSeen > 0 && now - lastSeen > BUSY_TIMEOUT && !inToolCall) {
             if (next === prev) next = { ...prev };
             next[agent.target] = { ...existing, status: "ready" };
           } else if (existing.status === "ready" && (lastSeen === 0 || now - lastSeen > IDLE_TIMEOUT)) {
@@ -164,6 +174,55 @@ export function useSessions() {
     }
   }, [extendSaiyan, dropSaiyan, resolveAgentFromFeed]);
 
+  // --- Ask detection from feed events ---
+  const ASK_RESUME_EVENTS = new Set<FeedEventType>(["PreToolUse", "SubagentStart", "UserPromptSubmit"]);
+  // Store last Stop message per oracle — Stop fires before Notification, carries the real question
+  const lastStopMessage = useRef<Record<string, string>>({});
+
+  const detectAsk = useCallback((event: FeedEvent) => {
+    const { addAsk, dismissByOracle } = useFleetStore.getState();
+    const agent = resolveAgentFromFeed(event);
+
+    // Auto-dismiss: agent resumed on its own
+    if (ASK_RESUME_EVENTS.has(event.event)) {
+      const name = agent?.name || event.oracle;
+      dismissByOracle(name);
+      delete lastStopMessage.current[name];
+      return;
+    }
+
+    const oracleName = agent?.name || event.oracle;
+
+    // Capture Stop message — this has the actual question text
+    if (event.event === "Stop" && event.message.trim()) {
+      lastStopMessage.current[oracleName] = event.message.trim();
+    }
+
+    if (event.event === "Notification") {
+      const msg = event.message.toLowerCase();
+      let askType: AskType | null = null;
+      if (msg.includes("waiting for your input") || msg.includes("waiting for input")) askType = "input";
+      else if (msg.includes("needs your attention") || msg.includes("attention")) askType = "attention";
+      else if (msg.includes("needs your approval") || msg.includes("approval")) askType = "plan";
+      if (askType) {
+        // Find the real question: check ref first, then search feed history for last Stop from this oracle
+        let stopMsg = lastStopMessage.current[oracleName];
+        if (!stopMsg) {
+          for (let i = feedEventsRef.current.length - 1; i >= 0; i--) {
+            const fe = feedEventsRef.current[i];
+            if (fe.oracle === event.oracle && fe.event === "Stop" && fe.message.trim()) {
+              stopMsg = fe.message.trim();
+              break;
+            }
+          }
+        }
+        const displayMessage = stopMsg && stopMsg.length > event.message.length ? stopMsg : event.message;
+        addAsk({ oracle: oracleName, target: agent?.target || "", type: askType, message: displayMessage });
+        delete lastStopMessage.current[oracleName];
+      }
+    }
+  }, [resolveAgentFromFeed]);
+
   const handleMessage = useCallback((data: any) => {
     if (data.type === "sessions") {
       setSessions(data.sessions);
@@ -178,6 +237,7 @@ export function useSessions() {
       });
       triggerFeedSaiyan(feedEvent);
       updateStatusFromFeed(feedEvent);
+      detectAsk(feedEvent);
     } else if (data.type === "feed-history") {
       const events = (data.events as FeedEvent[]).slice(-MAX_FEED);
       setFeedEvents(events);

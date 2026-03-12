@@ -28,6 +28,18 @@ export interface AgentEvent {
   detail: string;
 }
 
+export type AskType = "input" | "attention" | "plan";
+
+export interface AskItem {
+  id: string;
+  oracle: string;
+  target: string;      // tmux target e.g. "01-oracles:0"
+  type: AskType;
+  message: string;
+  ts: number;
+  dismissed?: boolean;
+}
+
 export interface ConfigData {
   host: string;
   port: number;

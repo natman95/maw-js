@@ -10,6 +10,7 @@ import { FleetGrid, FleetControls } from "./components/FleetGrid";
 import { OverviewGrid } from "./components/OverviewGrid";
 import { VSView } from "./components/VSView";
 import { ConfigView } from "./components/ConfigView";
+import { InboxOverlay } from "./components/InboxView";
 import { ShortcutOverlay } from "./components/ShortcutOverlay";
 import { JumpOverlay } from "./components/JumpOverlay";
 import { unlockAudio, isAudioUnlocked, setSoundMuted } from "./lib/sounds";
@@ -72,6 +73,7 @@ export function App() {
   const [selectedAgent, setSelectedAgent] = useState<AgentState | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showJump, setShowJump] = useState(false);
+  const [showInbox, setShowInbox] = useState(false);
 
   // "?" key opens shortcut overlay, "j" or Ctrl+K opens jump overlay
   useEffect(() => {
@@ -93,12 +95,18 @@ export function App() {
       if (e.key.toLowerCase() === "v" && !e.ctrlKey && !e.metaKey && !e.altKey) {
         window.location.hash = "vs";
       }
+      if (e.key.toLowerCase() === "i" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        setShowInbox(prev => !prev);
+      }
     };
     window.addEventListener("keydown", handler, true);
     return () => window.removeEventListener("keydown", handler, true);
   }, []);
 
   const { sessions, agents, saiyanTargets, saiyanSources, eventLog, addEvent, handleMessage, feedActive, agentFeedLog } = useSessions();
+
+  // Ask count for inbox badge
+  const askCount = useFleetStore((s) => s.asks.filter((a) => !a.dismissed).length);
 
   // Sync muted state to sound module
   const muted = useFleetStore((s) => s.muted);
@@ -133,6 +141,10 @@ export function App() {
     />
   );
 
+  const inboxOverlay = showInbox && (
+    <InboxOverlay send={send} onClose={() => setShowInbox(false)} />
+  );
+
   const terminalModal = selectedAgent && (
     <TerminalModal
       agent={selectedAgent}
@@ -148,7 +160,7 @@ export function App() {
     return (
       <div className="relative min-h-screen" style={{ background: "#020208" }}>
         <div className="relative z-10">
-          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="overview" onJump={() => setShowJump(true)} muted={muted} onToggleMute={toggleMuted} />
+          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="overview" onJump={() => setShowJump(true)} askCount={askCount} onInbox={() => setShowInbox(true)} muted={muted} onToggleMute={toggleMuted} />
         </div>
         <OverviewGrid
           sessions={sessions}
@@ -161,6 +173,7 @@ export function App() {
         {terminalModal}
         {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
         {jumpOverlay}
+        {inboxOverlay}
 
       </div>
     );
@@ -170,7 +183,7 @@ export function App() {
     return (
       <div className="relative min-h-screen" style={{ background: "#020208" }}>
         <div className="relative z-10">
-          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="fleet" onJump={() => setShowJump(true)} muted={muted} onToggleMute={toggleMuted}>
+          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="fleet" onJump={() => setShowJump(true)} askCount={askCount} onInbox={() => setShowInbox(true)} muted={muted} onToggleMute={toggleMuted}>
             <FleetControls agents={agents} send={send} />
           </StatusBar>
         </div>
@@ -190,6 +203,7 @@ export function App() {
         {terminalModal}
         {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
         {jumpOverlay}
+        {inboxOverlay}
 
       </div>
     );
@@ -199,7 +213,7 @@ export function App() {
     return (
       <div className="relative min-h-screen" style={{ background: "#020208" }}>
         <div className="relative z-10">
-          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="mission" onJump={() => setShowJump(true)} muted={muted} onToggleMute={toggleMuted} />
+          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="mission" onJump={() => setShowJump(true)} askCount={askCount} onInbox={() => setShowInbox(true)} muted={muted} onToggleMute={toggleMuted} />
         </div>
         <MissionControl
           sessions={sessions}
@@ -214,6 +228,7 @@ export function App() {
         {terminalModal}
         {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
         {jumpOverlay}
+        {inboxOverlay}
 
       </div>
     );
@@ -223,12 +238,13 @@ export function App() {
     return (
       <div className="relative min-h-screen" style={{ background: "#020208" }}>
         <div className="relative z-10">
-          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="vs" onJump={() => setShowJump(true)} muted={muted} onToggleMute={toggleMuted} />
+          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="vs" onJump={() => setShowJump(true)} askCount={askCount} onInbox={() => setShowInbox(true)} muted={muted} onToggleMute={toggleMuted} />
         </div>
         <VSView agents={agents} send={send} />
         {terminalModal}
         {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
         {jumpOverlay}
+        {inboxOverlay}
       </div>
     );
   }
@@ -237,11 +253,12 @@ export function App() {
     return (
       <div className="relative flex flex-col h-screen overflow-hidden" style={{ background: "#020208" }}>
         <div className="relative z-10 flex-shrink-0">
-          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="config" onJump={() => setShowJump(true)} muted={muted} onToggleMute={toggleMuted} />
+          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="config" onJump={() => setShowJump(true)} askCount={askCount} onInbox={() => setShowInbox(true)} muted={muted} onToggleMute={toggleMuted} />
         </div>
         <ConfigView />
         {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
         {jumpOverlay}
+        {inboxOverlay}
       </div>
     );
   }
@@ -250,7 +267,7 @@ export function App() {
     <div className="relative min-h-screen">
       <UniverseBg />
       <div className="relative z-10">
-        <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="office" onJump={() => setShowJump(true)} muted={muted} onToggleMute={toggleMuted} />
+        <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="office" onJump={() => setShowJump(true)} askCount={askCount} onInbox={() => setShowInbox(true)} muted={muted} onToggleMute={toggleMuted} />
         <RoomGrid sessions={sessions} agents={agents} saiyanTargets={saiyanTargets} onSelectAgent={onSelectAgent} />
       </div>
       {terminalModal}

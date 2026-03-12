@@ -8,6 +8,8 @@ export interface RecentEntry {
   lastBusy: number;
 }
 
+import type { AskItem } from "./types";
+
 interface FleetStore {
   // Recently active: target → agent metadata + timestamp
   recentMap: Record<string, RecentEntry>;
@@ -32,6 +34,12 @@ interface FleetStore {
   // Route persistence
   lastView: string;
   setLastView: (view: string) => void;
+
+  // Inbox asks
+  asks: AskItem[];
+  addAsk: (ask: Omit<AskItem, "id" | "ts">) => void;
+  dismissAsk: (id: string) => void;
+  dismissByOracle: (oracle: string) => void;
 }
 
 const RECENT_TTL = 30 * 60 * 1000; // 30 minutes
@@ -95,6 +103,19 @@ const hybridStorage: StateStorage = {
   },
 };
 
+// --- Asks persistence (separate from ui-state) ---
+let askSaveTimer: ReturnType<typeof setTimeout> | null = null;
+function persistAsks(asks: AskItem[]) {
+  if (askSaveTimer) clearTimeout(askSaveTimer);
+  askSaveTimer = setTimeout(() => {
+    fetch("/api/asks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(asks),
+    }).catch(() => {});
+  }, 1000);
+}
+
 export const useFleetStore = create<FleetStore>()(
   persist(
     (set, get) => ({
@@ -147,6 +168,37 @@ export const useFleetStore = create<FleetStore>()(
 
       lastView: "office",
       setLastView: (view) => set({ lastView: view }),
+
+      // Inbox asks
+      asks: [],
+      addAsk: (ask) => set((s) => {
+        const existing = s.asks.find((a) => a.oracle === ask.oracle && !a.dismissed);
+        if (existing) {
+          // Update message if new one is longer (Stop event has the real question)
+          if (ask.message.length > existing.message.length) {
+            const next = s.asks.map((a) => a.id === existing.id ? { ...a, message: ask.message, type: ask.type } : a);
+            persistAsks(next);
+            return { asks: next };
+          }
+          return s;
+        }
+        const item: AskItem = { ...ask, id: `${ask.oracle}-${Date.now()}`, ts: Date.now() };
+        const next = [item, ...s.asks].slice(0, 50);
+        persistAsks(next);
+        return { asks: next };
+      }),
+      dismissAsk: (id) => set((s) => {
+        const next = s.asks.map((a) => (a.id === id ? { ...a, dismissed: true } : a));
+        persistAsks(next);
+        return { asks: next };
+      }),
+      dismissByOracle: (oracle) => set((s) => {
+        const hasPending = s.asks.some((a) => a.oracle === oracle && !a.dismissed);
+        if (!hasPending) return s;
+        const next = s.asks.map((a) => (a.oracle === oracle && !a.dismissed ? { ...a, dismissed: true } : a));
+        persistAsks(next);
+        return { asks: next };
+      }),
     }),
     {
       name: "maw.fleet",
@@ -183,5 +235,17 @@ export const useFleetStore = create<FleetStore>()(
     }
   )
 );
+
+// Load asks from server on startup
+setTimeout(() => {
+  fetch("/api/asks")
+    .then((r) => r.json())
+    .then((data: AskItem[]) => {
+      if (Array.isArray(data) && data.length > 0) {
+        useFleetStore.setState({ asks: data });
+      }
+    })
+    .catch(() => {});
+}, 0);
 
 export const RECENT_TTL_MS = RECENT_TTL;

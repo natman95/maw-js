@@ -11,7 +11,7 @@ import { useFleetStore, RECENT_TTL_MS, type RecentEntry } from "../lib/store";
 import type { AgentState, Session, AgentEvent } from "../lib/types";
 import { describeActivity, type FeedEvent } from "../lib/feed";
 
-export type FeedLogEntry = { text: string; ts: number };
+export type FeedLogEntry = { text: string; ts: number; project?: string; eventType?: string };
 
 /** Fleet-specific controls for StatusBar — reads from Zustand, takes agents for counts */
 export function FleetControls({ agents, send }: { agents: AgentState[]; send: (msg: object) => void }) {
@@ -266,15 +266,20 @@ export const FleetGrid = memo(function FleetGrid({
     return result;
   }, [sorted, sessionAgents, grouped]);
 
-  // Resolve per-agent feed log — only primary oracle windows
-  // Strict: only show feed log on primary -oracle windows
+  // Resolve per-agent feed log — primary oracle + worktree windows
   const getAgentFeedLog = useCallback((agentName: string): FeedLogEntry[] | null => {
     if (!agentFeedLog) return null;
-    if (!agentName.endsWith("-oracle")) return null; // skip task windows like hermes-bitkub
     const oracleName = agentName.replace(/-oracle$/, "");
     const events = agentFeedLog.get(oracleName);
     if (!events || events.length === 0) return null;
-    return events.map(e => ({ text: describeActivity(e), ts: e.ts }));
+    // For worktree windows (e.g. "homekeeper-statusline"), filter to matching project
+    const suffix = agentName.replace(/^[^-]+-/, ""); // "statusline" from "homekeeper-statusline"
+    const isWorktree = !agentName.endsWith("-oracle");
+    const filtered = isWorktree
+      ? events.filter(e => e.project.includes(suffix))
+      : events;
+    if (filtered.length === 0) return null;
+    return filtered.map(e => ({ text: describeActivity(e), ts: e.ts, project: e.project, eventType: e.event }));
   }, [agentFeedLog]);
 
   const busyAgents = useMemo(() => agents.filter(a => a.status === "busy"), [agents]);

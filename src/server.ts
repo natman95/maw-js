@@ -149,6 +149,28 @@ app.post("/api/ui-state", async (c) => {
   }
 });
 
+// --- Asks persistence (inbox) ---
+const asksPath = join(import.meta.dir, "../asks.json");
+
+app.get("/api/asks", (c) => {
+  try {
+    if (!existsSync(asksPath)) return c.json([]);
+    return c.json(JSON.parse(readFileSync(asksPath, "utf-8")));
+  } catch {
+    return c.json([]);
+  }
+});
+
+app.post("/api/asks", async (c) => {
+  try {
+    const body = await c.req.json();
+    writeFileSync(asksPath, JSON.stringify(body, null, 2), "utf-8");
+    return c.json({ ok: true });
+  } catch (e: any) {
+    return c.json({ error: e.message }, 400);
+  }
+});
+
 // --- Fleet Config ---
 
 const fleetDir = join(import.meta.dir, "../fleet");

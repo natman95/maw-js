@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useState } from "react";
+import { memo, useCallback, useRef, useState, useEffect } from "react";
 import { AgentAvatar } from "./AgentAvatar";
 import { MiniMonitor } from "./MiniMonitor";
 import type { AgentState } from "../lib/types";
@@ -6,6 +6,26 @@ import type { FeedLogEntry } from "./FleetGrid";
 import { guessCommand } from "../lib/constants";
 
 const isTouch = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
+
+const RUNNING_EVENTS = new Set(["PreToolUse", "SubagentStart", "UserPromptSubmit"]);
+
+function formatElapsed(ms: number): string {
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}m ${sec}s`;
+}
+
+/** Live ticking timer for running tool calls */
+function ElapsedTimer({ since }: { since: number }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return <span style={{ color: "#fbbf24" }}>{formatElapsed(now - since)}</span>;
+}
 
 // --- Sub-components ---
 
@@ -70,6 +90,24 @@ function AgentInfo({ agent, isBusy, displayName, accent, agoLabel, saiyan, saiya
         }}>
           {agent.status}
         </span>
+        {feedLog && feedLog.length > 0 && feedLog[0].project && (() => {
+          const p = feedLog[0].project!;
+          const wtMatch = p.match(/[.-]wt-(?:\d+-)?(.+)$/);
+          if (wtMatch) {
+            return (
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+                style={{ background: "rgba(168,85,247,0.15)", color: "#c084fc" }}>
+                wt:{wtMatch[1]}
+              </span>
+            );
+          }
+          return (
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0"
+              style={{ background: "rgba(99,102,241,0.12)", color: "#818cf8" }}>
+              {p}
+            </span>
+          );
+        })()}
         {agoLabel && <span className="text-[10px] font-mono text-white/25 flex-shrink-0">{agoLabel}</span>}
         {/* Last activity reason — shows what triggered busy status */}
         {!isBusy && feedLog && feedLog.length > 0 && (
@@ -95,12 +133,17 @@ function AgentInfo({ agent, isBusy, displayName, accent, agoLabel, saiyan, saiya
       {feedLog && feedLog.length > 0 && (
         <div className="flex flex-col gap-0.5 mt-0.5">
           {feedLog.slice(0, 3).map((entry, i) => {
+            const isRunning = i === 0 && entry.eventType && RUNNING_EVENTS.has(entry.eventType);
             const ago = Math.round((Date.now() - entry.ts) / 1000);
             const agoStr = ago < 60 ? `${ago}s` : `${Math.floor(ago / 60)}m`;
             return (
               <span key={i} className="text-[10px] truncate font-mono"
                 style={{ color: "#fbbf24", opacity: i === 0 ? 0.8 : 0.4 - i * 0.1 }}>
-                {entry.text} <span style={{ color: "rgba(255,255,255,0.12)" }}>{agoStr}</span>
+                {entry.text}
+                {isRunning
+                  ? <>{" "}<ElapsedTimer since={entry.ts} /></>
+                  : <span style={{ color: "rgba(255,255,255,0.12)" }}> {agoStr}</span>
+                }
               </span>
             );
           })}
