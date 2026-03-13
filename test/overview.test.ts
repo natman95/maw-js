@@ -4,7 +4,7 @@ import type { Session } from "../src/ssh";
 
 const MOCK_SESSIONS: Session[] = [
   {
-    name: "1-neo",
+    name: "1-volt",
     windows: [
       { index: 1, name: "claude", active: true },
       { index: 2, name: "editor", active: false },
@@ -35,7 +35,7 @@ describe("buildTargets", () => {
   test("finds all numbered sessions except 0-overview", () => {
     const targets = buildTargets(MOCK_SESSIONS, []);
     expect(targets).toHaveLength(3);
-    expect(targets.map(t => t.oracle)).toEqual(["neo", "hermes", "pulse"]);
+    expect(targets.map(t => t.oracle)).toEqual(["volt", "hermes", "pulse"]);
   });
 
   test("excludes 0-overview session", () => {
@@ -50,22 +50,22 @@ describe("buildTargets", () => {
 
   test("picks active window index and name", () => {
     const targets = buildTargets(MOCK_SESSIONS, []);
-    expect(targets.find(t => t.oracle === "neo")!.window).toBe(1);
-    expect(targets.find(t => t.oracle === "neo")!.windowName).toBe("claude");
+    expect(targets.find(t => t.oracle === "volt")!.window).toBe(1);
+    expect(targets.find(t => t.oracle === "volt")!.windowName).toBe("claude");
     expect(targets.find(t => t.oracle === "hermes")!.window).toBe(2);
     expect(targets.find(t => t.oracle === "hermes")!.windowName).toBe("shell");
   });
 
   test("strips number prefix for oracle name", () => {
     const targets = buildTargets(MOCK_SESSIONS, []);
-    expect(targets[0].oracle).toBe("neo");
-    expect(targets[0].session).toBe("1-neo");
+    expect(targets[0].oracle).toBe("volt");
+    expect(targets[0].session).toBe("1-volt");
   });
 
   test("filters by oracle name", () => {
-    const targets = buildTargets(MOCK_SESSIONS, ["neo"]);
+    const targets = buildTargets(MOCK_SESSIONS, ["volt"]);
     expect(targets).toHaveLength(1);
-    expect(targets[0].oracle).toBe("neo");
+    expect(targets[0].oracle).toBe("volt");
   });
 
   test("filters by partial oracle name", () => {
@@ -75,15 +75,15 @@ describe("buildTargets", () => {
   });
 
   test("filters by session name", () => {
-    const targets = buildTargets(MOCK_SESSIONS, ["1-neo"]);
+    const targets = buildTargets(MOCK_SESSIONS, ["1-volt"]);
     expect(targets).toHaveLength(1);
-    expect(targets[0].oracle).toBe("neo");
+    expect(targets[0].oracle).toBe("volt");
   });
 
   test("multiple filters are OR'd", () => {
-    const targets = buildTargets(MOCK_SESSIONS, ["neo", "pulse"]);
+    const targets = buildTargets(MOCK_SESSIONS, ["volt", "pulse"]);
     expect(targets).toHaveLength(2);
-    expect(targets.map(t => t.oracle)).toEqual(["neo", "pulse"]);
+    expect(targets.map(t => t.oracle)).toEqual(["volt", "pulse"]);
   });
 
   test("no match returns empty", () => {
@@ -116,8 +116,8 @@ describe("buildTargets", () => {
 
 describe("paneTitle", () => {
   test("formats oracle name and target", () => {
-    const title = paneTitle({ session: "1-neo", window: 1, windowName: "neo-oracle", oracle: "neo" });
-    expect(title).toBe("neo (1-neo:1)");
+    const title = paneTitle({ session: "1-volt", window: 1, windowName: "volt-oracle", oracle: "volt" });
+    expect(title).toBe("volt (1-volt:1)");
   });
 });
 
@@ -171,7 +171,7 @@ describe("mirrorCmd", () => {
   });
 
   test("does not reference mirror.sh", () => {
-    const cmd = mirrorCmd({ session: "1-neo", window: 1, windowName: "neo-oracle", oracle: "neo" });
+    const cmd = mirrorCmd({ session: "1-volt", window: 1, windowName: "volt-oracle", oracle: "volt" });
     expect(cmd).not.toContain("mirror.sh");
     expect(cmd).toMatch(/^watch /);
   });
@@ -228,15 +228,15 @@ describe("chunkTargets", () => {
 
 describe("argument parsing", () => {
   test("separates flags from filter args", () => {
-    const filterArgs = ["neo", "--kill", "hermes", "-k"];
+    const filterArgs = ["volt", "--kill", "hermes", "-k"];
     const kill = filterArgs.includes("--kill") || filterArgs.includes("-k");
     const filters = filterArgs.filter(a => !a.startsWith("-"));
     expect(kill).toBe(true);
-    expect(filters).toEqual(["neo", "hermes"]);
+    expect(filters).toEqual(["volt", "hermes"]);
   });
 
   test("no flags means no kill", () => {
-    const filterArgs = ["neo", "hermes"];
+    const filterArgs = ["volt", "hermes"];
     const kill = filterArgs.includes("--kill") || filterArgs.includes("-k");
     expect(kill).toBe(false);
   });
