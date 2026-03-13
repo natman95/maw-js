@@ -10,6 +10,8 @@ import { FleetGrid, FleetControls } from "./components/FleetGrid";
 import { OverviewGrid } from "./components/OverviewGrid";
 import { VSView } from "./components/VSView";
 import { ConfigView } from "./components/ConfigView";
+import { TerminalView } from "./components/TerminalView";
+import { OrbitalView } from "./components/OrbitalView";
 import { InboxOverlay } from "./components/InboxView";
 import { ShortcutOverlay } from "./components/ShortcutOverlay";
 import { JumpOverlay } from "./components/JumpOverlay";
@@ -281,6 +283,22 @@ export function App() {
     return (
       <Layout activeView="config" {...layoutProps} fullHeight>
         <ConfigView />
+      </Layout>
+    );
+  }
+
+  if (route === "terminal") {
+    return (
+      <Layout activeView="terminal" {...layoutProps} fullHeight>
+        <TerminalView sessions={sessions} agents={agents} connected={connected} onSelectAgent={onSelectAgent} />
+      </Layout>
+    );
+  }
+
+  if (route === "orbital") {
+    return (
+      <Layout activeView="orbital" {...layoutProps}>
+        <OrbitalView sessions={sessions} agents={agents} connected={connected} onSelectAgent={onSelectAgent} />
       </Layout>
     );
   }

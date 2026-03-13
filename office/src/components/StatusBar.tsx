@@ -14,13 +14,14 @@ interface StatusBarProps {
 }
 
 const NAV_ITEMS = [
-  { href: "/office/#office", label: "Office", id: "office" },
-  { href: "/office/#fleet", label: "Fleet", id: "fleet" },
-  { href: "/office/#mission", label: "Mission", id: "mission" },
-  { href: "/office/#vs", label: "VS", id: "vs" },
-  { href: "/office/#overview", label: "Overview", id: "overview" },
-  { href: "/office/#config", label: "Config", id: "config" },
-  { href: "/dashboard", label: "Orbital", id: "orbital" },
+  { href: "#office", label: "Office", id: "office" },
+  { href: "#fleet", label: "Fleet", id: "fleet" },
+  { href: "#mission", label: "Mission", id: "mission" },
+  { href: "#vs", label: "VS", id: "vs" },
+  { href: "#overview", label: "Overview", id: "overview" },
+  { href: "#config", label: "Config", id: "config" },
+  { href: "#terminal", label: "Terminal", id: "terminal" },
+  { href: "#orbital", label: "Orbital", id: "orbital" },
 ];
 
 const isTouch = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);

@@ -45,15 +45,17 @@ app.post("/api/select", async (c) => {
   return c.json({ ok: true, target });
 });
 
-// Serve UI
-const html = Bun.file(import.meta.dir + "/ui.html");
-app.get("/", (c) => c.body(html.stream(), { headers: { "Content-Type": "text/html" } }));
+// Serve React app from root (single entry point for all views)
+app.get("/", serveStatic({ root: "./dist-office", path: "/index.html" }));
 
-const dashboardHtml = Bun.file(import.meta.dir + "/dashboard.html");
-app.get("/dashboard", (c) => c.body(dashboardHtml.stream(), { headers: { "Content-Type": "text/html" } }));
+// Legacy redirects — old paths → hash routes in the React app
+app.get("/dashboard", (c) => c.redirect("/#orbital"));
+app.get("/office", (c) => c.redirect("/#office"));
 
-// Serve React office app (built by vite to dist-office/)
-app.get("/office", serveStatic({ root: "./dist-office", path: "/index.html" }));
+// Serve React app assets
+app.get("/assets/*", serveStatic({ root: "./dist-office" }));
+
+// Keep /office/* for backward compat (deep-links, bookmarks)
 app.get("/office/*", serveStatic({
   root: "./",
   rewriteRequestPath: (p) => p.replace(/^\/office/, "/dist-office"),

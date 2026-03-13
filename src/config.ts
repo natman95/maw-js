@@ -83,7 +83,10 @@ export function buildCommand(agentName: string): string {
     if (matchGlob(pattern, agentName)) { cmd = command; break; }
   }
 
-  return cmd;
+  // Always clear stale CLAUDECODE env var before launching Claude.
+  // When Claude exits/crashes in tmux, CLAUDECODE persists in the shell
+  // and blocks new sessions with "cannot be launched inside another" error.
+  return `unset CLAUDECODE 2>/dev/null; ${cmd}`;
 }
 
 /** Get env vars from config (for tmux set-environment) */
