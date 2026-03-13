@@ -43,3 +43,29 @@ let _muted = false;
 export function setSoundMuted(m: boolean) { _muted = m; }
 export function isSoundMuted() { return _muted; }
 
+const saiyanSounds = ["/office/saiyan.mp3", "/office/saiyan-aura.mp3", "/office/saiyan-rose.mp3", "/office/saiyan-2.mp3"];
+const SAIYAN_MAX_PLAY = 3; // seconds before fade-out
+const SAIYAN_FADE_MS = 1500;
+
+/** Play a random saiyan sound with auto fade-out */
+export function playSaiyanSound() {
+  if (!unlocked || _muted) return;
+  try {
+    const src = saiyanSounds[Math.floor(Math.random() * saiyanSounds.length)];
+    const audio = new Audio(src);
+    audio.volume = 0.3;
+    audio.play().catch(() => {});
+    setTimeout(() => {
+      const startVol = audio.volume;
+      const steps = 30;
+      const stepMs = SAIYAN_FADE_MS / steps;
+      let step = 0;
+      const fade = setInterval(() => {
+        step++;
+        audio.volume = Math.max(0, startVol * (1 - step / steps));
+        if (step >= steps) { clearInterval(fade); audio.pause(); }
+      }, stepMs);
+    }, SAIYAN_MAX_PLAY * 1000);
+  } catch {}
+}
+

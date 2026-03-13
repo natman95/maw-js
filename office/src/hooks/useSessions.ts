@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { Session, AgentState, PaneStatus, AgentEvent } from "../lib/types";
 import { stripAnsi } from "../lib/ansi";
 import { agentSortKey } from "../lib/constants";
+import { playSaiyanSound } from "../lib/sounds";
 import { useFleetStore } from "../lib/store";
 import { activeOracles, describeActivity, type FeedEvent, type FeedEventType } from "../lib/feed";
 import type { AskType } from "../lib/types";
@@ -36,6 +37,7 @@ export function useSessions() {
   const clearSlept = useFleetStore((s) => s.clearSlept);
 
   const agentsRef = useRef<AgentState[]>([]);
+  const lastSoundTime = useRef(0);
 
   // --- Feed-based status tracking ---
   // target → last feed timestamp, target → last event type
@@ -73,6 +75,12 @@ export function useSessions() {
       setCaptureData(prev => {
         const existing = prev[target];
         if (existing?.status === "busy") return prev;
+        // Play saiyan sound on transition to busy (60s cooldown)
+        const now = Date.now();
+        if (now - lastSoundTime.current > 60_000) {
+          lastSoundTime.current = now;
+          playSaiyanSound();
+        }
         if (existing && existing.status !== "busy") addEvent(target, "status", `${existing.status} → busy`);
         clearSlept(target);
         return { ...prev, [target]: { preview: existing?.preview || "", status: "busy" } };

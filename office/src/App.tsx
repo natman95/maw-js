@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef, type ReactNode } from "react";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useSessions } from "./hooks/useSessions";
 import { UniverseBg } from "./components/UniverseBg";
@@ -16,6 +16,13 @@ import { JumpOverlay } from "./components/JumpOverlay";
 import { unlockAudio, isAudioUnlocked, setSoundMuted } from "./lib/sounds";
 import { useFleetStore } from "./lib/store";
 import type { AgentState } from "./lib/types";
+
+function parseHash(raw: string): { view: string; agentName: string | null } {
+  const parts = raw.split("/");
+  const view = parts[0] || "office";
+  const agentName = parts[1] || null;
+  return { view, agentName };
+}
 
 function useHashRoute() {
   const lastView = useFleetStore((s) => s.lastView);
@@ -36,7 +43,8 @@ function useHashRoute() {
     const onHash = () => {
       const h = window.location.hash.slice(1) || "office";
       setHash(h);
-      setLastView(h);
+      // Persist just the view part (not the agent)
+      setLastView(parseHash(h).view);
     };
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
@@ -67,9 +75,50 @@ function useAudioUnlock() {
   return ready;
 }
 
+/** Shared layout — StatusBar + overlays rendered once for all views */
+function Layout({ activeView, connected, agentCount, sessionCount, askCount, muted, onToggleMute, onJump, onInbox, statusBarChildren, terminalModal, showShortcuts, onCloseShortcuts, jumpOverlay, inboxOverlay, fullHeight, children }: {
+  activeView: string;
+  connected: boolean;
+  agentCount: number;
+  sessionCount: number;
+  askCount: number;
+  muted: boolean;
+  onToggleMute: () => void;
+  onJump: () => void;
+  onInbox: () => void;
+  statusBarChildren?: ReactNode;
+  terminalModal: ReactNode;
+  showShortcuts: boolean;
+  onCloseShortcuts: () => void;
+  jumpOverlay: ReactNode;
+  inboxOverlay: ReactNode;
+  fullHeight?: boolean;
+  children: ReactNode;
+}) {
+  const wrapperClass = fullHeight
+    ? "relative flex flex-col h-screen overflow-hidden"
+    : "relative min-h-screen";
+
+  return (
+    <div className={wrapperClass} style={{ background: "#020208" }}>
+      <div className={`relative z-10${fullHeight ? " flex-shrink-0" : ""}`}>
+        <StatusBar connected={connected} agentCount={agentCount} sessionCount={sessionCount} activeView={activeView} onJump={onJump} askCount={askCount} onInbox={onInbox} muted={muted} onToggleMute={onToggleMute}>
+          {statusBarChildren}
+        </StatusBar>
+      </div>
+      {children}
+      {terminalModal}
+      {showShortcuts && <ShortcutOverlay onClose={onCloseShortcuts} />}
+      {jumpOverlay}
+      {inboxOverlay}
+    </div>
+  );
+}
+
 export function App() {
   useAudioUnlock();
-  const route = useHashRoute();
+  const rawRoute = useHashRoute();
+  const { view: route, agentName: hashAgent } = parseHash(rawRoute);
   const [selectedAgent, setSelectedAgent] = useState<AgentState | null>(null);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showJump, setShowJump] = useState(false);
@@ -105,6 +154,27 @@ export function App() {
 
   const { sessions, agents, eventLog, addEvent, handleMessage, feedActive, agentFeedLog } = useSessions();
 
+  // Resolve hash agent name → AgentState once agents are loaded
+  const pendingHashAgent = useRef(hashAgent);
+  useEffect(() => { pendingHashAgent.current = hashAgent; }, [hashAgent]);
+  const resolvedFromHash = useRef(false);
+  useEffect(() => {
+    if (resolvedFromHash.current || !pendingHashAgent.current || agents.length === 0) return;
+    const name = pendingHashAgent.current.toLowerCase();
+    const match = agents.find(a => a.name.toLowerCase() === name);
+    if (match) {
+      setSelectedAgent(match);
+      resolvedFromHash.current = true;
+    }
+  }, [agents]);
+
+  // Close terminal when hash loses the agent part (e.g. browser back)
+  useEffect(() => {
+    if (!hashAgent && selectedAgent) {
+      setSelectedAgent(null);
+    }
+  }, [hashAgent, selectedAgent]);
+
   // Ask count for inbox badge
   const askCount = useFleetStore((s) => s.asks.filter((a) => !a.dismissed).length);
 
@@ -117,6 +187,9 @@ export function App() {
   const onSelectAgent = useCallback((agent: AgentState) => {
     setSelectedAgent(agent);
     send({ type: "select", target: agent.target });
+    // Push agent name into URL hash for deep-linking
+    const currentView = parseHash(window.location.hash.slice(1)).view;
+    window.location.hash = `${currentView}/${agent.name}`;
   }, [send]);
 
   // Agents in the same session as the selected agent
@@ -131,144 +204,94 @@ export function App() {
     const next = siblings[(idx + dir + siblings.length) % siblings.length];
     setSelectedAgent(next);
     send({ type: "select", target: next.target });
+    const currentView = parseHash(window.location.hash.slice(1)).view;
+    window.location.hash = `${currentView}/${next.name}`;
   }, [selectedAgent, siblings, send]);
 
-  const jumpOverlay = showJump && (
-    <JumpOverlay
-      agents={agents}
-      onSelect={onSelectAgent}
-      onClose={() => setShowJump(false)}
-    />
-  );
+  const onCloseTerminal = useCallback(() => {
+    setSelectedAgent(null);
+    // Remove agent name from hash, keep just the view
+    const currentView = parseHash(window.location.hash.slice(1)).view;
+    window.location.hash = currentView;
+  }, []);
 
-  const inboxOverlay = showInbox && (
-    <InboxOverlay send={send} onClose={() => setShowInbox(false)} />
-  );
+  // Shared props for Layout
+  const layoutProps = {
+    connected,
+    agentCount: agents.length,
+    sessionCount: sessions.length,
+    askCount,
+    muted,
+    onToggleMute: toggleMuted,
+    onJump: () => setShowJump(true),
+    onInbox: () => setShowInbox(true),
+    terminalModal: selectedAgent ? (
+      <TerminalModal agent={selectedAgent} send={send} onClose={onCloseTerminal} onNavigate={onNavigate} onSelectSibling={onSelectAgent} siblings={siblings} />
+    ) : null,
+    showShortcuts,
+    onCloseShortcuts: () => setShowShortcuts(false),
+    jumpOverlay: showJump ? <JumpOverlay agents={agents} onSelect={onSelectAgent} onClose={() => setShowJump(false)} /> : null,
+    inboxOverlay: showInbox ? <InboxOverlay send={send} onClose={() => setShowInbox(false)} /> : null,
+  };
 
-  const terminalModal = selectedAgent && (
-    <TerminalModal
-      agent={selectedAgent}
-      send={send}
-      onClose={() => setSelectedAgent(null)}
-      onNavigate={onNavigate}
-      onSelectSibling={onSelectAgent}
-      siblings={siblings}
-    />
-  );
-
-  if (route === "overview") {
+  if (route === "office") {
     return (
-      <div className="relative min-h-screen" style={{ background: "#020208" }}>
+      <Layout activeView="office" {...layoutProps}>
+        <UniverseBg />
         <div className="relative z-10">
-          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="overview" onJump={() => setShowJump(true)} askCount={askCount} onInbox={() => setShowInbox(true)} muted={muted} onToggleMute={toggleMuted} />
+          <RoomGrid sessions={sessions} agents={agents} onSelectAgent={onSelectAgent} />
         </div>
-        <OverviewGrid
-          sessions={sessions}
-          agents={agents}
-          connected={connected}
-          send={send}
-          onSelectAgent={onSelectAgent}
-        />
-        {terminalModal}
-        {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
-        {jumpOverlay}
-        {inboxOverlay}
-
-      </div>
+      </Layout>
     );
   }
 
   if (route === "fleet") {
     return (
-      <div className="relative min-h-screen" style={{ background: "#020208" }}>
-        <div className="relative z-10">
-          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="fleet" onJump={() => setShowJump(true)} askCount={askCount} onInbox={() => setShowInbox(true)} muted={muted} onToggleMute={toggleMuted}>
-            <FleetControls agents={agents} send={send} />
-          </StatusBar>
-        </div>
-        <FleetGrid
-          sessions={sessions}
-          agents={agents}
-          connected={connected}
-          send={send}
-          onSelectAgent={onSelectAgent}
-          eventLog={eventLog}
-          addEvent={addEvent}
-          feedActive={feedActive}
-          agentFeedLog={agentFeedLog}
-        />
-        {terminalModal}
-        {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
-        {jumpOverlay}
-        {inboxOverlay}
-
-      </div>
+      <Layout activeView="fleet" {...layoutProps} statusBarChildren={<FleetControls agents={agents} send={send} />}>
+        <FleetGrid sessions={sessions} agents={agents} connected={connected} send={send} onSelectAgent={onSelectAgent} eventLog={eventLog} addEvent={addEvent} feedActive={feedActive} agentFeedLog={agentFeedLog} />
+      </Layout>
     );
   }
 
   if (route === "mission") {
     return (
-      <div className="relative min-h-screen" style={{ background: "#020208" }}>
-        <div className="relative z-10">
-          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="mission" onJump={() => setShowJump(true)} askCount={askCount} onInbox={() => setShowInbox(true)} muted={muted} onToggleMute={toggleMuted} />
-        </div>
-        <MissionControl
-          sessions={sessions}
-          agents={agents}
-          connected={connected}
-          send={send}
-          onSelectAgent={onSelectAgent}
-          eventLog={eventLog}
-          addEvent={addEvent}
-        />
-        {terminalModal}
-        {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
-        {jumpOverlay}
-        {inboxOverlay}
-
-      </div>
+      <Layout activeView="mission" {...layoutProps}>
+        <MissionControl sessions={sessions} agents={agents} connected={connected} send={send} onSelectAgent={onSelectAgent} eventLog={eventLog} addEvent={addEvent} />
+      </Layout>
     );
   }
 
   if (route === "vs") {
     return (
-      <div className="relative min-h-screen" style={{ background: "#020208" }}>
-        <div className="relative z-10">
-          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="vs" onJump={() => setShowJump(true)} askCount={askCount} onInbox={() => setShowInbox(true)} muted={muted} onToggleMute={toggleMuted} />
-        </div>
+      <Layout activeView="vs" {...layoutProps}>
         <VSView agents={agents} send={send} />
-        {terminalModal}
-        {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
-        {jumpOverlay}
-        {inboxOverlay}
-      </div>
+      </Layout>
+    );
+  }
+
+  if (route === "overview") {
+    return (
+      <Layout activeView="overview" {...layoutProps}>
+        <OverviewGrid sessions={sessions} agents={agents} connected={connected} send={send} onSelectAgent={onSelectAgent} />
+      </Layout>
     );
   }
 
   if (route === "config") {
     return (
-      <div className="relative flex flex-col h-screen overflow-hidden" style={{ background: "#020208" }}>
-        <div className="relative z-10 flex-shrink-0">
-          <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="config" onJump={() => setShowJump(true)} askCount={askCount} onInbox={() => setShowInbox(true)} muted={muted} onToggleMute={toggleMuted} />
-        </div>
+      <Layout activeView="config" {...layoutProps} fullHeight>
         <ConfigView />
-        {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
-        {jumpOverlay}
-        {inboxOverlay}
-      </div>
+      </Layout>
     );
   }
 
+  // Fallback → office
   return (
-    <div className="relative min-h-screen">
+    <Layout activeView="office" {...layoutProps}>
       <UniverseBg />
       <div className="relative z-10">
-        <StatusBar connected={connected} agentCount={agents.length} sessionCount={sessions.length} activeView="office" onJump={() => setShowJump(true)} askCount={askCount} onInbox={() => setShowInbox(true)} muted={muted} onToggleMute={toggleMuted} />
         <RoomGrid sessions={sessions} agents={agents} onSelectAgent={onSelectAgent} />
       </div>
-      {terminalModal}
-      {showShortcuts && <ShortcutOverlay onClose={() => setShowShortcuts(false)} />}
-      {jumpOverlay}
-    </div>
+    </Layout>
   );
 }
