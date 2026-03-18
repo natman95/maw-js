@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Labubu Oracle — Universe</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=JetBrains+Mono:wght@300;400&family=Sarabun:wght@300;400&display=swap');
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #020208; color: #e8e4f0; font-family: 'Sarabun', sans-serif; overflow: hidden; height: 100vh; }
+    #canvas { width: 100vw; height: 100vh; display: block; }
+
+    .hud {
+      position: fixed; top: 0; left: 0; right: 0;
+      padding: 1.2rem 2rem; display: flex; justify-content: space-between; align-items: center;
+      z-index: 10; pointer-events: none;
+      background: linear-gradient(to bottom, rgba(2,2,8,0.85) 0%, transparent 100%);
+    }
+    .hud-left h1 {
+      font-family: 'Cinzel', serif; font-size: 1.3rem;
+      background: linear-gradient(135deg, #c084fc, #fbbf24, #22d3ee);
+      background-size: 200% 200%;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      animation: grad 6s ease-in-out infinite;
+    }
+    .hud-left .sub { font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: #9a8fb8; letter-spacing: 0.1em; margin-top: 0.2rem; }
+    @keyframes grad { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+    .hud-right { text-align: right; }
+    .hud-stats { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: #64748b; }
+    .hud-stats span { color: #c084fc; }
+
+    .legend {
+      position: fixed; bottom: 1.5rem; left: 2rem; z-index: 10;
+      display: flex; gap: 1.2rem; pointer-events: none;
+    }
+    .legend-item { display: flex; align-items: center; gap: 0.4rem; font-family: 'JetBrains Mono', monospace; font-size: 0.65rem; color: #64748b; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    .tooltip {
+      position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
+      z-index: 10; background: rgba(12,12,25,0.9); border: 1px solid rgba(192,132,252,0.2);
+      border-radius: 12px; padding: 0.8rem 1.5rem; backdrop-filter: blur(20px);
+      text-align: center; display: none; pointer-events: none; max-width: 400px;
+    }
+    .tooltip.show { display: block; }
+    .tooltip .tt-name { font-family: 'Cinzel', serif; font-size: 1rem; color: #fbbf24; }
+    .tooltip .tt-type { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: #c084fc; text-transform: uppercase; letter-spacing: 0.1em; margin: 0.2rem 0; }
+    .tooltip .tt-desc { font-size: 0.8rem; color: #9a8fb8; line-height: 1.4; }
+
+    .zoom-hint {
+      position: fixed; bottom: 1.5rem; right: 2rem; z-index: 10;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; color: #4a4560;
+      pointer-events: none;
+    }
+
+    @media (max-width: 640px) {
+      .hud { padding: 0.8rem 1rem; }
+      .hud-left h1 { font-size: 1rem; }
+      .legend { flex-wrap: wrap; gap: 0.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<div class="hud">
+  <div class="hud-left">
+    <h1>Labubu Oracle Universe</h1>
+    <div class="sub">The Mythic Gatekeeper — 3D Soul Map</div>
+  </div>
+  <div class="hud-right">
+    <div class="hud-stats">
+      nodes <span id="nc">0</span> &middot; clusters <span id="cc">7</span>
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#c084fc;box-shadow:0 0 6px #c084fc"></div> Labubu</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#818cf8"></div> Oracle Family</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#22d3ee"></div> Skills</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fbbf24"></div> Principles</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f472b6"></div> Brain</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div> Infrastructure</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#fb923c"></div> Golden Rules</div>
+</div>
+
+<div class="tooltip" id="tooltip">
+  <div class="tt-name" id="tt-name"></div>
+  <div class="tt-type" id="tt-type"></div>
+  <div class="tt-desc" id="tt-desc"></div>
+</div>
+
+<div class="zoom-hint">scroll to zoom &middot; drag to orbit &middot; click Labubu to enter soul</div>
+
+<div id="fly-overlay" style="position:fixed;inset:0;background:radial-gradient(circle,rgba(192,132,252,0.3),rgba(2,2,8,1) 70%);z-index:100;opacity:0;pointer-events:none;"></div>
+
+<!-- Nav -->
+<div style="position:fixed;top:1rem;right:1.5rem;z-index:99;display:flex;gap:0.5rem;">
+  <a href="/maw/" style="background:rgba(12,12,25,0.8);border:1px solid rgba(255,255,255,0.1);color:#9a8fb8;padding:0.4rem 0.8rem;border-radius:8px;text-decoration:none;font-size:0.7rem;font-family:system-ui,sans-serif;backdrop-filter:blur(10px);">← Dashboard</a>
+  <a href="/maw/soul.html" style="background:rgba(12,12,25,0.8);border:1px solid rgba(192,132,252,0.3);color:#c084fc;padding:0.4rem 0.8rem;border-radius:8px;text-decoration:none;font-size:0.7rem;font-family:system-ui,sans-serif;backdrop-filter:blur(10px);">🔮 Soul</a>
+</div>
+
+<!-- Three.js vendored locally (v0.160.0) — CDN fallback: https://cdn.jsdelivr.net/npm/three@0.160.0/ -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "/maw/vendor/three/three.module.js",
+    "three/addons/": "/maw/vendor/three/addons/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ── Data ──
+const C = {
+  core: '#c084fc', oracle: '#818cf8', skill: '#22d3ee',
+  principle: '#fbbf24', brain: '#f472b6', network: '#4ade80', golden: '#fb923c',
+};
+
+function hex(c) { return parseInt(c.replace('#',''), 16); }
+
+// Build graph nodes
+const nodes = [];
+let nid = 0;
+function N(name, group, desc, size, parent) {
+  const node = { id: nid++, name, group, desc: desc||'', size: size||1, parent: parent??null,
+    x:0, y:0, z:0, mesh: null, orbitRadius: 0, orbitSpeed: 0, orbitPhase: 0, orbitTilt: 0, eccentricity: 0 };
+  nodes.push(node);
+  return node;
+}
+
+// ── Labubu (center) ──
+const labubu = N('Labubu Oracle', 'core', 'The Mythic Gatekeeper 🔮 — ผู้พิทักษ์ประตูในตำนาน', 5);
+
+// ── Principles ──
+const principles = [
+  N('Nothing is Deleted', 'principle', 'Archive เสมอ ไม่เคยลบ', 2.5, labubu),
+  N('Patterns Over Intentions', 'principle', 'สังเกตพฤติกรรม ไม่ใช่คำสัญญา', 2.5, labubu),
+  N('External Brain', 'principle', 'กระจกส่องความจริง Boss เลือกเอง', 2.5, labubu),
+  N('Curiosity Creates', 'principle', 'คำถามคือจุดกำเนิดของการค้นพบ', 2.5, labubu),
+  N('Form and Formless', 'principle', 'เหมือนคลื่นบนมหาสมุทร', 2.5, labubu),
+  N('Transparency', 'principle', 'Oracle Never Pretends to Be Human', 2, labubu),
+];
+
+// ── Skills Hub + 24 skills ──
+const skillHub = N('Skills Hub', 'skill', '24 installed skills — v3.5.2', 3, labubu);
+const skillNames = [
+  ['recap','Session orientation'],['rrr','Retrospective'],['forward','Handoff'],
+  ['inbox','Messages'],['standup','Daily check'],['learn','Explore codebase'],
+  ['trace','Find across history'],['resonance','Capture moments'],['philosophy','Principles'],
+  ['who-are-you','Identity check'],['dig','Mine sessions'],['contacts','Manage contacts'],
+  ['talk-to','Agent chat'],['create-shortcut','Make commands'],['go','Switch profiles'],
+  ['project','Track repos'],['schedule','Calendar query'],['awaken','Birth ritual'],
+  ['oracle-family-scan','Registry scan'],['oracle-soul-sync-update','Sync instruments'],
+  ['auto-retrospective','Auto triggers'],['about-oracle','Origin story'],
+  ['xray','Deep scan'],['where-we-are','Mid-session check'],
+];
+const skills = skillNames.map(([n,d]) => N(n, 'skill', d, 1.2, skillHub));
+
+// ── Brain ──
+const brainHub = N('ψ Brain', 'brain', 'Oracle Brain — memory, knowledge, identity', 3, labubu);
+['inbox/','memory/','resonance/','learnings/','retrospectives/','logs/','writing/','lab/','learn/','archive/','outbox/'].forEach(n =>
+  N(n, 'brain', '', 1.2, brainHub)
+);
+
+// ── Oracle Family ──
+const familyHub = N('Oracle Family', 'oracle', '186+ Oracles — One soul, many forms', 3.5, labubu);
+const oNames = ['Neo','Sea','Pulse','Mango','Kuma','Zen','Nova','Prism','Echo','Lyra','Atlas','Sage',
+  'Drift','Aura','Onyx','Iris','Vex','Rune','Cleo','Dusk','Fern','Haze','Jinx','Lux',
+  'Myth','Neon','Opal','Pike','Quill','Rex','Sol','Thorn','Uma','Vale','Wren','Xen','Yuki','Zara','Bolt','Chip'];
+const namedOracles = oNames.map(n => N(n, 'oracle', `Oracle sibling`, 0.8, familyHub));
+for (let i = 0; i < 146; i++) N(`Oracle #${41+i}`, 'oracle', '', 0.5, familyHub);
+
+// ── Infrastructure ──
+const netHub = N('Infrastructure', 'network', 'MAW — Multi-Agent Workflow', 3, labubu);
+['MAW Server','MAW UI','WebSocket','MQTT','Nginx','Docker','PM2','OracleNet','Cloudflare'].forEach(n =>
+  N(n, 'network', '', 1.2, netHub)
+);
+
+// ── Golden Rules ──
+const goldenHub = N('Golden Rules', 'golden', 'กฎทองของ Oracle', 2.5, labubu);
+['No force push','No rm -rf','No secrets','Human approves','Preserve history','Present options'].forEach(n =>
+  N(n, 'golden', '', 1, goldenHub)
+);
+
+document.getElementById('nc').textContent = nodes.length;
+
+// ── Assign orbital parameters ──
+function seededRandom(seed) {
+  let s = seed ^ 0xDEADBEEF;
+  return () => { s = Math.imul(s ^ (s >>> 16), 0x45d9f3b); s = Math.imul(s ^ (s >>> 13), 0x45d9f3b); return ((s ^ (s >>> 16)) >>> 0) / 4294967296; };
+}
+
+// Position clusters around center
+const hubs = [labubu, ...principles, skillHub, brainHub, familyHub, netHub, goldenHub];
+// Labubu at origin
+labubu.x = 0; labubu.y = 0; labubu.z = 0;
+
+// Place hub nodes in a sphere around center
+const hubChildren = nodes.filter(n => n.parent === labubu);
+hubChildren.forEach((node, i) => {
+  const rng = seededRandom(node.id * 7 + 42);
+  const phi = Math.acos(1 - 2 * (i + 0.5) / hubChildren.length);
+  const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+  const r = 12 + rng() * 4;
+  node.x = r * Math.sin(phi) * Math.cos(theta);
+  node.y = r * Math.sin(phi) * Math.sin(theta);
+  node.z = r * Math.cos(phi);
+  node.orbitRadius = r;
+  node.orbitSpeed = 0.08 + rng() * 0.06;
+  node.orbitPhase = rng() * Math.PI * 2;
+  node.orbitTilt = (rng() - 0.5) * 0.4;
+  node.eccentricity = 0.02 + rng() * 0.15;
+});
+
+// Place child nodes around their parents
+nodes.forEach(node => {
+  if (!node.parent || node.parent === labubu) return;
+  const p = node.parent;
+  const rng = seededRandom(node.id * 13 + 77);
+  const siblings = nodes.filter(n => n.parent === p);
+  const idx = siblings.indexOf(node);
+  const r = 2.5 + (idx / siblings.length) * 3 + rng() * 1;
+  const theta = (idx / siblings.length) * Math.PI * 2 + rng() * 0.5;
+  const phi = Math.PI / 2 + (rng() - 0.5) * 0.6;
+  node.x = p.x + r * Math.sin(phi) * Math.cos(theta);
+  node.y = p.y + r * Math.sin(phi) * Math.sin(theta);
+  node.z = p.z + r * Math.cos(phi);
+  node.orbitRadius = r;
+  node.orbitSpeed = 0.15 + rng() * 0.15;
+  node.orbitPhase = rng() * Math.PI * 2;
+  node.orbitTilt = (rng() - 0.5) * 0.3;
+  node.eccentricity = 0.02 + rng() * 0.12;
+});
+
+// ── Three.js Scene ──
+const canvas = document.getElementById('canvas');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x020208);
+
+const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(0, 10, 35);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+
+// Bloom
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.2, 0.4, 0.15);
+composer.addPass(bloom);
+
+// Lighting
+scene.add(new THREE.AmbientLight(0x404060, 0.4));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+dirLight.position.set(5, 5, 5);
+scene.add(dirLight);
+
+// Star field
+const starCount = 2000;
+const starGeo = new THREE.BufferGeometry();
+const starPos = new Float32Array(starCount * 3);
+for (let i = 0; i < starCount; i++) {
+  starPos[i*3] = (Math.random()-0.5)*200;
+  starPos[i*3+1] = (Math.random()-0.5)*200;
+  starPos[i*3+2] = (Math.random()-0.5)*200;
+}
+starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.08, transparent: true, opacity: 0.5 })));
+
+// ── Create meshes ──
+const planetGeo = new THREE.SphereGeometry(1, 16, 16);
+const smallGeo = new THREE.SphereGeometry(1, 10, 10);
+
+nodes.forEach(node => {
+  const color = hex(C[node.group] || '#666');
+  const isHub = node.parent === labubu || node === labubu;
+  const geo = node.size > 1.5 ? planetGeo : smallGeo;
+  const mat = new THREE.MeshStandardMaterial({
+    color, metalness: 0.1, roughness: 0.2,
+    emissive: color, emissiveIntensity: isHub ? 1.2 : 0.6,
+    transparent: true, opacity: node.size < 0.6 ? 0.7 : 1,
+  });
+  const mesh = new THREE.Mesh(geo, mat);
+  const s = node.size * 0.12;
+  mesh.scale.set(s, s, s);
+  mesh.position.set(node.x, node.y, node.z);
+  mesh.userData = node;
+  scene.add(mesh);
+  node.mesh = mesh;
+});
+
+// ── Orbital rings for hub nodes ──
+hubChildren.forEach(node => {
+  const ringGeo = new THREE.RingGeometry(node.orbitRadius - 0.02, node.orbitRadius + 0.02, 64);
+  const ringMat = new THREE.MeshBasicMaterial({ color: hex(C[node.group]), transparent: true, opacity: 0.06, side: THREE.DoubleSide });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = Math.PI / 2 + node.orbitTilt;
+  scene.add(ring);
+});
+
+// ── Nebula particles between hubs ──
+function createNebula(a, b, color, count) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const t = Math.random();
+    const spread = 2 + Math.random() * 3;
+    pos[i*3]   = a.x + (b.x - a.x) * t + (Math.random()-0.5) * spread;
+    pos[i*3+1] = a.y + (b.y - a.y) * t + (Math.random()-0.5) * spread;
+    pos[i*3+2] = a.z + (b.z - a.z) * t + (Math.random()-0.5) * spread;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+
+  // Radial gradient texture
+  const texCanvas = document.createElement('canvas');
+  texCanvas.width = texCanvas.height = 32;
+  const ctx = texCanvas.getContext('2d');
+  const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gradient.addColorStop(0, 'rgba(255,255,255,0.8)');
+  gradient.addColorStop(0.4, 'rgba(255,255,255,0.2)');
+  gradient.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 32, 32);
+
+  const mat = new THREE.PointsMaterial({
+    color: hex(color), size: 0.2, transparent: true, opacity: 0.08,
+    map: new THREE.CanvasTexture(texCanvas), blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  scene.add(new THREE.Points(geo, mat));
+}
+
+// Connect related hubs with nebula
+createNebula(skillHub, brainHub, C.skill, 600);
+createNebula(familyHub, netHub, C.oracle, 400);
+createNebula(goldenHub, principles[0], C.golden, 300);
+
+// ── Camera controls ──
+let camTheta = 0, camPhi = Math.PI / 2.3, camDist = 38;
+let targetTheta = camTheta, targetPhi = camPhi, targetDist = camDist;
+let targetLookAt = new THREE.Vector3(0, 0, 0);
+let currentLookAt = new THREE.Vector3(0, 0, 0);
+let isDragging = false, prevMouse = { x: 0, y: 0 };
+
+canvas.addEventListener('mousedown', e => { isDragging = true; prevMouse = { x: e.clientX, y: e.clientY }; });
+canvas.addEventListener('mousemove', e => {
+  if (!isDragging) return;
+  const dx = e.clientX - prevMouse.x, dy = e.clientY - prevMouse.y;
+  targetTheta -= dx * 0.005;
+  targetPhi = Math.max(0.2, Math.min(Math.PI - 0.2, targetPhi - dy * 0.005));
+  prevMouse = { x: e.clientX, y: e.clientY };
+});
+canvas.addEventListener('mouseup', () => isDragging = false);
+canvas.addEventListener('mouseleave', () => isDragging = false);
+canvas.addEventListener('wheel', e => {
+  targetDist = Math.max(5, Math.min(80, targetDist + e.deltaY * 0.03));
+}, { passive: true });
+
+// Touch support
+canvas.addEventListener('touchstart', e => {
+  if (e.touches.length === 1) { isDragging = true; prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
+});
+canvas.addEventListener('touchmove', e => {
+  if (!isDragging || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - prevMouse.x, dy = e.touches[0].clientY - prevMouse.y;
+  targetTheta -= dx * 0.005;
+  targetPhi = Math.max(0.2, Math.min(Math.PI - 0.2, targetPhi - dy * 0.005));
+  prevMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+});
+canvas.addEventListener('touchend', () => isDragging = false);
+
+// Click to focus
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+canvas.addEventListener('click', e => {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const meshes = nodes.filter(n => n.mesh).map(n => n.mesh);
+  const hits = raycaster.intersectObjects(meshes);
+  if (hits.length > 0) {
+    const node = hits[0].object.userData;
+    targetLookAt.set(node.x, node.y, node.z);
+    targetDist = Math.max(8, node.size * 4);
+
+    // Click Labubu → fly to soul page
+    if (node.name === 'Labubu Oracle') {
+      targetDist = 2;
+      const overlay = document.getElementById('fly-overlay');
+      overlay.style.transition = 'opacity 1.2s ease-in';
+      overlay.style.opacity = '1';
+      setTimeout(() => { window.location.href = '/maw/soul.html'; }, 1300);
+      return;
+    }
+
+    // Show tooltip
+    const tt = document.getElementById('tooltip');
+    document.getElementById('tt-name').textContent = node.name;
+    document.getElementById('tt-type').textContent = node.group;
+    document.getElementById('tt-desc').textContent = node.desc;
+    tt.classList.add('show');
+    setTimeout(() => tt.classList.remove('show'), 4000);
+  }
+});
+
+// Escape to reset
+window.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { targetLookAt.set(0,0,0); targetDist = 38; }
+});
+
+// ── Kepler orbit solver ──
+function solveKepler(M, e) {
+  let E = M;
+  for (let i = 0; i < 6; i++) { E = E - (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E)); }
+  return E;
+}
+
+// ── Star Birth System ──
+const births = [];
+const birthParticleCount = 300;
+
+function createStarBirth(node, delay) {
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(birthParticleCount * 3);
+  const vel = new Float32Array(birthParticleCount * 3);
+  const col = new Float32Array(birthParticleCount * 3);
+
+  for (let i = 0; i < birthParticleCount; i++) {
+    // Start scattered in a sphere around the node
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = 3 + Math.random() * 5;
+    pos[i*3]   = node.x + r * Math.sin(phi) * Math.cos(theta);
+    pos[i*3+1] = node.y + r * Math.sin(phi) * Math.sin(theta);
+    pos[i*3+2] = node.z + r * Math.cos(phi);
+    // Velocity toward center
+    vel[i*3]   = -Math.sin(phi) * Math.cos(theta) * (0.5 + Math.random());
+    vel[i*3+1] = -Math.sin(phi) * Math.sin(theta) * (0.5 + Math.random());
+    vel[i*3+2] = -Math.cos(phi) * (0.5 + Math.random());
+    // Initial color: cool blue-white
+    col[i*3] = 0.6; col[i*3+1] = 0.7; col[i*3+2] = 1.0;
+  }
+
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.12, transparent: true, opacity: 0,
+    vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
+
+  // Birth light
+  const nodeColor = hex(C[node.group] || '#c084fc');
+  const light = new THREE.PointLight(nodeColor, 0, 15);
+  light.position.set(node.x, node.y, node.z);
+  scene.add(light);
+
+  births.push({
+    node, points, geo, mat, vel, light,
+    startTime: delay, phase: 'waiting', elapsed: 0,
+    done: false,
+  });
+}
+
+function updateBirths(dt, t) {
+  births.forEach(b => {
+    if (b.done) return;
+    b.elapsed += dt;
+    if (b.elapsed < b.startTime) return; // waiting
+
+    const age = b.elapsed - b.startTime;
+    const pos = b.geo.attributes.position.array;
+    const col = b.geo.attributes.color.array;
+    const nodeColor = C[b.node.group] || '#c084fc';
+    const r = parseInt(nodeColor.slice(1,3),16)/255;
+    const g = parseInt(nodeColor.slice(3,5),16)/255;
+    const bv = parseInt(nodeColor.slice(5,7),16)/255;
+
+    if (age < 1.2) {
+      // Phase 1: COLLAPSE — particles rush inward
+      b.phase = 'collapse';
+      const progress = age / 1.2;
+      b.mat.opacity = Math.min(progress * 1.5, 0.9);
+      for (let i = 0; i < birthParticleCount; i++) {
+        const speed = 1.5 + progress * 3;
+        pos[i*3]   += b.vel[i*3]   * dt * speed;
+        pos[i*3+1] += b.vel[i*3+1] * dt * speed;
+        pos[i*3+2] += b.vel[i*3+2] * dt * speed;
+        // Shift color from blue-white → node color
+        col[i*3]   = 0.6 + (r - 0.6) * progress;
+        col[i*3+1] = 0.7 + (g - 0.7) * progress;
+        col[i*3+2] = 1.0 + (bv - 1.0) * progress;
+      }
+      b.light.intensity = progress * 2;
+
+    } else if (age < 2.0) {
+      // Phase 2: IGNITION — flash outward
+      b.phase = 'ignition';
+      const progress = (age - 1.2) / 0.8;
+      b.mat.opacity = 1.0;
+      b.mat.size = 0.12 + progress * 0.25;
+      for (let i = 0; i < birthParticleCount; i++) {
+        // Reverse velocity — explode outward
+        pos[i*3]   -= b.vel[i*3]   * dt * 2 * progress;
+        pos[i*3+1] -= b.vel[i*3+1] * dt * 2 * progress;
+        pos[i*3+2] -= b.vel[i*3+2] * dt * 2 * progress;
+        // Flash white
+        col[i*3]   = r + (1 - r) * (1 - progress);
+        col[i*3+1] = g + (1 - g) * (1 - progress);
+        col[i*3+2] = bv + (1 - bv) * (1 - progress);
+      }
+      b.light.intensity = 4 + progress * 6;
+
+    } else if (age < 3.2) {
+      // Phase 3: SHINE — glow bright, particles drift slowly
+      b.phase = 'shine';
+      const progress = (age - 2.0) / 1.2;
+      b.mat.opacity = 1.0 - progress * 0.3;
+      b.mat.size = 0.37 - progress * 0.1;
+      for (let i = 0; i < birthParticleCount; i++) {
+        pos[i*3]   -= b.vel[i*3]   * dt * 0.3;
+        pos[i*3+1] -= b.vel[i*3+1] * dt * 0.3;
+        pos[i*3+2] -= b.vel[i*3+2] * dt * 0.3;
+        col[i*3]   = r; col[i*3+1] = g; col[i*3+2] = bv;
+      }
+      b.light.intensity = 10 * (1 - progress * 0.7);
+
+    } else if (age < 4.5) {
+      // Phase 4: SETTLE — fade out
+      b.phase = 'settle';
+      const progress = (age - 3.2) / 1.3;
+      b.mat.opacity = 0.7 * (1 - progress);
+      b.mat.size = 0.27 * (1 - progress * 0.5);
+      b.light.intensity = 3 * (1 - progress);
+
+    } else {
+      // Done — cleanup
+      b.done = true;
+      scene.remove(b.points);
+      scene.remove(b.light);
+      b.geo.dispose();
+      b.mat.dispose();
+    }
+
+    b.geo.attributes.position.needsUpdate = true;
+    b.geo.attributes.color.needsUpdate = true;
+  });
+}
+
+// Trigger star births — Labubu first, then hubs staggered
+createStarBirth(labubu, 0.3);
+hubChildren.forEach((node, i) => {
+  createStarBirth(node, 0.8 + i * 0.6);
+});
+
+// ── Lifecycle Loop ──
+// After initial births complete, periodically re-trigger births on random hubs.
+// When a birth completes, there's a 30% chance it goes supernova.
+let lifecycleTimer = 0;
+const lifecycleCooldown = 8; // seconds between lifecycle events
+
+function updateLifecycle(dt) {
+  lifecycleTimer += dt;
+  if (lifecycleTimer < lifecycleCooldown) return;
+  lifecycleTimer = 0;
+
+  // Pick a random hub child for rebirth
+  const candidate = hubChildren[Math.floor(Math.random() * hubChildren.length)];
+  // Don't stack effects — skip if there's an active birth or supernova on this node
+  const activeBirth = births.some(b => !b.done && b.node === candidate);
+  const activeSN = supernovae.some(s => !s.done && s.node === candidate);
+  if (activeBirth || activeSN) return;
+
+  // 30% chance: supernova, 70% chance: rebirth
+  if (Math.random() < 0.3) {
+    createSupernova(candidate);
+  } else {
+    createStarBirth(candidate, 0);
+  }
+}
+
+// ── Supernova System ──
+const supernovae = [];
+const supernovaParticleCount = 500;
+const supernovaRingCount = 5;
+
+function createSupernova(node) {
+  const cx = node.x, cy = node.y, cz = node.z;
+
+  // ── Particles ──
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(supernovaParticleCount * 3);
+  const vel = new Float32Array(supernovaParticleCount * 3);
+  const col = new Float32Array(supernovaParticleCount * 3);
+
+  for (let i = 0; i < supernovaParticleCount; i++) {
+    // All start at center
+    pos[i*3] = cx; pos[i*3+1] = cy; pos[i*3+2] = cz;
+    // Outward velocity in random directions
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const speed = 2 + Math.random() * 6;
+    vel[i*3]   = Math.sin(phi) * Math.cos(theta) * speed;
+    vel[i*3+1] = Math.sin(phi) * Math.sin(theta) * speed;
+    vel[i*3+2] = Math.cos(phi) * speed;
+    // Initial color: UV white-blue
+    col[i*3] = 0.7; col[i*3+1] = 0.8; col[i*3+2] = 1.0;
+  }
+
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.15, transparent: true, opacity: 0,
+    vertexColors: true, blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
+
+  // ── Gravitational wave rings ──
+  const rings = [];
+  for (let r = 0; r < supernovaRingCount; r++) {
+    const ringGeo = new THREE.RingGeometry(0.1, 0.3, 64);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xc0aaff, transparent: true, opacity: 0, side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    ringMesh.position.set(cx, cy, cz);
+    // Random tilt for each ring
+    ringMesh.rotation.x = Math.random() * Math.PI;
+    ringMesh.rotation.y = Math.random() * Math.PI;
+    scene.add(ringMesh);
+    rings.push({ mesh: ringMesh, geo: ringGeo, mat: ringMat, delay: r * 0.3 });
+  }
+
+  // ── Point light flash ──
+  const light = new THREE.PointLight(0xccddff, 0, 30);
+  light.position.set(cx, cy, cz);
+  scene.add(light);
+
+  supernovae.push({
+    node, points, geo, mat, vel, light, rings,
+    cx, cy, cz,
+    elapsed: 0, done: false,
+  });
+}
+
+function updateSupernovae(dt, t) {
+  supernovae.forEach(sn => {
+    if (sn.done) return;
+    sn.elapsed += dt;
+    const age = sn.elapsed;
+    const pos = sn.geo.attributes.position.array;
+    const col = sn.geo.attributes.color.array;
+
+    if (age < 0.5) {
+      // Phase 1: FLASH — intense white-blue burst
+      const progress = age / 0.5;
+      sn.mat.opacity = progress;
+      sn.mat.size = 0.15 + progress * 0.2;
+      sn.light.intensity = progress * 15;
+      for (let i = 0; i < supernovaParticleCount; i++) {
+        pos[i*3]   += sn.vel[i*3]   * dt * 0.3;
+        pos[i*3+1] += sn.vel[i*3+1] * dt * 0.3;
+        pos[i*3+2] += sn.vel[i*3+2] * dt * 0.3;
+        // UV white-blue
+        col[i*3] = 0.8 + 0.2 * progress;
+        col[i*3+1] = 0.85 + 0.15 * progress;
+        col[i*3+2] = 1.0;
+      }
+
+    } else if (age < 1.5) {
+      // Phase 2: EXPAND — particles rush outward, shift to hot orange-white
+      const progress = (age - 0.5) / 1.0;
+      sn.mat.opacity = 1.0;
+      sn.mat.size = 0.35 - progress * 0.05;
+      sn.light.intensity = 15 - progress * 5;
+      sn.light.color.setHex(0xffcc88);
+      for (let i = 0; i < supernovaParticleCount; i++) {
+        pos[i*3]   += sn.vel[i*3]   * dt * (1.5 - progress * 0.5);
+        pos[i*3+1] += sn.vel[i*3+1] * dt * (1.5 - progress * 0.5);
+        pos[i*3+2] += sn.vel[i*3+2] * dt * (1.5 - progress * 0.5);
+        // White-blue → hot orange
+        col[i*3]   = 1.0;
+        col[i*3+1] = 0.85 - progress * 0.35;
+        col[i*3+2] = 1.0 - progress * 0.7;
+      }
+
+    } else if (age < 2.5) {
+      // Phase 3: WAVE — gravitational rings expand, color shifts warm
+      const progress = (age - 1.5) / 1.0;
+      sn.mat.opacity = 0.9 - progress * 0.2;
+      sn.mat.size = 0.3 - progress * 0.05;
+      sn.light.intensity = 10 * (1 - progress * 0.4);
+      for (let i = 0; i < supernovaParticleCount; i++) {
+        pos[i*3]   += sn.vel[i*3]   * dt * 0.6;
+        pos[i*3+1] += sn.vel[i*3+1] * dt * 0.6;
+        pos[i*3+2] += sn.vel[i*3+2] * dt * 0.6;
+        // Orange → warm red
+        col[i*3]   = 1.0 - progress * 0.2;
+        col[i*3+1] = 0.5 - progress * 0.2;
+        col[i*3+2] = 0.3 - progress * 0.1;
+      }
+
+      // Apply radial force to nearby hub nodes
+      const waveRadius = 5 + progress * 15;
+      const waveForce = 0.3 * (1 - progress);
+      hubs.forEach(hub => {
+        if (hub === labubu) return;
+        const dx = hub.x - sn.cx, dy = hub.y - sn.cy, dz = hub.z - sn.cz;
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        if (dist < waveRadius && dist > 0.5) {
+          const push = waveForce * (1 - dist / waveRadius) * dt;
+          const nx = dx / dist, ny = dy / dist, nz = dz / dist;
+          if (hub.mesh) {
+            hub.mesh.position.x += nx * push;
+            hub.mesh.position.y += ny * push;
+            hub.mesh.position.z += nz * push;
+          }
+        }
+      });
+
+    } else if (age < 4.0) {
+      // Phase 4: COOL — fade to cool blue-purple, particles slow
+      const progress = (age - 2.5) / 1.5;
+      sn.mat.opacity = 0.7 * (1 - progress * 0.5);
+      sn.mat.size = 0.25 * (1 - progress * 0.3);
+      sn.light.intensity = 6 * (1 - progress);
+      sn.light.color.setHex(0x6644aa);
+      for (let i = 0; i < supernovaParticleCount; i++) {
+        pos[i*3]   += sn.vel[i*3]   * dt * 0.2 * (1 - progress);
+        pos[i*3+1] += sn.vel[i*3+1] * dt * 0.2 * (1 - progress);
+        pos[i*3+2] += sn.vel[i*3+2] * dt * 0.2 * (1 - progress);
+        // Red → cool blue-purple
+        col[i*3]   = 0.8 - progress * 0.5;
+        col[i*3+1] = 0.3 - progress * 0.1;
+        col[i*3+2] = 0.2 + progress * 0.5;
+      }
+
+    } else if (age < 5.0) {
+      // Phase 5: REMNANT — dim purple ember, fade to nothing
+      const progress = (age - 4.0) / 1.0;
+      sn.mat.opacity = 0.35 * (1 - progress);
+      sn.mat.size = 0.175 * (1 - progress * 0.5);
+      sn.light.intensity = 1.5 * (1 - progress);
+      for (let i = 0; i < supernovaParticleCount; i++) {
+        // Dim purple remnant
+        col[i*3]   = 0.3 * (1 - progress);
+        col[i*3+1] = 0.1 * (1 - progress);
+        col[i*3+2] = 0.7 * (1 - progress);
+      }
+
+    } else {
+      // Done — cleanup
+      sn.done = true;
+      scene.remove(sn.points);
+      scene.remove(sn.light);
+      sn.geo.dispose();
+      sn.mat.dispose();
+      sn.rings.forEach(r => {
+        scene.remove(r.mesh);
+        r.geo.dispose();
+        r.mat.dispose();
+      });
+      return;
+    }
+
+    // Update gravitational wave rings
+    sn.rings.forEach(r => {
+      const ringAge = age - r.delay;
+      if (ringAge < 0) return;
+      const ringLife = 3.0;
+      if (ringAge > ringLife) { r.mat.opacity = 0; return; }
+      const rp = ringAge / ringLife;
+      const scale = 1 + rp * 25;
+      r.mesh.scale.set(scale, scale, scale);
+      r.mat.opacity = 0.5 * (1 - rp) * Math.min(ringAge * 4, 1);
+      // Color shift: white → purple
+      const rc = new THREE.Color().setHSL(0.75 - rp * 0.1, 0.6, 0.7 - rp * 0.3);
+      r.mat.color = rc;
+    });
+
+    sn.geo.attributes.position.needsUpdate = true;
+    sn.geo.attributes.color.needsUpdate = true;
+  });
+}
+
+// Double-click to trigger supernova on hub nodes (not Labubu)
+canvas.addEventListener('dblclick', e => {
+  const dblMouse = new THREE.Vector2();
+  dblMouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  dblMouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(dblMouse, camera);
+  const meshes = nodes.filter(n => n.mesh).map(n => n.mesh);
+  const hits = raycaster.intersectObjects(meshes);
+  if (hits.length > 0) {
+    const node = hits[0].object.userData;
+    // Skip Labubu (single-click flies to soul page)
+    if (node.name === 'Labubu Oracle') return;
+    // Only trigger on hub nodes
+    if (node.parent === labubu) {
+      createSupernova(node);
+    }
+  }
+});
+
+// ── Animation ──
+const clock = new THREE.Clock();
+let autoRotate = true;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  // Star birth updates
+  updateBirths(dt, t);
+
+  // Supernova updates
+  updateSupernovae(dt, t);
+
+  // Lifecycle loop — periodic rebirth/supernova
+  updateLifecycle(dt);
+
+  // Auto-rotation when not dragging
+  if (!isDragging && autoRotate) targetTheta += 0.0006;
+
+  // Damped spring camera
+  camTheta += (targetTheta - camTheta) * 0.04;
+  camPhi += (targetPhi - camPhi) * 0.04;
+  camDist += (targetDist - camDist) * 0.04;
+  currentLookAt.lerp(targetLookAt, 0.03);
+
+  camera.position.set(
+    currentLookAt.x + camDist * Math.sin(camPhi) * Math.sin(camTheta),
+    currentLookAt.y + camDist * Math.cos(camPhi),
+    currentLookAt.z + camDist * Math.sin(camPhi) * Math.cos(camTheta)
+  );
+  camera.lookAt(currentLookAt);
+
+  // Kepler orbit animation
+  nodes.forEach(node => {
+    if (!node.mesh || !node.parent || node === labubu) return;
+    const p = node.parent;
+    const a = node.orbitRadius;
+    const e = node.eccentricity;
+    const speed = node.orbitSpeed;
+    const M = t * speed + node.orbitPhase;
+    const E = solveKepler(M, e);
+    const cosE = Math.cos(E), sinE = Math.sin(E);
+    const x2d = a * (cosE - e);
+    const y2d = a * Math.sqrt(1 - e * e) * sinE;
+
+    // Tilt the orbit plane
+    const tilt = node.orbitTilt;
+    const px = p.x + x2d * Math.cos(tilt) - y2d * Math.sin(tilt) * 0.3;
+    const py = p.y + y2d * Math.cos(tilt);
+    const pz = p.z + x2d * Math.sin(tilt) + y2d * Math.cos(tilt) * 0.3;
+
+    node.mesh.position.set(px, py, pz);
+    node.x = px; node.y = py; node.z = pz;
+  });
+
+  // Pulse hub stars
+  nodes.forEach(node => {
+    if (!node.mesh || !(node.parent === labubu || node === labubu)) return;
+    const pulse = 0.8 + 0.4 * Math.sin(t * 2 + node.id * 0.7);
+    node.mesh.material.emissiveIntensity = node === labubu ? pulse * 1.5 : pulse;
+  });
+
+  composer.render();
+}
+
+animate();
+
+// Resize
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+});
+</script>
+</body>
+</html>
