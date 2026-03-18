@@ -15,6 +15,7 @@ import { OrbitalView } from "./components/OrbitalView";
 import { InboxOverlay } from "./components/InboxView";
 import { WorktreeView } from "./components/WorktreeView";
 import { ChatView } from "./components/ChatView";
+import { DashboardView } from "./components/DashboardView";
 import { ShortcutOverlay } from "./components/ShortcutOverlay";
 import { JumpOverlay } from "./components/JumpOverlay";
 import { unlockAudio, isAudioUnlocked, setSoundMuted } from "./lib/sounds";
@@ -156,7 +157,7 @@ export function App() {
     return () => window.removeEventListener("keydown", handler, true);
   }, []);
 
-  const { sessions, agents, eventLog, addEvent, handleMessage, feedActive, agentFeedLog } = useSessions();
+  const { sessions, agents, eventLog, addEvent, handleMessage, feedEvents, feedActive, agentFeedLog } = useSessions();
 
   // Resolve hash agent name → AgentState once agents are loaded
   const pendingHashAgent = useRef(hashAgent);
@@ -309,6 +310,14 @@ export function App() {
     return (
       <Layout activeView="orbital" {...layoutProps}>
         <OrbitalView sessions={sessions} agents={agents} connected={connected} onSelectAgent={onSelectAgent} />
+      </Layout>
+    );
+  }
+
+  if (route === "dashboard") {
+    return (
+      <Layout activeView="dashboard" {...layoutProps}>
+        <DashboardView sessions={sessions} agents={agents} connected={connected} send={send} onSelectAgent={onSelectAgent} eventLog={eventLog} feedEvents={feedEvents} feedActive={feedActive} agentFeedLog={agentFeedLog} />
       </Layout>
     );
   }

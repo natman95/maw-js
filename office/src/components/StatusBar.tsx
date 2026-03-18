@@ -15,6 +15,7 @@ interface StatusBarProps {
 }
 
 const NAV_ITEMS = [
+  { href: "#dashboard", label: "Dashboard", id: "dashboard" },
   { href: "#fleet", label: "Fleet", id: "fleet" },
   { href: "#office", label: "Office", id: "office" },
   { href: "#orbital", label: "Orbital", id: "orbital" },
