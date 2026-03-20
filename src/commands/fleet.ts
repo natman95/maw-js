@@ -370,6 +370,67 @@ async function resumeActiveItems() {
   }
 }
 
+/**
+ * Scan disk for worktrees not registered in fleet configs.
+ * For each running session, check if there are worktrees on disk
+ * that don't have a corresponding tmux window, and spawn them.
+ */
+async function respawnMissingWorktrees(sessions: FleetSession[]): Promise<number> {
+  const ghqRoot = loadConfig().ghqRoot;
+  let spawned = 0;
+
+  for (const sess of sessions) {
+    if (sess.skip_command) continue;
+
+    // Find oracle main windows (pattern: {name}-oracle)
+    const mainWindows = sess.windows.filter(w => w.name.endsWith("-oracle"));
+    const registeredNames = new Set(sess.windows.map(w => w.name));
+
+    for (const main of mainWindows) {
+      const oracleName = main.name.replace(/-oracle$/, "");
+      const repoPath = `${ghqRoot}/${main.repo}`;
+      const repoName = main.repo.split("/").pop()!;
+      const parentDir = repoPath.replace(/\/[^/]+$/, "");
+
+      // Scan disk for worktrees
+      let wtPaths: string[] = [];
+      try {
+        const raw = await ssh(`ls -d ${parentDir}/${repoName}.wt-* 2>/dev/null || true`);
+        wtPaths = raw.split("\n").filter(Boolean);
+      } catch { continue; }
+
+      // Get running windows for this session
+      let runningWindows: string[] = [];
+      try {
+        const windows = await tmux.listWindows(sess.name);
+        runningWindows = windows.map(w => w.name);
+      } catch { continue; }
+
+      for (const wtPath of wtPaths) {
+        const wtBase = wtPath.split("/").pop()!;
+        const suffix = wtBase.replace(`${repoName}.wt-`, "");
+        const windowName = `${oracleName}-${suffix}`;
+        const taskPart = suffix.replace(/^\d+-/, "");
+        const altName = `${oracleName}-${taskPart}`;
+
+        // Skip if already registered in fleet config or running
+        if (registeredNames.has(windowName) || registeredNames.has(altName)) continue;
+        if (runningWindows.includes(windowName) || runningWindows.includes(altName)) continue;
+
+        try {
+          await tmux.newWindow(sess.name, windowName, { cwd: wtPath });
+          await new Promise(r => setTimeout(r, 300));
+          await tmux.sendText(`${sess.name}:${windowName}`, buildCommand(windowName));
+          console.log(`  \x1b[32m↻\x1b[0m ${windowName} (discovered on disk)`);
+          spawned++;
+        } catch { /* window creation failed */ }
+      }
+    }
+  }
+
+  return spawned;
+}
+
 export async function cmdWakeAll(opts: { kill?: boolean; all?: boolean; resume?: boolean } = {}) {
   const allSessions = loadFleet();
   // Skip dormant (20+) unless --all flag is passed
@@ -437,6 +498,10 @@ export async function cmdWakeAll(opts: { kill?: boolean; all?: boolean; resume?:
     sessCount++;
     console.log(`  \x1b[32m●\x1b[0m ${sess.name} — ${sess.windows.length} windows`);
   }
+
+  // Scan disk for worktrees not covered by fleet configs and spawn them
+  const wtExtra = await respawnMissingWorktrees(sessions);
+  winCount += wtExtra;
 
   console.log(`\n  \x1b[32m${sessCount} sessions, ${winCount} windows woke up.\x1b[0m\n`);
 
