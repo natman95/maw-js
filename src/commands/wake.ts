@@ -149,6 +149,31 @@ export async function cmdWake(oracle: string, opts: { task?: string; newWt?: str
   } else {
     // Ensure env vars are set on existing session (may predate this fix)
     await setSessionEnv(session);
+
+    // Respawn missing worktree windows (e.g. after reboot)
+    if (!opts.task && !opts.newWt) {
+      const allWt = await findWorktrees(parentDir, repoName);
+      if (allWt.length > 0) {
+        let existingWindows: string[] = [];
+        try {
+          const windows = await tmux.listWindows(session);
+          existingWindows = windows.map(w => w.name);
+        } catch { /* ok */ }
+
+        for (const wt of allWt) {
+          const taskPart = wt.name.replace(/^\d+-/, "");
+          const wtWindowName = `${oracle}-${wt.name}`;
+          // Also check shorter name pattern (oracle-taskPart)
+          const altName = `${oracle}-${taskPart}`;
+          if (existingWindows.includes(wtWindowName) || existingWindows.includes(altName)) continue;
+
+          await tmux.newWindow(session, wtWindowName, { cwd: wt.path });
+          await new Promise(r => setTimeout(r, 300));
+          await tmux.sendText(`${session}:${wtWindowName}`, buildCommand(wtWindowName));
+          console.log(`\x1b[32m↻\x1b[0m respawned: ${wtWindowName}`);
+        }
+      }
+    }
   }
 
   let targetPath = repoPath;
