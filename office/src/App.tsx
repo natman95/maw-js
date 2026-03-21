@@ -19,7 +19,57 @@ import { DashboardView } from "./components/DashboardView";
 import { ShortcutOverlay } from "./components/ShortcutOverlay";
 import { JumpOverlay } from "./components/JumpOverlay";
 import { OracleSearch } from "./components/OracleSearch";
-import { unlockAudio, isAudioUnlocked, setSoundMuted } from "./lib/sounds";
+import { unlockAudio, isAudioUnlocked, setSoundMuted, SOUND_PROFILES, getSoundProfile, setSoundProfile, previewSound } from "./lib/sounds";
+
+function FloatingButtons() {
+  const [showSounds, setShowSounds] = useState(false);
+  const [current, setCurrent] = useState(getSoundProfile());
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showSounds) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setShowSounds(false); };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, [showSounds]);
+
+  return (
+    <div ref={ref} className="fixed top-20 right-6 flex flex-col gap-3 z-30">
+      <button
+        onClick={() => window.dispatchEvent(new CustomEvent("search-open"))}
+        className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl backdrop-blur-xl active:scale-90 cursor-pointer transition-all shadow-lg"
+        style={{ background: "rgba(34,211,238,0.12)", border: "1px solid rgba(34,211,238,0.25)", color: "#22d3ee" }}
+        title="Oracle Search (⌘K)"
+      >🔍</button>
+      <button
+        onClick={() => window.dispatchEvent(new CustomEvent("broadcast-open"))}
+        className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl backdrop-blur-xl active:scale-90 cursor-pointer transition-all shadow-lg"
+        style={{ background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.25)", color: "#fbbf24" }}
+        title="Broadcast to all agents"
+      >📢</button>
+      <button
+        onClick={() => setShowSounds(!showSounds)}
+        className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl backdrop-blur-xl active:scale-90 cursor-pointer transition-all shadow-lg"
+        style={{ background: "rgba(168,85,247,0.12)", border: "1px solid rgba(168,85,247,0.25)", color: "#a855f7" }}
+        title="Change notification sound"
+      >{SOUND_PROFILES.find(p => p.id === current)?.emoji || "🔔"}</button>
+
+      {showSounds && (
+        <div className="absolute right-16 top-[8.5rem] rounded-2xl overflow-hidden" style={{ background: "rgba(13,13,24,0.95)", border: "1px solid rgba(255,255,255,0.1)", backdropFilter: "blur(12px)", minWidth: 200 }}>
+          {SOUND_PROFILES.map(p => (
+            <button key={p.id} onClick={() => { setSoundProfile(p.id); setCurrent(p.id); previewSound(p.id); }}
+              className="w-full flex items-center gap-3 px-5 py-3.5 text-left transition-colors hover:bg-white/[0.06]"
+              style={{ background: current === p.id ? "rgba(168,85,247,0.12)" : "transparent" }}>
+              <span className="text-2xl">{p.emoji}</span>
+              <span className="text-sm font-mono" style={{ color: current === p.id ? "#a855f7" : "rgba(255,255,255,0.5)" }}>{p.label}</span>
+              {current === p.id && <span className="ml-auto text-sm text-purple-400">✓</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 import { useFleetStore } from "./lib/store";
 import type { AgentState } from "./lib/types";
 
@@ -120,24 +170,7 @@ function Layout({ activeView, connected, agentCount, sessionCount, askCount, mut
       {broadcastModal}
 
       {/* Floating action buttons — top right */}
-      <div className="fixed top-20 right-6 flex flex-col gap-3 z-30">
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent("search-open"))}
-          className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl backdrop-blur-xl active:scale-90 cursor-pointer transition-all shadow-lg"
-          style={{ background: "rgba(34,211,238,0.12)", border: "1px solid rgba(34,211,238,0.25)", color: "#22d3ee" }}
-          title="Oracle Search (⌘K)"
-        >
-          🔍
-        </button>
-        <button
-          onClick={() => window.dispatchEvent(new CustomEvent("broadcast-open"))}
-          className="w-14 h-14 rounded-2xl flex items-center justify-center text-xl backdrop-blur-xl active:scale-90 cursor-pointer transition-all shadow-lg"
-          style={{ background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.25)", color: "#fbbf24" }}
-          title="Broadcast to all agents"
-        >
-          📢
-        </button>
-      </div>
+      <FloatingButtons />
     </div>
   );
 }
