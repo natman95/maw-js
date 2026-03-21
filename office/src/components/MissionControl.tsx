@@ -299,10 +299,12 @@ export const MissionControl = memo(function MissionControl({
   }, [layout]);
 
   // Compute viewBox based on zoom and pan
+  const isPortrait = typeof window !== "undefined" && window.innerHeight > window.innerWidth;
+  const baseH = isPortrait ? 800 : 1000;
   const vbW = 1200 / zoom;
-  const vbH = 1000 / zoom;
+  const vbH = baseH / zoom;
   const vbX = (1200 - vbW) / 2 - pan.x;
-  const vbY = (1000 - vbH) / 2 - pan.y;
+  const vbY = (baseH - vbH) / 2 - pan.y + (isPortrait ? -50 : 0);
 
   return (
     <div
