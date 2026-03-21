@@ -6,6 +6,7 @@ import { OracleSearch } from "./OracleSearch";
 import { BottomStats } from "./BottomStats";
 import { FpsCounter } from "./FpsCounter";
 import { roomStyle, PREVIEW_CARD } from "../lib/constants";
+import { BroadcastModal } from "./FleetGrid";
 import type { AgentState, Session, AgentEvent } from "../lib/types";
 interface MissionControlProps {
   sessions: Session[];
@@ -34,6 +35,7 @@ export const MissionControl = memo(function MissionControl({
   const hoverTimeout = useRef<ReturnType<typeof setTimeout>>();
 
   const [showSearch, setShowSearch] = useState(false);
+  const [showBroadcast, setShowBroadcast] = useState(false);
 
   // Hide search when card is pinned
   useEffect(() => {
@@ -567,22 +569,34 @@ export const MissionControl = memo(function MissionControl({
         </div>
       )}
 
-      {/* Search button — bottom left */}
-      <button
-        onClick={() => setShowSearch(true)}
-        className="absolute bottom-4 left-6 flex items-center gap-2 px-3 py-2 rounded-xl bg-black/50 backdrop-blur border border-white/10 text-white/50 hover:text-[#64b5f6] hover:border-[#64b5f6]/30 cursor-pointer transition-all z-20"
-        title="Search Oracle (⌘K)"
-      >
-        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
-          <circle cx={11} cy={11} r={8} />
-          <line x1={21} y1={21} x2={16.65} y2={16.65} />
-        </svg>
-        <span className="text-[10px] font-mono">Oracle</span>
-        <kbd className="text-[8px] text-white/20 ml-1">⌘K</kbd>
-      </button>
+      {/* Bottom left buttons — search + broadcast */}
+      <div className="absolute bottom-4 left-6 flex items-center gap-2 z-20">
+        <button
+          onClick={() => setShowSearch(true)}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-black/50 backdrop-blur border border-white/10 text-white/50 hover:text-[#64b5f6] hover:border-[#64b5f6]/30 cursor-pointer transition-all"
+          title="Search Oracle (⌘K)"
+        >
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
+            <circle cx={11} cy={11} r={8} />
+            <line x1={21} y1={21} x2={16.65} y2={16.65} />
+          </svg>
+          <span className="text-[10px] font-mono">Oracle</span>
+          <kbd className="text-[8px] text-white/20 ml-1">⌘K</kbd>
+        </button>
+        <button
+          onClick={() => setShowBroadcast(true)}
+          className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl bg-amber-500/10 backdrop-blur border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 hover:scale-105 active:scale-95 cursor-pointer transition-all shadow-[0_0_20px_rgba(251,191,36,0.15)]"
+          title="Broadcast to all agents"
+        >
+          📢
+        </button>
+      </div>
 
       {/* Oracle Search overlay */}
       {showSearch && <OracleSearch onClose={() => setShowSearch(false)} />}
+
+      {/* Broadcast modal */}
+      {showBroadcast && <BroadcastModal agents={agents} send={send} onClose={() => setShowBroadcast(false)} />}
 
       {/* Bottom stats + FPS */}
       <BottomStats agents={agents} />

@@ -14,7 +14,7 @@ import { describeActivity, type FeedEvent } from "../lib/feed";
 export type FeedLogEntry = { text: string; ts: number; project?: string; eventType?: string };
 
 /** Fleet-specific controls for StatusBar — reads from Zustand, takes agents for counts */
-function BroadcastModal({ agents, send, onClose }: { agents: AgentState[]; send: (msg: object) => void; onClose: () => void }) {
+export function BroadcastModal({ agents, send, onClose }: { agents: AgentState[]; send: (msg: object) => void; onClose: () => void }) {
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
   const [interim, setInterim] = useState("");
