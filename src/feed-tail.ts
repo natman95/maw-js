@@ -7,7 +7,8 @@ import { statSync, openSync, readSync, closeSync } from "node:fs";
 import { join } from "node:path";
 import { parseLine, activeOracles, type FeedEvent } from "./lib/feed";
 
-const DEFAULT_PATH = join(process.env.HOME || "/home/nat", ".oracle", "feed.log");
+import { homedir } from "node:os";
+const DEFAULT_PATH = join(process.env.MAW_FEED_PATH || join(homedir(), ".oracle", "feed.log"));
 const POLL_MS = 1000;
 const DEFAULT_MAX_BUFFER = 200;
 

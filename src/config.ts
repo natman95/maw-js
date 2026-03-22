@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
+import { homedir } from "os";
 
 export interface MawConfig {
   host: string;
@@ -14,7 +15,7 @@ export interface MawConfig {
 const DEFAULTS: MawConfig = {
   host: "local",
   port: 3456,
-  ghqRoot: "/home/nat/Code/github.com",
+  ghqRoot: join(homedir(), "Code/github.com"),
   oracleUrl: "http://localhost:47779",
   env: {},
   commands: { default: "claude" },
