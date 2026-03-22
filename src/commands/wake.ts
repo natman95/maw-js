@@ -3,18 +3,7 @@ import { tmux } from "../tmux";
 import { loadConfig, buildCommand, getEnvVars } from "../config";
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { execSync } from "child_process";
 import { FLEET_DIR } from "../paths";
-
-/** Fix socket ACL so other users in the group can access it */
-function fixSocketPermissions(): void {
-  const socket = process.env.MAW_TMUX_SOCKET || loadConfig().tmuxSocket;
-  if (!socket) return;
-  try {
-    execSync(`setfacl -m g:oracle:rwx '${socket}' 2>/dev/null; setfacl -m g:oracle:rx "$(dirname '${socket}')" 2>/dev/null`, { stdio: "ignore" });
-    console.log(`\x1b[36m🔓\x1b[0m socket ACL fixed: ${socket}`);
-  } catch { /* setfacl not available or not needed */ }
-}
 
 /**
  * Verify all windows in a session are running Claude (not empty zsh).
@@ -174,7 +163,6 @@ export async function cmdWake(oracle: string, opts: { task?: string; newWt?: str
     // Create session with main window (use oracle-oracle name to match fleet configs)
     const mainWindowName = `${oracle}-oracle`;
     await tmux.newSession(session, { window: mainWindowName, cwd: repoPath });
-    fixSocketPermissions();
     await setSessionEnv(session);
     await new Promise(r => setTimeout(r, 300));
     await tmux.sendText(`${session}:${mainWindowName}`, buildCommand(mainWindowName));
