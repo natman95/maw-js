@@ -1,10 +1,8 @@
 import { capture } from "./ssh";
 import { tmux } from "./tmux";
 import { registerBuiltinHandlers } from "./handlers";
-import type { FeedTailer } from "./feed-tail";
+import type { FeedEvent } from "./lib/feed";
 import type { MawWS, Handler } from "./types";
-import { statSync, readFileSync } from "fs";
-import { MAW_LOG_PATH, type LogEntry } from "./maw-log";
 
 export class MawEngine {
   private clients = new Set<MawWS>();
@@ -17,12 +15,12 @@ export class MawEngine {
   private sessionInterval: ReturnType<typeof setInterval> | null = null;
   private previewInterval: ReturnType<typeof setInterval> | null = null;
   private feedUnsub: (() => void) | null = null;
-  private feedTailer: FeedTailer;
-  private mawLogInterval: ReturnType<typeof setInterval> | null = null;
-  private mawLogOffset = 0;
+  private feedBuffer: FeedEvent[];
+  private feedListeners: Set<(event: FeedEvent) => void>;
 
-  constructor({ feedTailer }: { feedTailer: FeedTailer }) {
-    this.feedTailer = feedTailer;
+  constructor({ feedBuffer, feedListeners }: { feedBuffer: FeedEvent[]; feedListeners: Set<(event: FeedEvent) => void> }) {
+    this.feedBuffer = feedBuffer;
+    this.feedListeners = feedListeners;
     registerBuiltinHandlers(this);
   }
 
@@ -40,14 +38,13 @@ export class MawEngine {
       ws.send(JSON.stringify({ type: "sessions", sessions: this.cachedSessions }));
       this.sendBusyAgents(ws);
     } else {
-      // Cold start: fetch and send directly to this client
       tmux.listAll().then(sessions => {
         this.cachedSessions = sessions;
         ws.send(JSON.stringify({ type: "sessions", sessions }));
         this.sendBusyAgents(ws);
       }).catch(() => {});
     }
-    ws.send(JSON.stringify({ type: "feed-history", events: this.feedTailer.getRecent(50) }));
+    ws.send(JSON.stringify({ type: "feed-history", events: this.feedBuffer.slice(-50) }));
   }
 
   /** Scan panes for busy agents and send `recent` message to client. */
@@ -152,39 +149,14 @@ export class MawEngine {
     this.previewInterval = setInterval(() => {
       for (const ws of this.clients) this.pushPreviews(ws);
     }, 2000);
-    this.feedTailer.start();
-    this.feedUnsub = this.feedTailer.onEvent((event) => {
+
+    // Subscribe to feed events from HTTP POST /api/feed
+    const listener = (event: FeedEvent) => {
       const msg = JSON.stringify({ type: "feed", event });
       for (const ws of this.clients) ws.send(msg);
-    });
-
-    // Watch maw-log for new entries → broadcast to clients
-    try { this.mawLogOffset = statSync(MAW_LOG_PATH).size; } catch { this.mawLogOffset = 0; }
-    this.mawLogInterval = setInterval(() => this.checkMawLog(), 2000);
-  }
-
-  private checkMawLog() {
-    if (this.clients.size === 0) return;
-    try {
-      const size = statSync(MAW_LOG_PATH).size;
-      if (size <= this.mawLogOffset) return;
-      // Read new bytes
-      const buf = Buffer.alloc(size - this.mawLogOffset);
-      const fd = require("fs").openSync(MAW_LOG_PATH, "r");
-      require("fs").readSync(fd, buf, 0, buf.length, this.mawLogOffset);
-      require("fs").closeSync(fd);
-      this.mawLogOffset = size;
-
-      const lines = buf.toString("utf-8").split("\n").filter(Boolean);
-      const entries: LogEntry[] = [];
-      for (const line of lines) {
-        try { entries.push(JSON.parse(line)); } catch {}
-      }
-      if (entries.length > 0) {
-        const msg = JSON.stringify({ type: "maw-log", entries });
-        for (const ws of this.clients) ws.send(msg);
-      }
-    } catch {}
+    };
+    this.feedListeners.add(listener);
+    this.feedUnsub = () => this.feedListeners.delete(listener);
   }
 
   private stopIntervals() {
@@ -192,8 +164,6 @@ export class MawEngine {
     if (this.captureInterval) { clearInterval(this.captureInterval); this.captureInterval = null; }
     if (this.sessionInterval) { clearInterval(this.sessionInterval); this.sessionInterval = null; }
     if (this.previewInterval) { clearInterval(this.previewInterval); this.previewInterval = null; }
-    if (this.mawLogInterval) { clearInterval(this.mawLogInterval); this.mawLogInterval = null; }
     if (this.feedUnsub) { this.feedUnsub(); this.feedUnsub = null; }
-    this.feedTailer.stop();
   }
 }

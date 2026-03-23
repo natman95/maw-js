@@ -6,8 +6,8 @@ import { dirname, resolve } from "path";
 const MAW_ROOT = resolve(dirname(new URL(import.meta.url).pathname), "..");
 import { listSessions, capture, sendKeys, selectWindow } from "./ssh";
 import { processMirror } from "./commands/overview";
-import { FeedTailer } from "./feed-tail";
 import { MawEngine } from "./engine";
+import type { FeedEvent } from "./lib/feed";
 import type { WSData } from "./types";
 
 const app = new Hono();
@@ -419,16 +419,42 @@ app.get("/api/maw-log", (c) => {
   return c.json({ entries, total });
 });
 
-// --- Oracle Feed ---
-const feedTailer = new FeedTailer();
+// --- Oracle Feed (in-memory, HTTP push) ---
+const feedBuffer: FeedEvent[] = [];
+const FEED_MAX = 500;
+const feedListeners = new Set<(event: FeedEvent) => void>();
+
+function pushFeedEvent(event: FeedEvent) {
+  feedBuffer.push(event);
+  if (feedBuffer.length > FEED_MAX) feedBuffer.splice(0, feedBuffer.length - FEED_MAX);
+  for (const fn of feedListeners) fn(event);
+}
 
 app.get("/api/feed", (c) => {
   const limit = Math.min(200, +(c.req.query("limit") || "50"));
   const oracle = c.req.query("oracle") || undefined;
-  let events = feedTailer.getRecent(limit);
+  let events = feedBuffer.slice(-limit);
   if (oracle) events = events.filter(e => e.oracle === oracle);
-  const active = [...feedTailer.getActive().keys()];
-  return c.json({ events: events.reverse(), total: events.length, active_oracles: active });
+  const activeMap = new Map<string, FeedEvent>();
+  const cutoff = Date.now() - 5 * 60_000;
+  for (const e of feedBuffer) { if (e.ts >= cutoff) activeMap.set(e.oracle, e); }
+  return c.json({ events: events.reverse(), total: events.length, active_oracles: [...activeMap.keys()] });
+});
+
+app.post("/api/feed", async (c) => {
+  const body = await c.req.json();
+  const event: FeedEvent = {
+    timestamp: body.timestamp || new Date().toISOString(),
+    oracle: body.oracle || "unknown",
+    host: body.host || "local",
+    event: body.event || "Notification",
+    project: body.project || "",
+    sessionId: body.sessionId || "",
+    message: body.message || "",
+    ts: body.ts || Date.now(),
+  };
+  pushFeedEvent(event);
+  return c.json({ ok: true });
 });
 
 app.onError((err, c) => c.json({ error: err.message }, 500));
@@ -440,7 +466,7 @@ export { app };
 import { handlePtyMessage, handlePtyClose } from "./pty";
 
 export function startServer(port = +(process.env.MAW_PORT || loadConfig().port || 3456)) {
-  const engine = new MawEngine({ feedTailer });
+  const engine = new MawEngine({ feedBuffer, feedListeners });
 
   const wsHandler = {
     open: (ws: any) => {
@@ -493,12 +519,10 @@ import { MAW_LOG_PATH } from "./maw-log";
 
 import { describeActivity } from "./lib/feed";
 
-import { describeActivity } from "./lib/feed";
-
 function statusHeartbeat() {
   try {
     const cutoff = Date.now() - 15 * 60_000;
-    const events = feedTailer.getRecent(500).filter(e => e.ts >= cutoff);
+    const events = feedBuffer.filter(e => e.ts >= cutoff);
     if (events.length === 0) return;
 
     // Only count real work events (tool uses, prompts)
