@@ -110,10 +110,12 @@ async function attach(ws: ServerWebSocket<any>, target: string, cols: number, ro
 
   ws.send(JSON.stringify({ type: "attached", target: safe }));
 
-  // Force tmux to redraw existing content to the new PTY client
+  // Force tmux to redraw — send space+backspace through stdin to trigger output
   setTimeout(() => {
-    tmux.tryRun("refresh-client", "-t", ptySessionName).catch(() => {});
-  }, 300);
+    try {
+      proc.stdin?.write(new Uint8Array([12])); // Ctrl+L = redraw screen
+    } catch {}
+  }, 500);
 
   // No resize here — grouped session has its own size from stty
 
