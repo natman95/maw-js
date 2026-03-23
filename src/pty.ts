@@ -110,10 +110,11 @@ async function attach(ws: ServerWebSocket<any>, target: string, cols: number, ro
 
   ws.send(JSON.stringify({ type: "attached", target: safe }));
 
-  // Force tmux to redraw — send space+backspace through stdin to trigger output
-  setTimeout(() => {
+  // Force tmux to redraw — resize +1/-1 trick triggers full repaint
+  setTimeout(async () => {
     try {
-      proc.stdin?.write(new Uint8Array([12])); // Ctrl+L = redraw screen
+      await tmux.resizePane(`${ptySessionName}:`, c + 1, r);
+      setTimeout(() => tmux.resizePane(`${ptySessionName}:`, c, r).catch(() => {}), 200);
     } catch {}
   }, 500);
 
