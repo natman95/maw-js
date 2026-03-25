@@ -1,7 +1,7 @@
 import { memo, useState, useEffect } from "react";
 import { apiUrl, wsUrl } from "../lib/api";
 
-interface TeamMember {
+export interface TeamMember {
   name: string;
   color: string | null;
   backendType: string | null;
@@ -10,7 +10,7 @@ interface TeamMember {
   model: string;
 }
 
-interface Team {
+export interface Team {
   name: string;
   description: string;
   members: TeamMember[];
@@ -23,7 +23,7 @@ interface Task {
   owner: string | null;
 }
 
-const COLOR_MAP: Record<string, string> = {
+export const COLOR_MAP: Record<string, string> = {
   blue: "#60a5fa",
   green: "#4ade80",
   red: "#f87171",

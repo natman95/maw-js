@@ -10,6 +10,7 @@ import { useFps } from "./FpsCounter";
 import { useFleetStore, RECENT_TTL_MS, type RecentEntry } from "../lib/store";
 import type { AgentState, Session, AgentEvent } from "../lib/types";
 import { describeActivity, type FeedEvent } from "../lib/feed";
+import type { Team } from "./TeamPanel";
 
 export type FeedLogEntry = { text: string; ts: number; project?: string; eventType?: string };
 
@@ -174,6 +175,7 @@ interface FleetGridProps {
   addEvent: (target: string, type: AgentEvent["type"], detail: string) => void;
   feedActive?: Map<string, FeedEvent>;
   agentFeedLog?: Map<string, FeedEvent[]>;
+  teams?: Team[];
 }
 
 /** Track visible agent targets via IntersectionObserver */
@@ -233,7 +235,7 @@ function sortRooms(sessions: Session[], agentMap: Map<string, AgentState[]>, mod
 }
 
 export const FleetGrid = memo(function FleetGrid({
-  sessions, agents, connected, send, onSelectAgent, eventLog, addEvent, feedActive, agentFeedLog,
+  sessions, agents, connected, send, onSelectAgent, eventLog, addEvent, feedActive, agentFeedLog, teams,
 }: FleetGridProps) {
   const fps = useFps();
   const observe = useVisibleTargets(send);
@@ -459,7 +461,7 @@ export const FleetGrid = memo(function FleetGrid({
                     featured={i === 0} agoLabel={agoLabel} feedLog={getAgentFeedLog(agent.name)}
                     slept={sleptTargets.includes(entry.target)} alignWidth={96}
                     observe={observe} showPreview={showPreview} hidePreview={hidePreview} onAgentClick={onAgentClick}
-                    send={send} onSendDone={onSendDone} />
+                    send={send} onSendDone={onSendDone} teams={teams} />
                 );
               })}
             </div>
@@ -507,7 +509,7 @@ export const FleetGrid = memo(function FleetGrid({
                       feedLog={getAgentFeedLog(agent.name)}
                       slept={sleptTargets.includes(agent.target)}
                       observe={observe} showPreview={showPreview} hidePreview={hidePreview} onAgentClick={onAgentClick}
-                      send={send} onSendDone={onSendDone} />
+                      send={send} onSendDone={onSendDone} teams={teams} />
                   ))}
                 </div>
               )}

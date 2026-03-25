@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import type { Session, AgentState, PaneStatus, AgentEvent } from "../lib/types";
+import type { Team } from "../components/TeamPanel";
 import { stripAnsi } from "../lib/ansi";
 import { agentSortKey } from "../lib/constants";
 import { playNotificationSound } from "../lib/sounds";
@@ -18,6 +19,9 @@ export function useSessions() {
 
   const [eventLog, setEventLog] = useState<AgentEvent[]>([]);
   const MAX_EVENTS = 200;
+
+  // Agent Teams state
+  const [teams, setTeams] = useState<Team[]>([]);
 
   // Oracle feed state
   const [feedEvents, setFeedEvents] = useState<FeedEvent[]>([]);
@@ -203,6 +207,8 @@ export function useSessions() {
           if (agent) markBusy([{ target: agent.target, name: agent.name, session: agent.session }], e.ts);
         }
       }
+    } else if (data.type === "teams") {
+      setTeams(data.teams || []);
     } else if (data.type === "previews") {
       const previews: Record<string, string> = data.data;
       setCaptureData((prev) => {
@@ -272,5 +278,5 @@ export function useSessions() {
     return map;
   }, [feedEvents, resolveAgentFromFeed]);
 
-  return { sessions, agents, eventLog, addEvent, handleMessage, feedEvents, feedActive, agentFeedLog };
+  return { sessions, agents, eventLog, addEvent, handleMessage, feedEvents, feedActive, agentFeedLog, teams };
 }

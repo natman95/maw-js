@@ -3,6 +3,8 @@ import { AgentAvatar } from "./AgentAvatar";
 import { MiniMonitor } from "./MiniMonitor";
 import type { AgentState } from "../lib/types";
 import type { FeedLogEntry } from "./FleetGrid";
+import type { Team } from "./TeamPanel";
+import { COLOR_MAP } from "./TeamPanel";
 import { guessCommand } from "../lib/constants";
 
 const isTouch = typeof window !== "undefined" && ("ontouchstart" in window || navigator.maxTouchPoints > 0);
@@ -74,10 +76,13 @@ function AgentControls({ agent, displayName, accent, inputOpen, send, onMic }: {
   );
 }
 
-function AgentInfo({ agent, isBusy, displayName, accent, agoLabel, feedLog }: {
+function AgentInfo({ agent, isBusy, displayName, accent, agoLabel, feedLog, teams }: {
   agent: AgentState; isBusy: boolean; displayName: string; accent: string;
-  agoLabel?: string; feedLog?: FeedLogEntry[] | null;
+  agoLabel?: string; feedLog?: FeedLogEntry[] | null; teams?: Team[];
 }) {
+  const agentTeam = teams?.find(t => t.members.some(m => m.name === agent.name));
+  const teamMember = agentTeam?.members.find(m => m.name === agent.name);
+  const teamColor = teamMember?.color ? COLOR_MAP[teamMember.color] || "#888" : "#888";
   return (
     <div className="flex flex-col gap-1 flex-1 min-w-0">
       <div className="flex items-center gap-3">
@@ -110,6 +115,13 @@ function AgentInfo({ agent, isBusy, displayName, accent, agoLabel, feedLog }: {
             </span>
           );
         })()}
+        {agentTeam && (
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded flex-shrink-0 flex items-center gap-1"
+            style={{ background: `${teamColor}18`, color: teamColor }}>
+            <span className="w-1.5 h-1.5 rounded-full" style={{ background: teamColor }} />
+            {agentTeam.name}
+          </span>
+        )}
         {agoLabel && <span className="text-[10px] font-mono text-white/25 flex-shrink-0">{agoLabel}</span>}
         {/* Last activity reason — shows what triggered busy status */}
         {!isBusy && feedLog && feedLog.length > 0 && (
@@ -208,11 +220,12 @@ interface AgentRowProps {
   onAgentClick: (agent: AgentState, accent: string, label: string, e: React.MouseEvent) => void;
   send?: (msg: object) => void;
   onSendDone?: (agent: AgentState, accent: string, roomLabel: string) => void;
+  teams?: Team[];
 }
 
 export const AgentRow = memo(function AgentRow({
   agent, accent, roomLabel, isLast, agoLabel, featured,
-  feedLog, slept, alignWidth, observe, showPreview, hidePreview, onAgentClick, send, onSendDone,
+  feedLog, slept, alignWidth, observe, showPreview, hidePreview, onAgentClick, send, onSendDone, teams,
 }: AgentRowProps) {
   const isBusy = agent.status === "busy";
   const displayName = agent.name.replace(/-oracle$/, "").replace(/-/g, " ");
@@ -341,7 +354,7 @@ export const AgentRow = memo(function AgentRow({
         )}
 
         <AgentInfo agent={agent} isBusy={isBusy} displayName={displayName} accent={accent}
-          agoLabel={agoLabel} feedLog={feedLog} />
+          agoLabel={agoLabel} feedLog={feedLog} teams={teams} />
 
         {send && <AgentControls agent={agent} displayName={displayName} accent={accent}
           inputOpen={inputOpen} send={send} onMic={handleMic} />}
