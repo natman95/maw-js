@@ -79,19 +79,19 @@ export async function restoreTabOrder(session: string): Promise<number> {
         try {
           await tmux.run("move-window", "-s", `${session}:${actual.index}`, "-t", `${session}:${saved.index}`);
           moved++;
-        } catch {}
+        } catch { /* expected: tmux move-window may conflict */ }
       }
     } else {
       // Target index is empty — just move
       try {
         await tmux.run("move-window", "-s", `${session}:${actual.index}`, "-t", `${session}:${saved.index}`);
         moved++;
-      } catch {}
+      } catch { /* expected: tmux move-window may conflict */ }
     }
   }
 
   // Clean up saved order file after successful restore
-  try { unlinkSync(filePath); } catch {}
+  try { unlinkSync(filePath); } catch { /* expected: file may already be removed */ }
 
   return moved;
 }

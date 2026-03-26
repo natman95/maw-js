@@ -20,7 +20,7 @@ function resolvePsiPath(): string {
   try {
     const cfg = JSON.parse(readFileSync(join(homedir(), ".config/maw/maw.config.json"), "utf-8"));
     if (cfg.psiPath) return cfg.psiPath;
-  } catch {}
+  } catch { /* expected: config may not exist */ }
   return "/home/nat/Code/github.com/laris-co/neo-oracle/ψ";
 }
 

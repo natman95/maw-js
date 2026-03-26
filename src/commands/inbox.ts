@@ -25,7 +25,7 @@ function scanItems(dir: string): InboxItem[] {
           date: st.mtime.toISOString().slice(0, 10) + " " + st.mtime.toTimeString().slice(0, 5),
         });
       }
-    } catch {}
+    } catch { /* expected: subdirectory may not be readable */ }
   }
   scan(dir, "message");
   try {
@@ -33,7 +33,7 @@ function scanItems(dir: string): InboxItem[] {
       const sp = join(dir, sub);
       if (statSync(sp).isDirectory()) scan(sp, sub);
     }
-  } catch {}
+  } catch { /* expected: directory may not exist */ }
   return items.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
 }
 

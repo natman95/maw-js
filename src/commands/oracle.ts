@@ -80,7 +80,7 @@ export async function cmdOracleAbout(oracle: string) {
       try {
         const content = await capture(`${session}:${w.index}`, 3);
         status = content.trim() ? "\x1b[32m●\x1b[0m" : "\x1b[33m●\x1b[0m";
-      } catch {}
+      } catch { /* expected: capture may fail for inactive pane */ }
       console.log(`    ${status} ${w.name}`);
     }
   } else {
@@ -112,7 +112,7 @@ export async function cmdOracleAbout(oracle: string) {
         break;
       }
     }
-  } catch {}
+  } catch { /* expected: fleet dir may not exist */ }
 
   if (fleetFile) {
     const actualWindows = session

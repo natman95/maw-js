@@ -127,7 +127,7 @@ function usage() {
 if (cmd === "--version" || cmd === "-v") {
   const pkg = require("../package.json");
   let hash = "";
-  try { hash = require("child_process").execSync("git rev-parse --short HEAD", { cwd: import.meta.dir }).toString().trim(); } catch {}
+  try { hash = require("child_process").execSync("git rev-parse --short HEAD", { cwd: import.meta.dir }).toString().trim(); } catch { /* expected: may not be in a git repo */ }
   console.log(`maw v${pkg.version}${hash ? ` (${hash})` : ""}`);
 } else if (!cmd || cmd === "--help" || cmd === "-h") {
   usage();

@@ -26,7 +26,7 @@ const subscribePreviews: Handler = (ws, data, engine) => {
 };
 
 const select: Handler = (_ws, data) => {
-  selectWindow(data.target).catch(() => {});
+  selectWindow(data.target).catch(() => { /* expected: window may not exist */ });
 };
 
 const send: Handler = async (ws, data, engine) => {

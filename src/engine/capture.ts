@@ -42,7 +42,7 @@ export async function pushPreviews(
         changed[target] = content;
         hasChanges = true;
       }
-    } catch {}
+    } catch { /* expected: capture may fail for inactive pane */ }
   }));
 
   lastPreviews.set(ws, prevMap);

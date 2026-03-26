@@ -82,7 +82,7 @@ export async function cmdMegaStatus() {
     teamDirs = readdirSync(TEAMS_DIR).filter(d =>
       existsSync(join(TEAMS_DIR, d, "config.json"))
     );
-  } catch { }
+  } catch { /* expected: teams dir may not exist */ }
 
   if (!teamDirs.length) {
     console.log("\x1b[90mNo teams found. Use /mega-agent or TeamCreate to start.\x1b[0m");
@@ -158,7 +158,7 @@ export async function cmdMegaStop() {
     teamDirs = readdirSync(TEAMS_DIR).filter(d =>
       existsSync(join(TEAMS_DIR, d, "config.json"))
     );
-  } catch { }
+  } catch { /* expected: teams dir may not exist */ }
 
   const alive = teamDirs.filter(d => {
     const team = loadTeam(d);
@@ -186,7 +186,7 @@ export async function cmdMegaStop() {
         try {
           execSync(`tmux kill-pane -t ${m.tmuxPaneId}`, { timeout: 2000 });
           console.log(`    \x1b[90mkilled pane ${m.tmuxPaneId} (${m.name})\x1b[0m`);
-        } catch { }
+        } catch { /* expected: pane may already be dead */ }
       }
     }
   }

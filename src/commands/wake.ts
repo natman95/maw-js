@@ -45,7 +45,7 @@ export async function fetchIssuePrompt(issueNum: number, repo?: string): Promise
       const remote = await ssh("git remote get-url origin 2>/dev/null");
       const m = remote.match(/github\.com[:/](.+?)(?:\.git)?$/);
       if (m) repoSlug = m[1];
-    } catch {}
+    } catch { /* expected: may not be in a git repo */ }
   }
   if (!repoSlug) throw new Error("Could not detect repo — pass --repo org/name");
 
@@ -284,8 +284,11 @@ export async function cmdWake(oracle: string, opts: { task?: string; newWt?: str
       const branch = `agents/${wtName}`;
 
       // Delete stale branch if it exists but has no worktree (#62)
-      try { await ssh(`git -C '${repoPath}' branch -D '${branch}' 2>/dev/null`); } catch { /* branch doesn't exist — fine */ }
-      await ssh(`git -C '${repoPath}' worktree add '${wtPath}' -b '${branch}'`);
+      const safeRepoPath = repoPath.replace(/'/g, "'\\''");
+      const safeWtPath = wtPath.replace(/'/g, "'\\''");
+      const safeBranch = branch.replace(/'/g, "'\\''");
+      try { await ssh(`git -C '${safeRepoPath}' branch -D '${safeBranch}' 2>/dev/null`); } catch { /* branch doesn't exist — fine */ }
+      await ssh(`git -C '${safeRepoPath}' worktree add '${safeWtPath}' -b '${safeBranch}'`);
       console.log(`\x1b[32m+\x1b[0m worktree: ${wtPath} (${branch})`);
 
       targetPath = wtPath;

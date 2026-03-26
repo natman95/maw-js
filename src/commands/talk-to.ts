@@ -183,7 +183,7 @@ export async function cmdTalkTo(target: string, message: string, force = false) 
     sid,
     ch,
   }) + "\n";
-  try { await mkdir(logDir, { recursive: true }); await appendFile(logFile, line); } catch {}
+  try { await mkdir(logDir, { recursive: true }); await appendFile(logFile, line); } catch (e) { console.error(`\x1b[33m⚠\x1b[0m talk-to log write failed: ${e}`); }
 
   console.log(`\x1b[32m✓\x1b[0m thread #${threadResult?.thread_id ?? "?"} + sent → ${tmuxTarget}`);
 }

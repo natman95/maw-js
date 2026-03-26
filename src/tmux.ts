@@ -159,7 +159,7 @@ export class Tmux {
   async getPaneCommands(targets: string[]): Promise<Record<string, string>> {
     const result: Record<string, string> = {};
     await Promise.allSettled(targets.map(async (t) => {
-      try { result[t] = await this.getPaneCommand(t); } catch {}
+      try { result[t] = await this.getPaneCommand(t); } catch { /* expected: pane may have closed */ }
     }));
     return result;
   }
@@ -175,7 +175,7 @@ export class Tmux {
   async getPaneInfos(targets: string[]): Promise<Record<string, { command: string; cwd: string }>> {
     const result: Record<string, { command: string; cwd: string }> = {};
     await Promise.allSettled(targets.map(async (t) => {
-      try { result[t] = await this.getPaneInfo(t); } catch {}
+      try { result[t] = await this.getPaneInfo(t); } catch { /* expected: pane may have closed */ }
     }));
     return result;
   }

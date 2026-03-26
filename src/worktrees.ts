@@ -184,7 +184,7 @@ export async function cleanupWorktree(wtPath: string): Promise<string[]> {
 
   // 2. Get branch, remove worktree
   let branch = "";
-  try { branch = (await ssh(`git -C '${wtPath}' rev-parse --abbrev-ref HEAD`)).trim(); } catch {}
+  try { branch = (await ssh(`git -C '${wtPath}' rev-parse --abbrev-ref HEAD`)).trim(); } catch { /* expected: worktree may be corrupt */ }
 
   try {
     await ssh(`git -C '${mainPath}' worktree remove '${wtPath}' --force`);

@@ -102,7 +102,7 @@ async function doSleep(session: string, windowName: string, oracle: string) {
   try {
     await mkdir(logDir, { recursive: true });
     await appendFile(logFile, line);
-  } catch {}
+  } catch (e) { console.error(`\x1b[33m⚠\x1b[0m sleep log write failed: ${e}`); }
 
   console.log(`\x1b[32msleep\x1b[0m ${oracle} (${windowName})`);
 }

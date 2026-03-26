@@ -63,7 +63,7 @@ export function scanTeams(): TeamData[] {
               catch { return null; }
             })
             .filter(Boolean);
-        } catch {}
+        } catch { /* expected: tasks dir may not exist */ }
         const alive = isTeamAlive(config.members || [], panes);
         return { ...config, tasks, alive };
       } catch { return null; }

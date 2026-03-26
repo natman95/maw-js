@@ -132,9 +132,11 @@ export async function cmdFleetRenumber() {
     const oldName = e.session.name;
 
     if (newFile !== e.file) {
-      // Update config.name in JSON
+      // Update config.name in JSON — write to temp file then atomically rename
       e.session.name = newName;
-      await Bun.write(join(FLEET_DIR, newFile), JSON.stringify(e.session, null, 2) + "\n");
+      const tmpPath = join(FLEET_DIR, `.tmp-${newFile}`);
+      await Bun.write(tmpPath, JSON.stringify(e.session, null, 2) + "\n");
+      renameSync(tmpPath, join(FLEET_DIR, newFile));
 
       // Remove old file (only if name changed)
       const oldPath = join(FLEET_DIR, e.file);
@@ -226,7 +228,7 @@ export async function cmdFleetValidate() {
       for (const w of unregistered) {
         issues.push(`\x1b[33mUnregistered window\x1b[0m: '${w.name}' in ${e.session.name} — won't survive reboot`);
       }
-    } catch {}
+    } catch (err) { console.error(`  \x1b[33m⚠\x1b[0m failed to list windows for ${e.session.name}: ${err}`); }
   }
 
   // Report
@@ -272,7 +274,7 @@ export async function cmdFleetSync() {
         console.log(`  \x1b[32m+\x1b[0m ${winName} → ${e.file}${repo ? ` (${repo})` : ""}`);
         added++;
       }
-    } catch {}
+    } catch (err) { console.error(`  \x1b[33m⚠\x1b[0m failed to sync ${e.session.name}: ${err}`); }
 
     // Write updated config
     if (added > 0) {
@@ -315,7 +317,7 @@ export async function cmdFleetSyncConfigs() {
     const dest = join(FLEET_DIR, file);
 
     // Remove existing file/symlink before creating new symlink
-    try { unlinkSync(dest); } catch {}
+    try { unlinkSync(dest); } catch { /* expected: file may not exist */ }
     symlinkSync(src, dest);
     synced++;
   }

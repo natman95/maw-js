@@ -37,7 +37,7 @@ export async function cmdWorkon(repo: string, task?: string): Promise<void> {
       const wtPath = `${parentDir}/${repoName}.wt-${wtName}`;
       const branch = `agents/${wtName}`;
 
-      try { await ssh(`git -C '${repoPath}' branch -D '${branch}' 2>/dev/null`); } catch {}
+      try { await ssh(`git -C '${repoPath}' branch -D '${branch}' 2>/dev/null`); } catch { /* expected: branch may not exist */ }
       await ssh(`git -C '${repoPath}' worktree add '${wtPath}' -b '${branch}'`);
       console.log(`\x1b[32m+\x1b[0m worktree: ${wtPath} (${branch})`);
       targetPath = wtPath;

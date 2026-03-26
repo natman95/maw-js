@@ -20,7 +20,7 @@ configApi.get("/config-files", (c) => {
       const enabled = !f.endsWith(".disabled");
       files.push({ name: f, path: `fleet/${f}`, enabled });
     }
-  } catch {}
+  } catch { /* expected: fleet dir may not exist */ }
   return c.json({ files });
 });
 
@@ -28,6 +28,7 @@ configApi.get("/config-files", (c) => {
 configApi.get("/config-file", (c) => {
   const filePath = c.req.query("path");
   if (!filePath) return c.json({ error: "path required" }, 400);
+  if (filePath.includes("..")) return c.json({ error: "invalid path" }, 400);
   const fullPath = join(import.meta.dir, "../..", filePath);
   if (!existsSync(fullPath)) return c.json({ error: "not found" }, 404);
   try {

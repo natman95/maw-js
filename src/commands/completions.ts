@@ -57,7 +57,7 @@ export async function cmdCompletions(sub: string) {
           }
         }
       }
-    } catch {}
+    } catch { /* expected: tmux may not be running */ }
     console.log([...names].sort().join("\n"));
   } else if (sub === "fleet") {
     console.log("init ls renumber validate sync");
