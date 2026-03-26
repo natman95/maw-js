@@ -1,5 +1,6 @@
 import { tmux } from "../tmux";
 import { detectSession } from "./wake";
+import { saveTabOrder } from "../tab-order";
 import { appendFile, mkdir } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
@@ -23,6 +24,9 @@ export async function cmdSleepOne(oracle: string, window?: string) {
 
   // Determine window name
   const windowName = window ? `${oracle}-${window}` : `${oracle}-oracle`;
+
+  // Save tab order before sleeping (so wake can restore positions)
+  await saveTabOrder(session);
 
   // Verify window exists
   let windows;

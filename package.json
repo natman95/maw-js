@@ -13,9 +13,9 @@
     "dev:office": "cd office && bunx vite",
     "dev:stop": "pm2 delete maw maw-dev 2>/dev/null; echo '→ dev stopped'",
     "postinstall": "bun run build:office",
-    "deploy": "bun install && bun run build:office && pm2 delete maw-dev 2>/dev/null; pm2 restart maw",
+    "deploy": "bun install && bun run build:office && bun src/cli.ts fleet sync && pm2 delete maw-dev 2>/dev/null; pm2 restart maw",
     "build:8bit": "cd office-8bit && bash build.sh",
-    "deploy:remote": "bun run build:office && pm2 restart maw && echo '→ deployed to :3456'"
+    "deploy:remote": "bun run build:office && bun src/cli.ts fleet sync && pm2 restart maw && echo '→ deployed to :3456'"
   },
   "description": "maw.js — Multi-Agent Workflow in Bun/TS. Remote tmux orchestra control. CLI + Web UI.",
   "dependencies": {

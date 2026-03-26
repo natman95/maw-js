@@ -4,6 +4,7 @@ import { loadConfig, buildCommand, getEnvVars } from "../config";
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { FLEET_DIR } from "../paths";
+import { restoreTabOrder } from "../tab-order";
 
 /**
  * Verify all windows in a session are running Claude (not empty zsh).
@@ -227,6 +228,12 @@ export async function cmdWake(oracle: string, opts: { task?: string; newWt?: str
     await new Promise(r => setTimeout(r, 3000));
     const retried = await ensureSessionRunning(session);
     if (retried > 0) console.log(`\x1b[33m${retried} window(s) retried.\x1b[0m`);
+  }
+
+  // Restore saved tab order (from previous sleep)
+  const reordered = await restoreTabOrder(session);
+  if (reordered > 0) {
+    console.log(`\x1b[36m↻ ${reordered} window(s) reordered to saved positions.\x1b[0m`);
   }
 
   let targetPath = repoPath;

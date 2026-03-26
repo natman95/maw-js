@@ -6,15 +6,21 @@ import { join } from "path";
 import { homedir } from "os";
 import { FLEET_DIR } from "../paths";
 
+export interface DoneOpts {
+  force?: boolean;
+  dryRun?: boolean;
+}
+
 /**
- * maw done <window-name>
+ * maw done <window-name> [--force] [--dry-run]
  *
  * Clean up a finished worktree window:
+ * 0. Send /rrr to agent + git auto-save (unless --force)
  * 1. Kill the tmux window
  * 2. Remove git worktree (if it is one)
  * 3. Remove from fleet config JSON
  */
-export async function cmdDone(windowName_: string) {
+export async function cmdDone(windowName_: string, opts: DoneOpts = {}) {
   let windowName = windowName_;
   const sessions = await listSessions();
   const ghqRoot = loadConfig().ghqRoot;
@@ -40,6 +46,63 @@ export async function cmdDone(windowName_: string) {
       const signal = JSON.stringify({ ts: new Date().toISOString(), from, type: "done", msg: `worktree ${windowName} completed`, thread: null }) + "\n";
       try { mkdirSync(inboxDir, { recursive: true }); appendFileSync(join(inboxDir, `${parentTarget}.jsonl`), signal); } catch {}
     }
+  }
+
+  // 0.5. Auto-save: send /rrr + git commit + push (unless --force)
+  if (sessionName !== null && windowIndex !== null && !opts.force) {
+    const target = `${sessionName}:${windowName}`;
+
+    // Get pane's cwd for git operations
+    let paneCwd = "";
+    try {
+      paneCwd = (await ssh(`tmux display-message -t '${target}' -p '#{pane_current_path}'`)).trim();
+    } catch {}
+
+    if (opts.dryRun) {
+      console.log(`  \x1b[36m⬡\x1b[0m [dry-run] would send /rrr to ${target} and wait 10s`);
+      if (paneCwd) {
+        console.log(`  \x1b[36m⬡\x1b[0m [dry-run] would git add + commit + push in ${paneCwd}`);
+      }
+      console.log(`  \x1b[36m⬡\x1b[0m [dry-run] would kill window ${target}`);
+      console.log(`  \x1b[36m⬡\x1b[0m [dry-run] would remove worktree + fleet config`);
+      console.log();
+      return;
+    }
+
+    // Send /rrr to the agent for a session retrospective
+    console.log(`  \x1b[36m⏳\x1b[0m sending /rrr to ${target}...`);
+    try {
+      await tmux.sendText(target, "/rrr");
+      // Wait 10s for the agent to process the retrospective
+      await new Promise(r => setTimeout(r, 10_000));
+      console.log(`  \x1b[32m✓\x1b[0m /rrr sent (waited 10s)`);
+    } catch {
+      console.log(`  \x1b[33m⚠\x1b[0m could not send /rrr (agent may not be running)`);
+    }
+
+    // Git auto-save in pane's cwd
+    if (paneCwd) {
+      console.log(`  \x1b[36m⏳\x1b[0m git auto-save in ${paneCwd}...`);
+      try {
+        await ssh(`git -C '${paneCwd}' add -A`);
+        try {
+          await ssh(`git -C '${paneCwd}' commit -m 'chore: auto-save before done'`);
+          console.log(`  \x1b[32m✓\x1b[0m committed changes`);
+        } catch {
+          console.log(`  \x1b[90m○\x1b[0m nothing to commit`);
+        }
+        try {
+          await ssh(`git -C '${paneCwd}' push`);
+          console.log(`  \x1b[32m✓\x1b[0m pushed to remote`);
+        } catch {
+          console.log(`  \x1b[33m⚠\x1b[0m push failed (no remote or auth issue)`);
+        }
+      } catch (e: any) {
+        console.log(`  \x1b[33m⚠\x1b[0m git auto-save failed: ${e.message || e}`);
+      }
+    }
+  } else if (opts.dryRun) {
+    console.log(`  \x1b[36m⬡\x1b[0m [dry-run] window '${windowName}' not running — nothing to auto-save`);
   }
 
   // 1. Kill tmux window

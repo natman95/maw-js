@@ -1,10 +1,11 @@
 import { join } from "path";
-import { readdirSync, renameSync, existsSync, unlinkSync } from "fs";
+import { readdirSync, renameSync, existsSync, unlinkSync, symlinkSync, mkdirSync } from "fs";
 import { ssh } from "../ssh";
 import { tmux } from "../tmux";
 import { loadConfig, buildCommand, getEnvVars } from "../config";
 import { ensureSessionRunning } from "./wake";
 import { FLEET_DIR } from "../paths";
+import { saveTabOrder, restoreTabOrder } from "../tab-order";
 
 interface FleetWindow {
   name: string;
@@ -287,11 +288,48 @@ export async function cmdFleetSync() {
   }
 }
 
+/**
+ * Sync repo fleet/*.json configs to FLEET_DIR (~/.config/maw/fleet/).
+ * Symlinks each config so edits in either location stay in sync.
+ */
+export async function cmdFleetSyncConfigs() {
+  const repoFleetDir = join(import.meta.dir, "..", "..", "fleet");
+
+  if (!existsSync(repoFleetDir)) {
+    console.error(`  \x1b[31m✗\x1b[0m No fleet/ directory found in repo`);
+    process.exit(1);
+  }
+
+  const files = readdirSync(repoFleetDir).filter(f => f.endsWith(".json"));
+  if (files.length === 0) {
+    console.log("  \x1b[90mNo fleet configs to sync.\x1b[0m");
+    return;
+  }
+
+  // Ensure FLEET_DIR exists
+  mkdirSync(FLEET_DIR, { recursive: true });
+
+  let synced = 0;
+  for (const file of files) {
+    const src = join(repoFleetDir, file);
+    const dest = join(FLEET_DIR, file);
+
+    // Remove existing file/symlink before creating new symlink
+    try { unlinkSync(dest); } catch {}
+    symlinkSync(src, dest);
+    synced++;
+  }
+
+  console.log(`  \x1b[32m✓ ${synced} fleet config(s) synced\x1b[0m → ${FLEET_DIR}`);
+}
+
 export async function cmdSleep() {
   const sessions = loadFleet();
   let killed = 0;
 
   for (const sess of sessions) {
+    // Save tab order before killing (so wake can restore positions)
+    await saveTabOrder(sess.name);
     try {
       await tmux.killSession(sess.name);
       console.log(`  \x1b[90m●\x1b[0m ${sess.name} — sleep`);
@@ -508,6 +546,15 @@ export async function cmdWakeAll(opts: { kill?: boolean; all?: boolean; resume?:
     } else {
       console.log("  \x1b[32m✓ All windows running.\x1b[0m");
     }
+  }
+
+  // Restore saved tab order (from previous sleep)
+  let totalReordered = 0;
+  for (const sess of sessions) {
+    totalReordered += await restoreTabOrder(sess.name);
+  }
+  if (totalReordered > 0) {
+    console.log(`  \x1b[36m↻ ${totalReordered} window(s) reordered to saved positions.\x1b[0m`);
   }
 
   console.log(`\n  \x1b[32m${sessCount} sessions, ${winCount} windows woke up.\x1b[0m\n`);

@@ -2,6 +2,7 @@ import { listSessions, findWindow, capture, sendKeys, getPaneCommand, getPaneCom
 import { loadConfig } from "../config";
 import { resolveFleetSession } from "./wake";
 import { runHook } from "../hooks";
+import { scanWorktrees } from "../worktrees";
 
 /** Resolve which sessions to search for an oracle query (#86). */
 function resolveSearchSessions(query: string, sessions: Session[]): Session[] {
@@ -56,6 +57,20 @@ export async function cmdList() {
       console.log(`  ${dot} ${w.index}: ${w.name}${suffix}`);
     }
   }
+
+  // Detect orphaned worktree directories (on disk but no tmux window)
+  try {
+    const worktrees = await scanWorktrees();
+    const orphans = worktrees.filter(wt => wt.status === "stale" || wt.status === "orphan");
+    if (orphans.length > 0) {
+      console.log("");
+      for (const wt of orphans) {
+        const dirName = wt.path.split("/").pop() || wt.name;
+        const label = wt.status === "orphan" ? "orphaned (prunable)" : "no tmux window";
+        console.log(`  \x1b[33m⚠ orphaned:\x1b[0m ${dirName} \x1b[90m(${label})\x1b[0m`);
+      }
+    }
+  } catch { /* worktree scan failed — non-critical */ }
 }
 
 export async function cmdPeek(query?: string) {
