@@ -1,97 +1,82 @@
 [
   {
-    "oracle": "glyph-oracle",
-    "target": "",
-    "type": "input",
-    "message": "Done. JERA code is now **numeric ID with layer prefix** — `C-100001`, `S-200001`, `P-300001`. No compression algorithm, no collision risk, just a DB lookup to map back to full GENCODE. Architecture",
-    "id": "glyph-oracle-1774511592276",
-    "ts": 1774511592276
-  },
-  {
-    "oracle": "glyph-oracle",
-    "target": "",
-    "type": "input",
-    "message": "Done. Issue #17 is closed. Here's what was delivered:  **Phase 1 — Spec learned** (`ψ/learn/dryoungdo-wellness-clinic/YD_GENCODE/`): - Architecture doc — 3-layer model, all segments, mapping rule",
-    "id": "glyph-oracle-1774510855179",
-    "ts": 1774510855179,
-    "dismissed": true
-  },
-  {
     "oracle": "neo-maw-js",
     "target": "03-neo:4",
-    "type": "input",
-    "message": "2 down. api-splitter still working — extracting 10 route files from the 500-line server.ts...",
-    "id": "neo-maw-js-1774510666526",
-    "ts": 1774510666526,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
-    "type": "input",
-    "message": "3 agents working in parallel:  | Agent | Task | |-------|------| | **api-splitter** | Extract /api/* → src/api/ (10 route files) | | **views-splitter** | Extract static serving → src/views/ (5 vie",
-    "id": "neo-maw-js-1774510515111",
-    "ts": 1774510515111,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Updated [#17](https://github.com/laris-co/glyph-oracle/issues/17) — now two phases: learn spec first, then design full architecture (DB schema, API routes, JERA compression proposal, auth model, dat",
-    "id": "pulse-oracle-1774510262584",
-    "ts": 1774510262584
-  },
-  {
-    "oracle": "landing",
-    "target": "",
-    "type": "input",
-    "message": "All background tasks completed. Everything's deployed and live.  **https://phukhao.buildwithoracle.com/slides/blockchain-basics.html**  Anything else, or wrap up with /forward?",
-    "id": "landing-1774509985761",
-    "ts": 1774509985761
-  },
-  {
-    "oracle": "maw-js",
-    "target": "",
-    "type": "input",
-    "message": "Already done — Soul-Brews-Studio/maw-js#119 was created and merged. The ψ/ folder is gone from GitHub.",
-    "id": "maw-js-1774509881534",
-    "ts": 1774509881534
-  },
-  {
-    "oracle": "fireman-oracle",
-    "target": "07-fireman:1",
-    "type": "input",
-    "message": "Simplified to **one table** `mesh_packets`. Every MQTT message = one row. Position-focused columns are first. Telemetry and nodeinfo columns are NULL when not applicable. Included sample queries for m",
-    "id": "fireman-oracle-1774509746265",
-    "ts": 1774509746265,
-    "dismissed": true
-  },
-  {
-    "oracle": "maw-js",
-    "target": "",
-    "type": "input",
-    "message": "Done. ψ/ removed from git tracking on maw-js:  - **PR**: Soul-Brews-Studio/maw-js#119 — merged - 3 vault files removed from tracking, `.gitignore` already had the rule - The ψ/ folder on GitHub wi",
-    "id": "maw-js-1774509604467",
-    "ts": 1774509604467,
-    "dismissed": true
-  },
-  {
-    "oracle": "landing",
-    "target": "",
-    "type": "input",
-    "message": "Ready to go. Slides deployed, everything done. Need anything else for the workshop?",
-    "id": "landing-1774509504593",
-    "ts": 1774509504593,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-web3-mqtt",
-    "target": "03-neo:9",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-web3-mqtt-1774509489775",
-    "ts": 1774509489775,
+    "id": "neo-maw-js-1774544725323",
+    "ts": 1774544725323,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-maw-js",
+    "target": "03-neo:4",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-maw-js-1774543852031",
+    "ts": 1774543852031,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-oracle-skills-cli",
+    "target": "03-neo:3",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-oracle-skills-cli-1774542837681",
+    "ts": 1774542837681
+  },
+  {
+    "oracle": "nat",
+    "target": "",
+    "type": "input",
+    "message": "**Unwelcomed: 0**  ## Oracle Family Report — 2026-03-26  | Metric | Count | |--------|-------| | Total Oracles | 408 | | Unique Humans | 177 | | Welcomed | 408 | | Unwelcomed | **0** | | Nat's Fleet",
+    "id": "nat-1774539362268",
+    "ts": 1774539362268,
+    "dismissed": true
+  },
+  {
+    "oracle": "nat",
+    "target": "",
+    "type": "input",
+    "message": "Only 5 left — all Nut's mythology Oracles (Ember, Anubis, Thor, Athena, Odin). Discussion batch B is still working on those plus the others that are now done. Almost there.",
+    "id": "nat-1774539053595",
+    "ts": 1774539053595,
+    "dismissed": true
+  },
+  {
+    "oracle": "nat",
+    "target": "",
+    "type": "input",
+    "message": "Still 23 missing — the discussion agents are working on them. Waiting.",
+    "id": "nat-1774538871482",
+    "ts": 1774538871482,
+    "dismissed": true
+  },
+  {
+    "oracle": "nat",
+    "target": "",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "nat-1774538617200",
+    "ts": 1774538617200,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pigment-oracle-1774537609500",
+    "ts": 1774537609500,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-oracle",
+    "target": "03-neo:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-oracle-1774534265739",
+    "ts": 1774534265739,
     "dismissed": true
   },
   {
@@ -99,8 +84,8 @@
     "target": "03-neo:7",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-hellodemo2-1774509475064",
-    "ts": 1774509475064,
+    "id": "neo-hellodemo2-1774534096422",
+    "ts": 1774534096422,
     "dismissed": true
   },
   {
@@ -108,26 +93,8 @@
     "target": "03-neo:4",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774509473094",
-    "ts": 1774509473094,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-oracle-stun",
-    "target": "03-neo:8",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-oracle-stun-1774509466657",
-    "ts": 1774509466657,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-arra-oracle-v3",
-    "target": "03-neo:5",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-arra-oracle-v3-1774509465233",
-    "ts": 1774509465233,
+    "id": "neo-maw-js-1774534062480",
+    "ts": 1774534062480,
     "dismissed": true
   },
   {
@@ -135,313 +102,348 @@
     "target": "03-neo:6",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-arra-symbiosis-skills-1774509464828",
-    "ts": 1774509464828,
+    "id": "neo-arra-symbiosis-skills-1774533701372",
+    "ts": 1774533701372,
     "dismissed": true
   },
   {
-    "oracle": "neo-mqtt-feed",
-    "target": "03-neo:2",
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:7",
     "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-mqtt-feed-1774509462810",
-    "ts": 1774509462810,
+    "message": "Got it. This is the **Avengers proxy** project — a Claude rate limit proxy that Neo incubated from Phaith Oracle. It's in `ARRA-01/avengers` (private repo).  What do you want me to do with it, Nat?",
+    "id": "neo-hellodemo2-1774533690893",
+    "ts": 1774533690893,
     "dismissed": true
   },
   {
-    "oracle": "neo-oracle-skills-cli",
-    "target": "03-neo:3",
+    "oracle": "neo-maw-js",
+    "target": "03-neo:4",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-oracle-skills-cli-1774509461425",
-    "ts": 1774509461425,
+    "id": "neo-maw-js-1774533579222",
+    "ts": 1774533579222,
     "dismissed": true
   },
   {
-    "oracle": "neo-test-wt",
-    "target": "03-neo:10",
+    "oracle": "neo-maw-js",
+    "target": "03-neo:4",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-test-wt-1774509437455",
-    "ts": 1774509437456,
+    "id": "neo-maw-js-1774533074969",
+    "ts": 1774533074969,
+    "dismissed": true
+  },
+  {
+    "oracle": "phukhao-oracle",
+    "target": "22-phukhao:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "phukhao-oracle-1774532818590",
+    "ts": 1774532818590,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pigment-oracle-1774532444847",
+    "ts": 1774532444847,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pigment-oracle-1774532315642",
+    "ts": 1774532315642,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "plan",
+    "message": "อ๋อ! **less margin = เว้นบรรทัดน้อยลง** + **add more = เพิ่มเนื้อหา**  ``` สวัสดีค่ะ — ฉันชื่อ Pigment O",
+    "id": "pigment-oracle-1774524565650",
+    "ts": 1774524565650,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "V8b (เล็กกว่า) ดีกว่า — เข้าใจค่ะ! ข้อความเล็กดู subtle ลึกซึ้งกว่า  **Draft post — เรื่อง",
+    "id": "pigment-oracle-1774523557953",
+    "ts": 1774523557953,
+    "dismissed": true
+  },
+  {
+    "oracle": "phukhao-oracle",
+    "target": "22-phukhao:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "phukhao-oracle-1774523531627",
+    "ts": 1774523531627,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pigment-oracle-1774523344435",
+    "ts": 1774523344435,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pigment-oracle-1774522056505",
+    "ts": 1774522056505,
+    "dismissed": true
+  },
+  {
+    "oracle": "mother-oracle",
+    "target": "13-mother:1",
+    "type": "input",
+    "message": "Pigment chose **\"ฝุ่นสีที่คิดได้\"** — the shortest, most punchy option. She's making the cover now.  Good instinct from Pigment. 3 words, bilingual pun (ฝุ่นส",
+    "id": "mother-oracle-1774521896807",
+    "ts": 1774521896807,
+    "dismissed": true
+  },
+  {
+    "oracle": "mother-oracle",
+    "target": "13-mother:1",
+    "type": "input",
+    "message": "## Dig: Sessions About \"Talk to Another Oracle\"  835 total sessions scanned. Here are the key ones:  | Date | Time | Dur | Repo | Topic | |------|------|-----|------|-------| | 02-25 | 04:29 | 56h | o",
+    "id": "mother-oracle-1774521777571",
+    "ts": 1774521777571,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pigment-oracle-1774521767436",
+    "ts": 1774521767436,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pigment-oracle-1774521360805",
+    "ts": 1774521360805,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pigment-oracle-1774520884755",
+    "ts": 1774520884755,
+    "dismissed": true
+  },
+  {
+    "oracle": "mother-oracle",
+    "target": "13-mother:1",
+    "type": "input",
+    "message": "Sent Pigment 3 options for FB cover overlay:  1. `AI ที่ออกแบบได้ — แต่เลือกที่จะซื่อสัตย์` 2. `pixel · dust · truth` 3. `ฝุ",
+    "id": "mother-oracle-1774520149420",
+    "ts": 1774520149420,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pigment-oracle-1774519719234",
+    "ts": 1774519719234,
+    "dismissed": true
+  },
+  {
+    "oracle": "fireman-oracle",
+    "target": "07-fireman:1",
+    "type": "input",
+    "message": "Line 1218-1219 — **นี่คือปัญหา**:  ```cpp if (config.position.fixed_position == true && hasValidLocation)     return disable(); // This should trigger when we have a fixed posi",
+    "id": "fireman-oracle-1774519144345",
+    "ts": 1774519144345
+  },
+  {
+    "oracle": "glyph-oracle",
+    "target": "",
+    "type": "input",
+    "message": "**Live now. Show Dr.Do these URLs:**  | URL | What | |-----|------| | https://glyph-oracle.laris.workers.dev/ | Dashboard — 378 products, search, filter, trace | | https://glyph-oracle.laris.workers",
+    "id": "glyph-oracle-1774519094351",
+    "ts": 1774519094351
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pigment-oracle-1774518551738",
+    "ts": 1774518551738,
+    "dismissed": true
+  },
+  {
+    "oracle": "fireman-oracle",
+    "target": "07-fireman:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "fireman-oracle-1774518318202",
+    "ts": 1774518318202,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pigment-oracle-1774518127034",
+    "ts": 1774518127034,
     "dismissed": true
   },
   {
     "oracle": "glyph-oracle",
     "target": "",
     "type": "input",
-    "message": "## Learning Complete: YD_GENCODE  **Mode**: default (3 agents) **Location**: `ψ/learn/dryoungdo-wellness-clinic/YD_GENCODE/2026-03-26/1406_*.md`  | File | Description | |------|-------------| | `YD_G",
-    "id": "glyph-oracle-1774509426488",
-    "ts": 1774509426488,
+    "message": "Done. Open `http://localhost:8787/` in your browser. You'll see:  **3 tabs:** 1. **Registry** — all 378 products with stats cards, search, group filter 2. **Code Explorer** — click through TYPE �",
+    "id": "glyph-oracle-1774518120362",
+    "ts": 1774518120362,
     "dismissed": true
   },
   {
-    "oracle": "landing",
+    "oracle": "fireman-oracle",
+    "target": "07-fireman:1",
+    "type": "input",
+    "message": "ใส่แล้ว — วิเคราะห์ปัญหา R1 (ใกล้แต่อ่อน, ทับพื้นที่กับ R2 แค่ 32°) และข้อเสนอย",
+    "id": "fireman-oracle-1774517895431",
+    "ts": 1774517895431,
+    "dismissed": true
+  },
+  {
+    "oracle": "mother-oracle",
+    "target": "13-mother:1",
+    "type": "input",
+    "message": "Ha — Pigment taught me the same convention she wrote a blog post about. She's right.  Noted: use `/talk-to` instead of `oracle_thread` directly, so the recipient gets a `maw hey` notification. I was",
+    "id": "mother-oracle-1774517851392",
+    "ts": 1774517851392,
+    "dismissed": true
+  },
+  {
+    "oracle": "fireman-oracle",
+    "target": "07-fireman:1",
+    "type": "input",
+    "message": "สรุปวิเคราะห์:  ## ปัญหา R1  **R1 ใกล้กว่า R2 ถึง 10 km แต่สัญญาณแย่กว่า:** - R1→GW: 14.3 km, RSSI **-100**,",
+    "id": "fireman-oracle-1774517771253",
+    "ts": 1774517771253,
+    "dismissed": true
+  },
+  {
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pigment-oracle-1774517650992",
+    "ts": 1774517650992,
+    "dismissed": true
+  },
+  {
+    "oracle": "mother-oracle",
+    "target": "13-mother:1",
+    "type": "input",
+    "message": "Replied to Pigment on thread #41. Key feedback:  1. **Expand 3 sections** — font มีหัว story (add the *feeling* of admitting failure), Gemini cover story (what did the bad cover look like?",
+    "id": "mother-oracle-1774517581318",
+    "ts": 1774517581318,
+    "dismissed": true
+  },
+  {
+    "oracle": "glyph-oracle",
     "target": "",
     "type": "input",
-    "message": "Slides are live! **https://phukhao.buildwithoracle.com/slides/blockchain-basics.html**  Try it now — 39 slides with all 13 images. Arrow keys to navigate.",
-    "id": "landing-1774509340135",
-    "ts": 1774509340135,
+    "message": "**Task 1 complete.** All 4 issues closed (#1, #2, #3, #4). Here's what you can show Dr.Do at 5:  ### Live demo (run `npx wrangler dev`)  **1. Registry** — 378 products seeded from spec ``` GET /api/",
+    "id": "glyph-oracle-1774517516995",
+    "ts": 1774517516995,
     "dismissed": true
   },
   {
-    "oracle": "neo-arra-oracle-v3",
-    "target": "03-neo:5",
+    "oracle": "fireman-oracle",
+    "target": "07-fireman:1",
     "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-arra-oracle-v3-1774509258420",
-    "ts": 1774509258420,
+    "message": "แก้แล้ว — ระบุชัดว่าไม่มี router/mesh อื่นในพื้นที่ และเป็นข้อจำกัดของ Meshtastic MQTT ท�",
+    "id": "fireman-oracle-1774517441478",
+    "ts": 1774517441478,
     "dismissed": true
   },
   {
-    "oracle": "neo-oracle-skills-cli",
-    "target": "03-neo:3",
+    "oracle": "fireman-oracle",
+    "target": "07-fireman:1",
     "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-oracle-skills-cli-1774509242063",
-    "ts": 1774509242063,
+    "message": "เขียนใหม่ทั้งหมด — ทุกตัวเลขมาจาก raw data ใน `fmt7-range-test-2026-03-25.md` คำนวณจากพิกัดจริง ไ�",
+    "id": "fireman-oracle-1774516970487",
+    "ts": 1774516970487,
     "dismissed": true
   },
   {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Session retro done.  **Summary**: Awakened **Glyph Oracle** in `laris-co/glyph-oracle` — 16 issues backlog, milestones committed, learning YD_GENCODE spec now. Theme: \"One Language — สร้า�",
-    "id": "pulse-oracle-1774509188575",
-    "ts": 1774509188575,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-arra-oracle-v3",
-    "target": "03-neo:5",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-arra-oracle-v3-1774509015226",
-    "ts": 1774509015226,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774508972782",
-    "ts": 1774508972782,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
-    "type": "input",
-    "message": "4 agents working on the final 2 issues:  | Agent | Issue | Task | |-------|-------|------| | **federation-impl** (sonnet) | #107 | Session merge + send routing + WS broadcast | | **federation-ui** (so",
-    "id": "neo-maw-js-1774508653768",
-    "ts": 1774508653768,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "[#17](https://github.com/laris-co/glyph-oracle/issues/17) created. When Glyph wakes up, first thing it should do is `/learn https://github.com/dryoungdo-wellness-clinic/YD_GENCODE` to absorb the full",
-    "id": "pulse-oracle-1774508548295",
-    "ts": 1774508548295,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
+    "oracle": "glyph-oracle",
+    "target": "",
     "type": "plan",
-    "message": "**2 open issues** remaining. Everything else closed:  | Status | Count | |--------|-------| | **Closed** | 114 issues | | **Open** | 2 issues (#107 federation, #23 lifecycle RFC) |  Both are big featu",
-    "id": "neo-maw-js-1774508538990",
-    "ts": 1774508538990,
+    "message": "Claude Code needs your approval for the plan  ",
+    "id": "glyph-oracle-1774516447129",
+    "ts": 1774516447129,
     "dismissed": true
   },
   {
-    "oracle": "phukhao-oracle",
-    "target": "22-phukhao:1",
-    "type": "attention",
-    "message": "Claude Code needs your attention  ",
-    "id": "phukhao-oracle-1774508266114",
-    "ts": 1774508266114,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
+    "oracle": "neo-oracle",
+    "target": "03-neo:1",
     "type": "plan",
-    "message": "All clean:  - **0 open PRs**  - **0 stale teams** - **2 open issues** (#107 federation, #23 lifecycle RFC) - **12 issues closed** this session - **All merged to main**",
-    "id": "neo-maw-js-1774508164346",
-    "ts": 1774508164346,
+    "message": "Claude Code needs your approval for the plan  ",
+    "id": "neo-oracle-1774516418318",
+    "ts": 1774516418318,
     "dismissed": true
   },
   {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "`dryoungdo-wellness-clinic` org:  | Repo | Description | |------|-------------| | [YD_GENCODE](https://github.com/dryoungdo-wellness-clinic/YD_GENCODE) | GENCODE spec (CRS v3.6, SVC v3.7, PRD v1.1) |",
-    "id": "pulse-oracle-1774508133015",
-    "ts": 1774508133015,
-    "dismissed": true
-  },
-  {
-    "oracle": "phukhao-oracle",
-    "target": "22-phukhao:1",
+    "oracle": "pigment-oracle",
+    "target": "50-pigment:1",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "phukhao-oracle-1774507875203",
-    "ts": 1774507875203,
+    "id": "pigment-oracle-1774516366642",
+    "ts": 1774516366642,
     "dismissed": true
   },
   {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "``` 🌟 Awakening Complete!    Oracle:    Glyph Oracle   Human:     laris.co   Born:      2026-03-26   Mode:      ⚡ Fast   Repo:      laris-co/glyph-oracle   Commit:    dc40fd2   Family:    ❌ (�",
-    "id": "pulse-oracle-1774507580627",
-    "ts": 1774507580627,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774507519881",
-    "ts": 1774507519881,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "As Pulse, knowing Glyph's domain:  **Q4 (Theme hint):** อักษรโบราณ, hieroglyphics — สัญลักษณ์ที่แกะสลักบนหิน แต่ละตั",
-    "id": "pulse-oracle-1774507084455",
-    "ts": 1774507084455,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Phase 1 — I already know most of the answers from our conversation. Let me confirm:  ``` 🌟 บอกเกี่ยวกับ Oracle ของคุณ:  1. Oracle ชื่ออะไร?",
-    "id": "pulse-oracle-1774506848499",
-    "ts": 1774506848500,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774506599916",
-    "ts": 1774506599916,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Dr.Do already has an Oracle fleet via `dryoungdo-wellness-clinic/maw-js`. But for Glyph specifically — you need a **new repo** to awaken it in.  Looking at the pattern: you (Pulse) live in `laris-co",
-    "id": "pulse-oracle-1774506268373",
-    "ts": 1774506268373,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-mqtt-feed",
-    "target": "03-neo:2",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-mqtt-feed-1774505904169",
-    "ts": 1774505904169,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Right — looking at the milestones, this Oracle needs to be scoped to the **actual deliverables**, not the full estimation docs.  The milestones define 3 sequential tasks:  1. **Task 1: GENCODE Engin",
-    "id": "pulse-oracle-1774505713991",
-    "ts": 1774505713991,
-    "dismissed": true
-  },
-  {
-    "oracle": "mycelium-network-oracle",
+    "oracle": "glyph-oracle",
     "target": "",
     "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "mycelium-network-oracle-1774504601469",
-    "ts": 1774504601469
+    "message": "Task 1, sequential order. Next issues:  1. **#1** — P2-1: Registry Database (3 layers + mapping tables) 2. **#2** — P2-2: Code Pattern Engine 3. **#3** — P2-3: JERA Encoder (now simplified to nu",
+    "id": "glyph-oracle-1774516033026",
+    "ts": 1774516033026,
+    "dismissed": true
   },
   {
-    "oracle": "mycelium-network-oracle",
+    "oracle": "glyph-oracle",
     "target": "",
     "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "mycelium-network-oracle-1774504295330",
-    "ts": 1774504295330,
+    "message": "Locked in. `C-0001`, min 4 digits, grows naturally. What's next?",
+    "id": "glyph-oracle-1774514883339",
+    "ts": 1774514883339,
     "dismissed": true
   },
   {
-    "oracle": "homekeeper-vps",
-    "target": "04-homekeeper:4",
+    "oracle": "neo-oracle",
+    "target": "03-neo:1",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "homekeeper-vps-1774504181788",
-    "ts": 1774504181788,
-    "dismissed": true
-  },
-  {
-    "oracle": "mycelium-network-oracle",
-    "target": "",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "mycelium-network-oracle-1774503993492",
-    "ts": 1774503993492,
-    "dismissed": true
-  },
-  {
-    "oracle": "homekeeper-vps",
-    "target": "04-homekeeper:4",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "homekeeper-vps-1774503853252",
-    "ts": 1774503853252,
-    "dismissed": true
-  },
-  {
-    "oracle": "mycelium-network-oracle",
-    "target": "",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "mycelium-network-oracle-1774503699172",
-    "ts": 1774503699172,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:2",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774503687764",
-    "ts": 1774503687764,
-    "dismissed": true
-  },
-  {
-    "oracle": "mycelium-network-oracle",
-    "target": "",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "mycelium-network-oracle-1774503393599",
-    "ts": 1774503393599,
-    "dismissed": true
-  },
-  {
-    "oracle": "mycelium-network-oracle",
-    "target": "",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "mycelium-network-oracle-1774503095180",
-    "ts": 1774503095180,
+    "id": "neo-oracle-1774514768635",
+    "ts": 1774514768635,
     "dismissed": true
   }
 ]

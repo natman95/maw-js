@@ -10,6 +10,7 @@ import { federationApi } from "./federation";
 import { worktreesApi } from "./worktrees";
 import { uiStateApi } from "./ui-state";
 import { deprecatedApi } from "./deprecated";
+import { talkApi } from "./talk";
 
 export const api = new Hono();
 
@@ -24,3 +25,4 @@ api.route("/", federationApi);
 api.route("/", worktreesApi);
 api.route("/", uiStateApi);
 api.route("/", deprecatedApi);
+api.route("/", talkApi);

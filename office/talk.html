@@ -293,6 +293,81 @@ function toggleListening() {
   recognition.start();
 }
 
+// ===== WEBSOCKET FEED — watch oracle's output =====
+let feedWs = null;
+let currentResponseDiv = null;
+let responseTimeout = null;
+let lastFeedText = '';
+
+function connectFeed() {
+  feedWs = new WebSocket(`ws://${location.hostname}:${location.port || 3456}/ws`);
+  feedWs.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+
+      // Watch feed events for our oracle
+      if (msg.type === 'feed' && msg.events) {
+        for (const ev of msg.events) {
+          if (!ev.session?.includes(oracle)) continue;
+          if (state !== 'thinking') continue;
+
+          // Show streaming text
+          const text = ev.preview || ev.text || '';
+          if (text && text !== lastFeedText) {
+            lastFeedText = text;
+            if (!currentResponseDiv) {
+              currentResponseDiv = document.createElement('div');
+              currentResponseDiv.className = 'msg ai';
+              messagesEl.appendChild(currentResponseDiv);
+            }
+            currentResponseDiv.textContent = text;
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+
+            // Reset timeout — oracle is still producing output
+            clearTimeout(responseTimeout);
+            responseTimeout = setTimeout(finishResponse, 3000);
+          }
+        }
+      }
+
+      // Also watch capture/preview for our oracle's windows
+      if (msg.type === 'previews' && state === 'thinking') {
+        for (const [target, preview] of Object.entries(msg.previews || {})) {
+          if (!target.includes(oracle)) continue;
+          const text = (preview as string || '').trim();
+          if (text && text.length > 10 && text !== lastFeedText) {
+            lastFeedText = text;
+            if (!currentResponseDiv) {
+              currentResponseDiv = document.createElement('div');
+              currentResponseDiv.className = 'msg ai';
+              messagesEl.appendChild(currentResponseDiv);
+            }
+            currentResponseDiv.textContent = text;
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+
+            clearTimeout(responseTimeout);
+            responseTimeout = setTimeout(finishResponse, 3000);
+          }
+        }
+      }
+    } catch {}
+  };
+  feedWs.onclose = () => setTimeout(connectFeed, 3000);
+}
+
+function finishResponse() {
+  if (currentResponseDiv) {
+    const finalText = currentResponseDiv.textContent;
+    currentResponseDiv = null;
+    lastFeedText = '';
+    speak(finalText);
+  } else {
+    setState('idle');
+  }
+}
+
+connectFeed();
+
 // ===== SEND =====
 function sendText() {
   const text = textInput.value.trim();
@@ -306,30 +381,28 @@ textInput.addEventListener('keydown', (e) => {
 });
 
 async function sendMessage(text) {
-  // Show user message
   addMessage(text, 'user');
-  history.push({ role: 'user', content: text });
   setState('thinking');
+  currentResponseDiv = null;
+  lastFeedText = '';
 
   try {
     const res = await fetch('/api/talk', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ oracle, message: text, history: history.slice(-10) }),
+      body: JSON.stringify({ oracle, message: text }),
     });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
     const data = await res.json();
-    const reply = data.reply || data.content || 'I hear you.';
-
-    history.push({ role: 'assistant', content: reply });
-    addMessage(reply, 'ai');
-    speak(reply);
+    if (!data.ok) {
+      addMessage(data.error || 'Oracle not found', 'ai');
+      setState('idle');
+      return;
+    }
+    // Message sent to oracle — now watch feed for response
+    // finishResponse() will be called when output stops (3s timeout)
+    responseTimeout = setTimeout(finishResponse, 8000); // max wait 8s
   } catch (err) {
-    // Fallback: echo mode (no API yet)
-    const fallback = `${theme.title} is listening. API endpoint /api/talk not configured yet. Your message: "${text}"`;
-    addMessage(fallback, 'ai');
+    addMessage(`Error: ${err.message}`, 'ai');
     setState('idle');
   }
 }
