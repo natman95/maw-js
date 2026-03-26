@@ -300,7 +300,8 @@ let responseTimeout = null;
 let lastFeedText = '';
 
 function connectFeed() {
-  feedWs = new WebSocket(`ws://${location.hostname}:${location.port || 3456}/ws`);
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  feedWs = new WebSocket(`${wsProto}//${location.host}/ws`);
   feedWs.onmessage = (e) => {
     try {
       const msg = JSON.parse(e.data);
@@ -334,7 +335,7 @@ function connectFeed() {
       if (msg.type === 'previews' && state === 'thinking') {
         for (const [target, preview] of Object.entries(msg.previews || {})) {
           if (!target.includes(oracle)) continue;
-          const text = (preview as string || '').trim();
+          const text = (preview || '').toString().trim();
           if (text && text.length > 10 && text !== lastFeedText) {
             lastFeedText = text;
             if (!currentResponseDiv) {

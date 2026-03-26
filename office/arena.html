@@ -64,7 +64,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 // ===== CONFIG =====
-const WS_URL = `ws://${location.hostname}:${location.port || 3456}/ws`;
+const WS_URL = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`;
 const FLOOR_SIZE = 30;
 const DESK_SPACING = 3.5;
 const STATUS_COLORS = {
