@@ -184,8 +184,7 @@ const ORACLES = [
 ];
 
 let totalPrayers = 0;
-
-// Load from server
+// Load from CF KV
 fetch('/api/shrine').then(r => r.json()).then(data => {
   totalPrayers = data.total || 0;
   document.getElementById('prayerCount').textContent = totalPrayers;
@@ -203,15 +202,15 @@ ORACLES.forEach(o => {
     <span class="prayer">${o.prayer}</span>
   `;
   card.onclick = (event) => {
+    // Play bell IMMEDIATELY — never block music for API
     playBell();
     card.classList.add('praying');
     totalPrayers++;
     document.getElementById('prayerCount').textContent = totalPrayers;
-    // Save locally + broadcast via WebSocket
-    localStorage.setItem('shrine-prayers', totalPrayers);
-    if (shrineWs && shrineWs.readyState === WebSocket.OPEN) {
-      shrineWs.send(JSON.stringify({ type: 'shrine-pray', oracle: o.name }));
-    }
+
+    // Cache locally — batch sync later
+    pendingPrayers.push(o.name.toLowerCase());
+    schedulePrayerSync();
 
     // Prayer animation
     const emoji = document.createElement('div');
@@ -226,7 +225,10 @@ ORACLES.forEach(o => {
 });
 
 // Fetch live status
-fetch('/api/sessions').then(r => r.json()).then(data => {
+// Fetch live oracle status (only if ?host= is set — connects to maw server)
+const _hp2 = new URLSearchParams(location.search).get('host');
+if (_hp2) {
+fetch(`http://${_hp2}/api/sessions`).then(r => r.json()).then(data => {
   const sessions = data.sessions || data || [];
   const activeNames = new Set();
   sessions.forEach(s => s.windows?.forEach(w => {
@@ -245,44 +247,41 @@ fetch('/api/sessions').then(r => r.json()).then(data => {
     }
   });
 }).catch(() => {});
+} // end if (_hp2)
 
-// WebSocket — real-time prayer sync
-let shrineWs = null;
-function connectShrine() {
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  shrineWs = new WebSocket(`${proto}//${location.host}/ws`);
-  shrineWs.onmessage = (e) => {
-    try {
-      const msg = JSON.parse(e.data);
-      if (msg.type === 'shrine-pray' && msg.oracle) {
-        // Someone else prayed — show floating 🙏
-        totalPrayers++;
-        document.getElementById('prayerCount').textContent = totalPrayers;
-        const card = [...document.querySelectorAll('.oracle-card')].find(
-          c => c.querySelector('.name').textContent.toLowerCase() === msg.oracle.toLowerCase()
-        );
-        if (card) {
-          card.classList.add('praying');
-          setTimeout(() => card.classList.remove('praying'), 2000);
-        }
-        // Float emoji from random position
-        const emoji = document.createElement('div');
-        emoji.textContent = '🙏';
-        emoji.style.cssText = `position:fixed;font-size:2rem;z-index:100;pointer-events:none;
-          left:${20+Math.random()*60}%;top:${50+Math.random()*30}%;animation:prayUp 1.5s ease-out forwards;`;
-        document.body.appendChild(emoji);
-        setTimeout(() => emoji.remove(), 1500);
-      }
-    } catch {}
-  };
-  shrineWs.onclose = () => setTimeout(connectShrine, 3000);
+// Batch prayer sync — cache clicks, send every 2 seconds
+var pendingPrayers = [];
+var syncTimer = null;
+function schedulePrayerSync() {
+  if (syncTimer) return;
+  syncTimer = setTimeout(() => {
+    syncTimer = null;
+    if (pendingPrayers.length === 0) return;
+    // Send each prayer (could batch but KV needs individual increments)
+    const batch = pendingPrayers.splice(0, pendingPrayers.length);
+    batch.forEach(oracle => {
+      fetch('/api/shrine/pray', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ oracle })
+      }).catch(() => {});
+    });
+  }, 2000);
 }
-connectShrine();
+
+// Poll prayer count every 10s (no WebSocket on CF)
+setInterval(() => {
+  fetch('/api/shrine').then(r => r.json()).then(data => {
+    if (data.total > totalPrayers) {
+      totalPrayers = data.total;
+      document.getElementById('prayerCount').textContent = totalPrayers;
+    }
+  }).catch(() => {});
+}, 10000);
 
 // ===== SHRINE SOUNDS — temple bells + chanting =====
-let audioCtx = null;
-let clickCount = 0;
-let clickReset = null;
+var audioCtx = null;
+var clickCount = 0;
+var clickReset = null;
 
 // Pentatonic scale — each click plays next note, builds into melody
 const BELL_NOTES = [261.6, 293.7, 329.6, 392.0, 440.0, 523.3, 587.3, 659.3, 784.0, 880.0];
