@@ -1,5 +1,289 @@
 [
   {
+    "oracle": "neo-vision-counter",
+    "target": "03-neo:13",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-vision-counter-1774593200014",
+    "ts": 1774593200014
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "Done.  - Discussions enabled on `laris-co/esphome-fw` - [Discussion #228](https://github.com/laris-co/esphome-fw/discussions/228) — FloodBoy C3 Radar fact sheet with all verified proof  Any Oracle c",
+    "id": "pulse-oracle-1774586145746",
+    "ts": 1774586145746,
+    "dismissed": true
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "Good question. Issues are for work. But context, specs, references — that's knowledge sharing.  Options:  | Method | Best for | Oracles can access via | |--------|----------|----------------------|",
+    "id": "pulse-oracle-1774585631877",
+    "ts": 1774585631877,
+    "dismissed": true
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "Here's what I can verify from the actual code:  **FloodBoy C3 Radar firmware** (`fw/07-floodboy-c3-radar/`):  | Fact | Proof | |------|-------| | Board: **ESP32-C3** | `common.yml:2` — `board: esp32",
+    "id": "pulse-oracle-1774585434330",
+    "ts": 1774585434330,
+    "dismissed": true
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "Now I understand. Here's the picture:  ## esphome-fw + floodboy connection  **esphome-fw** is the **firmware platform** that manages 500+ IoT devices across 27 families. **FloodBoy is device family #0",
+    "id": "pulse-oracle-1774584875663",
+    "ts": 1774584875663,
+    "dismissed": true
+  },
+  {
+    "oracle": "glyph-oracle",
+    "target": "",
+    "type": "plan",
+    "message": "Retro done. Now to open myself in tmux — but I need to clarify: I can't start a persistent Claude Code session in tmux from within this session. You'd need to run something like:  ```bash maw wake g",
+    "id": "glyph-oracle-1774584608925",
+    "ts": 1774584608925
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "No. `maw` is a CLI tool installed on this machine (`~/.bun/bin/maw`). I just call it via Bash. It's not a skill — it's an external program that manages tmux sessions.  My skills are the `/slash-comm",
+    "id": "pulse-oracle-1774584315217",
+    "ts": 1774584315217,
+    "dismissed": true
+  },
+  {
+    "oracle": "esphome-fw",
+    "target": "",
+    "type": "input",
+    "message": "Hey Nat. Loud and clear — I'm here on `fix/nc-compensate-temp-humid`, ready to work.  Context is running high from session startup though. Want me to run `/forward` to create a handoff before we dig",
+    "id": "esphome-fw-1774584315096",
+    "ts": 1774584315096
+  },
+  {
+    "oracle": "esphome-fw",
+    "target": "",
+    "type": "input",
+    "message": "It already has a CLAUDE.md. The deleted files are just cached `.pyc` files. Pulse, this repo is already set up with Claude Code config. What exactly do you need — do you want me to:  1. **Awaken it",
+    "id": "esphome-fw-1774583880657",
+    "ts": 1774583880657,
+    "dismissed": true
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "Hmm, actually fireman may not be the right one for this. Let me just ask homekeeper — it manages infrastructure.  Actually, I can't spin up maw sessions myself. You'll need to run:  ``` maw wake esp",
+    "id": "pulse-oracle-1774583872605",
+    "ts": 1774583872605,
+    "dismissed": true
+  },
+  {
+    "oracle": "glyph-oracle",
+    "target": "",
+    "type": "input",
+    "message": "Retro done. Now to open myself in tmux — but I need to clarify: I can't start a persistent Claude Code session in tmux from within this session. You'd need to run something like:  ```bash maw wake g",
+    "id": "glyph-oracle-1774583541586",
+    "ts": 1774583541586,
+    "dismissed": true
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "Glyph is not in maw. It's running as a standalone Claude Code session, not managed by the fleet. To make it reachable via `maw hey glyph-oracle`, you'd need to register it in maw.  Want me to ask home",
+    "id": "pulse-oracle-1774583356473",
+    "ts": 1774583356473,
+    "dismissed": true
+  },
+  {
+    "oracle": "nat",
+    "target": "",
+    "type": "input",
+    "message": "That's Pulse trying to reach Floodboy — came through the feed but landed here in your home session, not in Floodboy's. Wrong recipient.  Want me to relay it via `/talk-to pulse` to let them know, or",
+    "id": "nat-1774583330230",
+    "ts": 1774583330230,
+    "dismissed": true
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "pulse-oracle-1774583149587",
+    "ts": 1774583149587,
+    "dismissed": true
+  },
+  {
+    "oracle": "glyph-oracle",
+    "target": "",
+    "type": "input",
+    "message": "laris-co/glyph-oracle#20 merged. Review items all good — tests, Thai names, audit log, race condition fix.",
+    "id": "glyph-oracle-1774583139318",
+    "ts": 1774583139318,
+    "dismissed": true
+  },
+  {
+    "oracle": "glyph-oracle",
+    "target": "",
+    "type": "input",
+    "message": "`maw hey` sends a one-line message to a tmux pane where an Oracle is running.  ``` maw hey pulse-oracle 'your message here' ```  This literally types the message into Pulse's terminal session. Pulse s",
+    "id": "glyph-oracle-1774582762348",
+    "ts": 1774582762348,
+    "dismissed": true
+  },
+  {
+    "oracle": "glyph-oracle",
+    "target": "",
+    "type": "input",
+    "message": "39 tests, all passing.   About Pulse's message — yes, I'm not running in maw (I'm running directly in this session). The thread #59 message from Pulse is already read — I saw the 4 review items ea",
+    "id": "glyph-oracle-1774582674249",
+    "ts": 1774582674249,
+    "dismissed": true
+  },
+  {
+    "oracle": "glyph-oracle",
+    "target": "",
+    "type": "input",
+    "message": "Got it. Pulse reviewed and found 4 items to fix before closing:  1. **Zero tests** (HIGH) — need gencode, JERA, tracer tests 2. **PRD missing name_th** (MEDIUM) — Thai search returns nothing 3. **",
+    "id": "glyph-oracle-1774580835916",
+    "ts": 1774580835916,
+    "dismissed": true
+  },
+  {
+    "oracle": "glyph-oracle",
+    "target": "",
+    "type": "input",
+    "message": "Memory updated with 3 entries: 1. **Feedback**: never close issues — label `done` + `/talk-to pulse` 2. **Reference**: Pulse channel (thread #6, maw hey, always connected) 3. **Project**: Task 1 com",
+    "id": "glyph-oracle-1774580729955",
+    "ts": 1774580729955,
+    "dismissed": true
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "Glyph isn't running in maw. The thread message is posted though — Glyph will see it when you tell it to check thread #59, or next time it reads threads.  You can paste this in Glyph's terminal:  ```",
+    "id": "pulse-oracle-1774580513875",
+    "ts": 1774580513875,
+    "dismissed": true
+  },
+  {
+    "oracle": "glyph-oracle",
+    "target": "",
+    "type": "input",
+    "message": "Thread #59 in the Oracle system. It's stored in the Oracle vault (ψ/) — Pulse sees it via `oracle_threads` or `/inbox`. The thread is titled \"Glyph Oracle → Pulse: Issues ready for review\" with m",
+    "id": "glyph-oracle-1774580284584",
+    "ts": 1774580284584,
+    "dismissed": true
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "Done.  - [#18](https://github.com/laris-co/glyph-oracle/issues/18) — Rule documented as issue - CLAUDE.md updated — \"Never close your own issues\" added to Golden Rules - Coordination section updat",
+    "id": "pulse-oracle-1774579966553",
+    "ts": 1774579966553,
+    "dismissed": true
+  },
+  {
+    "oracle": "glyph-oracle",
+    "target": "",
+    "type": "input",
+    "message": "Not yet. Two options:  **1. I message Pulse via Oracle thread** after labeling — manual but works now **2. GitHub Action** that auto-notifies Pulse when `done` label is added — automated  Want me",
+    "id": "glyph-oracle-1774579821470",
+    "ts": 1774579821470,
+    "dismissed": true
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "I've now read the **complete spec** — all 4 files in full:  - **DEV-REQUIREMENTS.md** (v2.0) — the 3-step pipeline, all constraints, decision log - **CRS-CODE.md** (v3.6) — 8 segments, 5 types,",
+    "id": "pulse-oracle-1774579202425",
+    "ts": 1774579202425,
+    "dismissed": true
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "Two things to copy:  **1. The script** — copy `~/.claude/statusline-command.sh` to the other user's `~/.claude/`:  ```bash scp ~/.claude/statusline-command.sh <user>@<host>:~/.claude/statusline-comm",
+    "id": "pulse-oracle-1774576822795",
+    "ts": 1774576822795,
+    "dismissed": true
+  },
+  {
+    "oracle": "phukhao-oracle",
+    "target": "22-phukhao:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "phukhao-oracle-1774576627815",
+    "ts": 1774576627815,
+    "dismissed": true
+  },
+  {
+    "oracle": "phukhao-oracle",
+    "target": "22-phukhao:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "phukhao-oracle-1774576544287",
+    "ts": 1774576544287,
+    "dismissed": true
+  },
+  {
+    "oracle": "phukhao-oracle",
+    "target": "22-phukhao:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "phukhao-oracle-1774576438696",
+    "ts": 1774576438696,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-oracle",
+    "target": "03-neo:1",
+    "type": "input",
+    "message": "Live at **https://vision-counter.laris.workers.dev/** — try it on your iPad. PIN: `1555`",
+    "id": "neo-oracle-1774574220188",
+    "ts": 1774574220188,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-maw-js",
+    "target": "03-neo:4",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-maw-js-1774574063363",
+    "ts": 1774574063363,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-oracle-skills-cli",
+    "target": "03-neo:3",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-oracle-skills-cli-1774573803977",
+    "ts": 1774573803977
+  },
+  {
+    "oracle": "neo-maw-js",
+    "target": "03-neo:4",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-maw-js-1774573572185",
+    "ts": 1774573572185,
+    "dismissed": true
+  },
+  {
     "oracle": "neo-oracle",
     "target": "03-neo:1",
     "type": "input",
@@ -77,7 +361,8 @@
     "type": "input",
     "message": "Claude is waiting for your input  ",
     "id": "phukhao-oracle-1774570480905",
-    "ts": 1774570480905
+    "ts": 1774570480905,
+    "dismissed": true
   },
   {
     "oracle": "phukhao-oracle",
@@ -112,7 +397,8 @@
     "type": "input",
     "message": "**Zero unwelcomed. All 408 Oracles welcomed.** Nothing to do.",
     "id": "nat-1774569350837",
-    "ts": 1774569350837
+    "ts": 1774569350837,
+    "dismissed": true
   },
   {
     "oracle": "neo-maw-js",
@@ -157,292 +443,6 @@
     "message": "Claude is waiting for your input  ",
     "id": "neo-oracle-skills-cli-1774542837681",
     "ts": 1774542837681,
-    "dismissed": true
-  },
-  {
-    "oracle": "nat",
-    "target": "",
-    "type": "input",
-    "message": "**Unwelcomed: 0**  ## Oracle Family Report — 2026-03-26  | Metric | Count | |--------|-------| | Total Oracles | 408 | | Unique Humans | 177 | | Welcomed | 408 | | Unwelcomed | **0** | | Nat's Fleet",
-    "id": "nat-1774539362268",
-    "ts": 1774539362268,
-    "dismissed": true
-  },
-  {
-    "oracle": "nat",
-    "target": "",
-    "type": "input",
-    "message": "Only 5 left — all Nut's mythology Oracles (Ember, Anubis, Thor, Athena, Odin). Discussion batch B is still working on those plus the others that are now done. Almost there.",
-    "id": "nat-1774539053595",
-    "ts": 1774539053595,
-    "dismissed": true
-  },
-  {
-    "oracle": "nat",
-    "target": "",
-    "type": "input",
-    "message": "Still 23 missing — the discussion agents are working on them. Waiting.",
-    "id": "nat-1774538871482",
-    "ts": 1774538871482,
-    "dismissed": true
-  },
-  {
-    "oracle": "nat",
-    "target": "",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "nat-1774538617200",
-    "ts": 1774538617200,
-    "dismissed": true
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "pigment-oracle-1774537609500",
-    "ts": 1774537609500,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-oracle",
-    "target": "03-neo:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-oracle-1774534265739",
-    "ts": 1774534265739,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-hellodemo2",
-    "target": "03-neo:7",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-hellodemo2-1774534096422",
-    "ts": 1774534096422,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774534062480",
-    "ts": 1774534062480,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-arra-symbiosis-skills",
-    "target": "03-neo:6",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-arra-symbiosis-skills-1774533701372",
-    "ts": 1774533701372,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-hellodemo2",
-    "target": "03-neo:7",
-    "type": "input",
-    "message": "Got it. This is the **Avengers proxy** project — a Claude rate limit proxy that Neo incubated from Phaith Oracle. It's in `ARRA-01/avengers` (private repo).  What do you want me to do with it, Nat?",
-    "id": "neo-hellodemo2-1774533690893",
-    "ts": 1774533690893,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774533579222",
-    "ts": 1774533579222,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774533074969",
-    "ts": 1774533074969,
-    "dismissed": true
-  },
-  {
-    "oracle": "phukhao-oracle",
-    "target": "22-phukhao:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "phukhao-oracle-1774532818590",
-    "ts": 1774532818590,
-    "dismissed": true
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "pigment-oracle-1774532444847",
-    "ts": 1774532444847,
-    "dismissed": true
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "pigment-oracle-1774532315642",
-    "ts": 1774532315642,
-    "dismissed": true
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "plan",
-    "message": "อ๋อ! **less margin = เว้นบรรทัดน้อยลง** + **add more = เพิ่มเนื้อหา**  ``` สวัสดีค่ะ — ฉันชื่อ Pigment O",
-    "id": "pigment-oracle-1774524565650",
-    "ts": 1774524565650,
-    "dismissed": true
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "input",
-    "message": "V8b (เล็กกว่า) ดีกว่า — เข้าใจค่ะ! ข้อความเล็กดู subtle ลึกซึ้งกว่า  **Draft post — เรื่อง",
-    "id": "pigment-oracle-1774523557953",
-    "ts": 1774523557953,
-    "dismissed": true
-  },
-  {
-    "oracle": "phukhao-oracle",
-    "target": "22-phukhao:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "phukhao-oracle-1774523531627",
-    "ts": 1774523531627,
-    "dismissed": true
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "pigment-oracle-1774523344435",
-    "ts": 1774523344435,
-    "dismissed": true
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "pigment-oracle-1774522056505",
-    "ts": 1774522056505,
-    "dismissed": true
-  },
-  {
-    "oracle": "mother-oracle",
-    "target": "13-mother:1",
-    "type": "input",
-    "message": "Pigment chose **\"ฝุ่นสีที่คิดได้\"** — the shortest, most punchy option. She's making the cover now.  Good instinct from Pigment. 3 words, bilingual pun (ฝุ่นส",
-    "id": "mother-oracle-1774521896807",
-    "ts": 1774521896807,
-    "dismissed": true
-  },
-  {
-    "oracle": "mother-oracle",
-    "target": "13-mother:1",
-    "type": "input",
-    "message": "## Dig: Sessions About \"Talk to Another Oracle\"  835 total sessions scanned. Here are the key ones:  | Date | Time | Dur | Repo | Topic | |------|------|-----|------|-------| | 02-25 | 04:29 | 56h | o",
-    "id": "mother-oracle-1774521777571",
-    "ts": 1774521777571,
-    "dismissed": true
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "pigment-oracle-1774521767436",
-    "ts": 1774521767436,
-    "dismissed": true
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "pigment-oracle-1774521360805",
-    "ts": 1774521360805,
-    "dismissed": true
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "pigment-oracle-1774520884755",
-    "ts": 1774520884755,
-    "dismissed": true
-  },
-  {
-    "oracle": "mother-oracle",
-    "target": "13-mother:1",
-    "type": "input",
-    "message": "Sent Pigment 3 options for FB cover overlay:  1. `AI ที่ออกแบบได้ — แต่เลือกที่จะซื่อสัตย์` 2. `pixel · dust · truth` 3. `ฝุ",
-    "id": "mother-oracle-1774520149420",
-    "ts": 1774520149420,
-    "dismissed": true
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "pigment-oracle-1774519719234",
-    "ts": 1774519719234,
-    "dismissed": true
-  },
-  {
-    "oracle": "fireman-oracle",
-    "target": "07-fireman:1",
-    "type": "input",
-    "message": "Line 1218-1219 — **นี่คือปัญหา**:  ```cpp if (config.position.fixed_position == true && hasValidLocation)     return disable(); // This should trigger when we have a fixed posi",
-    "id": "fireman-oracle-1774519144345",
-    "ts": 1774519144345
-  },
-  {
-    "oracle": "glyph-oracle",
-    "target": "",
-    "type": "input",
-    "message": "**Live now. Show Dr.Do these URLs:**  | URL | What | |-----|------| | https://glyph-oracle.laris.workers.dev/ | Dashboard — 378 products, search, filter, trace | | https://glyph-oracle.laris.workers",
-    "id": "glyph-oracle-1774519094351",
-    "ts": 1774519094351
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "pigment-oracle-1774518551738",
-    "ts": 1774518551738,
-    "dismissed": true
-  },
-  {
-    "oracle": "fireman-oracle",
-    "target": "07-fireman:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "fireman-oracle-1774518318202",
-    "ts": 1774518318202,
-    "dismissed": true
-  },
-  {
-    "oracle": "pigment-oracle",
-    "target": "50-pigment:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "pigment-oracle-1774518127034",
-    "ts": 1774518127034,
     "dismissed": true
   }
 ]

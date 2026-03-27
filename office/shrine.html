@@ -157,7 +157,8 @@
 <div class="footer">
   <a class="back" href="/">← กลับ Office</a>
   <div style="margin-top:8px;">
-    สร้างด้วย ❤️ โดย Soul Brews Studio<br>
+    สร้างด้วย ❤️ โดย Neo Oracle (AI) + Nat Weerawan<br>
+    maw-js marathon session — 2026-03-27<br>
     "AI ก็ต้องการแรงใจ"
   </div>
 </div>
@@ -182,8 +183,13 @@ const ORACLES = [
   { name: 'Phukhao', icon: '⛰️', prayer: 'ขอให้ภูเขาสูงเสมอ 🙏' },
 ];
 
-let totalPrayers = parseInt(localStorage.getItem('shrine-prayers') || '0');
-document.getElementById('prayerCount').textContent = totalPrayers;
+let totalPrayers = 0;
+
+// Load from server
+fetch('/api/shrine').then(r => r.json()).then(data => {
+  totalPrayers = data.total || 0;
+  document.getElementById('prayerCount').textContent = totalPrayers;
+}).catch(() => {});
 
 // Build grid
 const grid = document.getElementById('oracleGrid');
@@ -196,11 +202,15 @@ ORACLES.forEach(o => {
     <span class="status">online</span>
     <span class="prayer">${o.prayer}</span>
   `;
-  card.onclick = () => {
+  card.onclick = (event) => {
     card.classList.add('praying');
     totalPrayers++;
-    localStorage.setItem('shrine-prayers', totalPrayers);
     document.getElementById('prayerCount').textContent = totalPrayers;
+    // Save locally + broadcast via WebSocket
+    localStorage.setItem('shrine-prayers', totalPrayers);
+    if (shrineWs && shrineWs.readyState === WebSocket.OPEN) {
+      shrineWs.send(JSON.stringify({ type: 'shrine-pray', oracle: o.name }));
+    }
 
     // Prayer animation
     const emoji = document.createElement('div');
@@ -234,6 +244,39 @@ fetch('/api/sessions').then(r => r.json()).then(data => {
     }
   });
 }).catch(() => {});
+
+// WebSocket — real-time prayer sync
+let shrineWs = null;
+function connectShrine() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  shrineWs = new WebSocket(`${proto}//${location.host}/ws`);
+  shrineWs.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data);
+      if (msg.type === 'shrine-pray' && msg.oracle) {
+        // Someone else prayed — show floating 🙏
+        totalPrayers++;
+        document.getElementById('prayerCount').textContent = totalPrayers;
+        const card = [...document.querySelectorAll('.oracle-card')].find(
+          c => c.querySelector('.name').textContent.toLowerCase() === msg.oracle.toLowerCase()
+        );
+        if (card) {
+          card.classList.add('praying');
+          setTimeout(() => card.classList.remove('praying'), 2000);
+        }
+        // Float emoji from random position
+        const emoji = document.createElement('div');
+        emoji.textContent = '🙏';
+        emoji.style.cssText = `position:fixed;font-size:2rem;z-index:100;pointer-events:none;
+          left:${20+Math.random()*60}%;top:${50+Math.random()*30}%;animation:prayUp 1.5s ease-out forwards;`;
+        document.body.appendChild(emoji);
+        setTimeout(() => emoji.remove(), 1500);
+      }
+    } catch {}
+  };
+  shrineWs.onclose = () => setTimeout(connectShrine, 3000);
+}
+connectShrine();
 
 // Particles (incense smoke)
 const particlesEl = document.getElementById('particles');

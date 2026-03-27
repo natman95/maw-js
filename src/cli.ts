@@ -100,6 +100,10 @@ function usage() {
   maw costs                   Token usage + estimated cost per agent
   maw pr [window]             Create PR from current branch (links issue if branch has issue-N)
   maw triggers                List configured workflow triggers
+  maw transport status        Transport layer connectivity (tmux/MQTT/HTTP)
+  maw avengers status         ARRA-01 rate limit monitor (all accounts)
+  maw avengers best           Account with most capacity
+  maw avengers traffic        Traffic stats across accounts
   maw serve [port]            Start web UI (default: 3456)
 
 \x1b[33mWake modes:\x1b[0m
@@ -329,6 +333,19 @@ if (cmd === "--version" || cmd === "-v") {
   await cmdTriggers();
 } else if (cmd === "health" || cmd === "status") {
   await cmdHealth();
+} else if (cmd === "transport" || cmd === "tp") {
+  const sub = args[1]?.toLowerCase();
+  if (!sub || sub === "status") {
+    const { cmdTransportStatus } = await import("./commands/transport");
+    await cmdTransportStatus();
+  } else {
+    console.error("usage: maw transport status");
+    process.exit(1);
+  }
+} else if (cmd === "avengers" || cmd === "avg") {
+  const sub = args[1]?.toLowerCase();
+  const { cmdAvengers } = await import("./commands/avengers");
+  await cmdAvengers(sub || "status");
 } else if (cmd === "serve") {
   const { startServer } = await import("./server");
   startServer(args[1] ? +args[1] : 3456);

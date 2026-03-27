@@ -13,6 +13,8 @@ import { deprecatedApi } from "./deprecated";
 import { talkApi } from "./talk";
 import { costsApi } from "./costs";
 import { triggersApi } from "./triggers";
+import { avengersApi } from "./avengers";
+import { transportApi } from "./transport";
 
 export const api = new Hono();
 
@@ -30,3 +32,5 @@ api.route("/", deprecatedApi);
 api.route("/", talkApi);
 api.route("/", costsApi);
 api.route("/", triggersApi);
+api.route("/", avengersApi);
+api.route("/", transportApi);
