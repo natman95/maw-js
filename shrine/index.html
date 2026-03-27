@@ -183,13 +183,13 @@ const ORACLES = [
   { name: 'Phukhao', icon: '⛰️', prayer: 'ขอให้ภูเขาสูงเสมอ 🙏' },
 ];
 
-// Host param for CF deploy
-const _hp = new URLSearchParams(location.search).get('host');
-const apiHost = _hp || location.host;
-const wsProto = _hp ? 'wss:' : (location.protocol === 'https:' ? 'wss:' : 'ws:');
+let totalPrayers = 0;
 
-let totalPrayers = parseInt(localStorage.getItem('shrine-prayers') || '0');
-document.getElementById('prayerCount').textContent = totalPrayers;
+// Load from server
+fetch('/api/shrine').then(r => r.json()).then(data => {
+  totalPrayers = data.total || 0;
+  document.getElementById('prayerCount').textContent = totalPrayers;
+}).catch(() => {});
 
 // Build grid
 const grid = document.getElementById('oracleGrid');
@@ -203,6 +203,7 @@ ORACLES.forEach(o => {
     <span class="prayer">${o.prayer}</span>
   `;
   card.onclick = (event) => {
+    playBell();
     card.classList.add('praying');
     totalPrayers++;
     document.getElementById('prayerCount').textContent = totalPrayers;
@@ -225,7 +226,7 @@ ORACLES.forEach(o => {
 });
 
 // Fetch live status
-fetch(`${location.protocol}//${apiHost}/api/sessions`).then(r => r.json()).then(data => {
+fetch('/api/sessions').then(r => r.json()).then(data => {
   const sessions = data.sessions || data || [];
   const activeNames = new Set();
   sessions.forEach(s => s.windows?.forEach(w => {
@@ -248,7 +249,8 @@ fetch(`${location.protocol}//${apiHost}/api/sessions`).then(r => r.json()).then(
 // WebSocket — real-time prayer sync
 let shrineWs = null;
 function connectShrine() {
-  shrineWs = new WebSocket(`${wsProto}//${apiHost}/ws`);
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  shrineWs = new WebSocket(`${proto}//${location.host}/ws`);
   shrineWs.onmessage = (e) => {
     try {
       const msg = JSON.parse(e.data);
@@ -276,6 +278,82 @@ function connectShrine() {
   shrineWs.onclose = () => setTimeout(connectShrine, 3000);
 }
 connectShrine();
+
+// ===== SHRINE SOUNDS — temple bells + chanting =====
+let audioCtx = null;
+let clickCount = 0;
+let clickReset = null;
+
+// Pentatonic scale — each click plays next note, builds into melody
+const BELL_NOTES = [261.6, 293.7, 329.6, 392.0, 440.0, 523.3, 587.3, 659.3, 784.0, 880.0];
+// Thai temple bowl frequencies
+const BOWL_FREQS = [174.6, 220, 261.6, 329.6, 392];
+
+function playBell() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const ctx = audioCtx;
+  const now = ctx.currentTime;
+
+  // Pick note from scale based on click count (cycles through)
+  const freq = BELL_NOTES[clickCount % BELL_NOTES.length];
+  clickCount++;
+
+  // Clear reset timer — if clicking fast, build the melody
+  clearTimeout(clickReset);
+  clickReset = setTimeout(() => { clickCount = 0; }, 3000);
+
+  // Main bell tone
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.3, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 2.5);
+
+  // Overtone (temple bell shimmer)
+  const osc2 = ctx.createOscillator();
+  const gain2 = ctx.createGain();
+  osc2.type = 'sine';
+  osc2.frequency.value = freq * 2.76; // inharmonic — real bell sound
+  gain2.gain.setValueAtTime(0.08, now);
+  gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.8);
+  osc2.connect(gain2);
+  gain2.connect(ctx.destination);
+  osc2.start(now);
+  osc2.stop(now + 1.8);
+
+  // Sub bass (bowl resonance)
+  const sub = ctx.createOscillator();
+  const subGain = ctx.createGain();
+  sub.type = 'sine';
+  sub.frequency.value = freq / 2;
+  subGain.gain.setValueAtTime(0.15, now);
+  subGain.gain.exponentialRampToValueAtTime(0.001, now + 3);
+  sub.connect(subGain);
+  subGain.connect(ctx.destination);
+  sub.start(now);
+  sub.stop(now + 3);
+
+  // Every 5th click — bonus singing bowl chord
+  if (clickCount % 5 === 0) {
+    BOWL_FREQS.forEach((f, i) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = 'sine';
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.06, now + i * 0.1);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 4);
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(now + i * 0.1);
+      o.stop(now + 4);
+    });
+  }
+}
 
 // Particles (incense smoke)
 const particlesEl = document.getElementById('particles');

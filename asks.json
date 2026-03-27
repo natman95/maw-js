@@ -1,5 +1,14 @@
 [
   {
+    "oracle": "neo-maw-js",
+    "target": "03-neo:4",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-maw-js-1774593834650",
+    "ts": 1774593834650,
+    "dismissed": true
+  },
+  {
     "oracle": "neo-vision-counter",
     "target": "03-neo:13",
     "type": "input",
@@ -434,15 +443,6 @@
     "message": "Claude is waiting for your input  ",
     "id": "neo-maw-js-1774543852031",
     "ts": 1774543852031,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-oracle-skills-cli",
-    "target": "03-neo:3",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-oracle-skills-cli-1774542837681",
-    "ts": 1774542837681,
     "dismissed": true
   }
 ]
