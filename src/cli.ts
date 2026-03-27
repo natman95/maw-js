@@ -25,6 +25,7 @@ import { cmdReunion } from "./commands/reunion";
 import { cmdAssign } from "./commands/assign";
 import { cmdPr } from "./commands/pr";
 import { cmdCosts } from "./commands/costs";
+import { cmdTriggers } from "./commands/triggers";
 import { logAudit } from "./audit";
 
 const args = process.argv.slice(2);
@@ -97,6 +98,7 @@ function usage() {
   maw assign <issue-url> --oracle <name>  Explicit oracle
   maw costs                   Token usage + estimated cost per agent
   maw pr [window]             Create PR from current branch (links issue if branch has issue-N)
+  maw triggers                List configured workflow triggers
   maw serve [port]            Start web UI (default: 3456)
 
 \x1b[33mWake modes:\x1b[0m
@@ -322,6 +324,8 @@ if (cmd === "--version" || cmd === "-v") {
   await cmdCosts();
 } else if (cmd === "pr") {
   await cmdPr(args[1]);
+} else if (cmd === "triggers" || cmd === "trigger") {
+  await cmdTriggers();
 } else if (cmd === "serve") {
   const { startServer } = await import("./server");
   startServer(args[1] ? +args[1] : 3456);

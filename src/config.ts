@@ -8,6 +8,16 @@ function detectGhqRoot(): string {
   catch { return join(require("os").homedir(), "Code/github.com"); }
 }
 
+export type TriggerEvent = "issue-close" | "pr-merge" | "agent-idle" | "agent-wake" | "agent-crash";
+
+export interface TriggerConfig {
+  on: TriggerEvent;
+  repo?: string;       // filter by repo (for issue-close, pr-merge)
+  timeout?: number;     // seconds (for agent-idle)
+  action: string;       // shell command to execute — supports {agent}, {repo}, {issue} templates
+  name?: string;        // optional human label
+}
+
 export interface MawConfig {
   host: string;
   port: number;
@@ -21,6 +31,7 @@ export interface MawConfig {
   idleTimeoutMinutes?: number;
   federationToken?: string;
   autoRestart?: boolean;
+  triggers?: TriggerConfig[];
 }
 
 const DEFAULTS: MawConfig = {
@@ -116,6 +127,24 @@ function validateConfig(raw: Record<string, unknown>): Partial<MawConfig> {
       result.tmuxSocket = raw.tmuxSocket;
     } else {
       warn("tmuxSocket", "must be a string");
+    }
+  }
+
+  // triggers: TriggerConfig[]
+  if ("triggers" in raw) {
+    if (Array.isArray(raw.triggers)) {
+      const valid = raw.triggers.filter((t: any) => {
+        if (!t || typeof t !== "object") return false;
+        if (!t.on || typeof t.on !== "string") return false;
+        if (!t.action || typeof t.action !== "string") return false;
+        return true;
+      });
+      if (valid.length !== raw.triggers.length) {
+        warn("triggers", `has ${raw.triggers.length - valid.length} invalid entries, keeping valid ones`);
+      }
+      result.triggers = valid;
+    } else {
+      warn("triggers", "must be an array");
     }
   }
 
