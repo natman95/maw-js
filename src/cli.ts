@@ -27,6 +27,7 @@ import { cmdPr } from "./commands/pr";
 import { cmdCosts } from "./commands/costs";
 import { cmdTriggers } from "./commands/triggers";
 import { cmdHealth } from "./commands/health";
+import { cmdBroadcast } from "./commands/broadcast";
 import { logAudit } from "./audit";
 
 const args = process.argv.slice(2);
@@ -333,6 +334,9 @@ if (cmd === "--version" || cmd === "-v") {
   await cmdTriggers();
 } else if (cmd === "health" || cmd === "status") {
   await cmdHealth();
+} else if (cmd === "broadcast" || cmd === "shout") {
+  const msg = args.slice(1).join(" ");
+  await cmdBroadcast(msg);
 } else if (cmd === "transport" || cmd === "tp") {
   const sub = args[1]?.toLowerCase();
   if (!sub || sub === "status") {
