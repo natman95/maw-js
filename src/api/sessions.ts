@@ -32,51 +32,52 @@ sessionsApi.get("/mirror", async (c) => {
 });
 
 sessionsApi.post("/send", async (c) => {
-  const { target, text } = await c.req.json();
-  if (!target || !text) return c.json({ error: "target and text required" }, 400);
-
-  // Check if target is on a peer
-  const local = await listSessions();
-  const peerUrl = await findPeerForTarget(target, local);
-
-  if (peerUrl) {
-    // Route to peer (found via session aggregation)
-    const ok = await sendKeysToPeer(peerUrl, target, text);
-    if (ok) return c.json({ ok: true, target, text, source: peerUrl });
-    return c.json({ error: "Failed to send to peer", target, source: peerUrl }, 502);
-  }
-
-  // Check agent registry — direct routing via config
-  const config = loadConfig();
-  const targetName = target.replace(/-oracle$/, "").split(":").pop() || target;
-  const agentNode = config.agents?.[targetName] || config.agents?.[target];
-  if (agentNode && agentNode !== (config.node || config.host || "local")) {
-    const peer = config.namedPeers?.find(p => p.name === agentNode);
-    const peerUrl2 = peer?.url || config.peers?.find(p => p.includes(agentNode));
-    if (peerUrl2) {
-      const res = await curlFetch(`${peerUrl2}/api/send`, {
-        method: "POST",
-        body: JSON.stringify({ target, text }),
-        timeout: 10000,
-      });
-      if (res.ok && res.data?.ok) {
-        return c.json({ ok: true, target: res.data.target || target, text, source: peerUrl2 });
-      }
-      return c.json({ error: `Agent ${targetName} mapped to ${agentNode} but send failed`, target, source: peerUrl2 }, 502);
-    }
-  }
-
-  // Send locally — fuzzy match: try target, then strip -oracle suffix
-  const baseName = target.replace(/-oracle$/, "");
-  const resolved = findWindow(local, target) || findWindow(local, baseName);
-  if (!resolved) {
-    return c.json({ error: `target not found: ${target}`, target }, 404);
-  }
   try {
-    await sendKeys(resolved, text);
-    return c.json({ ok: true, target: resolved, text, source: "local" });
+    const { target, text } = await c.req.json();
+    if (!target || !text) return c.json({ error: "target and text required" }, 400);
+
+    const local = await listSessions();
+
+    // Step 1: Fuzzy resolve locally first
+    const baseName = target.replace(/-oracle$/, "");
+    const resolved = findWindow(local, target) || findWindow(local, baseName);
+
+    if (resolved) {
+      await sendKeys(resolved, text);
+      return c.json({ ok: true, target: resolved, text, source: "local" });
+    }
+
+    // Step 2: Check agent registry for remote routing
+    const config = loadConfig();
+    const targetName = baseName.split(":").pop() || baseName;
+    const agentNode = config.agents?.[targetName] || config.agents?.[target];
+    if (agentNode && agentNode !== (config.node || config.host || "local")) {
+      const peer = config.namedPeers?.find(p => p.name === agentNode);
+      const peerUrl = peer?.url || config.peers?.find(p => p.includes(agentNode));
+      if (peerUrl) {
+        const res = await curlFetch(`${peerUrl}/api/send`, {
+          method: "POST",
+          body: JSON.stringify({ target, text }),
+          timeout: 10000,
+        });
+        if (res.ok && res.data?.ok) {
+          return c.json({ ok: true, target: res.data.target || target, text, source: peerUrl });
+        }
+        return c.json({ error: `Agent ${targetName} → ${agentNode} send failed`, target, source: peerUrl }, 502);
+      }
+    }
+
+    // Step 3: Check peers via aggregated sessions
+    const peerUrl = await findPeerForTarget(target, local);
+    if (peerUrl) {
+      const ok = await sendKeysToPeer(peerUrl, target, text);
+      if (ok) return c.json({ ok: true, target, text, source: peerUrl });
+      return c.json({ error: "Failed to send to peer", target, source: peerUrl }, 502);
+    }
+
+    return c.json({ error: `target not found: ${target}`, target }, 404);
   } catch (err) {
-    return c.json({ error: `sendKeys failed: ${String(err)}`, target: resolved }, 500);
+    return c.json({ error: String(err) }, 500);
   }
 });
 
