@@ -3,6 +3,7 @@ import { loadConfig } from "../config";
 import { resolveFleetSession } from "./wake";
 import { runHook } from "../hooks";
 import { scanWorktrees } from "../worktrees";
+import { curlFetch } from "../curl-fetch";
 
 /** Resolve which sessions to search for an oracle query (#86). */
 function resolveSearchSessions(query: string, sessions: Session[]): Session[] {
@@ -120,4 +121,23 @@ export async function cmdSend(query: string, message: string, force = false) {
   await sendKeys(target, message);
   await runHook("after_send", { to: query, message });
   console.log(`\x1b[32msent\x1b[0m → ${target}: ${message}`);
+}
+
+/** maw wire — federation send via local maw server's /api/send (routes to peers) */
+export async function cmdWire(query: string, message: string) {
+  const config = loadConfig();
+  const port = config.port || 3456;
+
+  const res = await curlFetch(`http://localhost:${port}/api/send`, {
+    method: "POST",
+    body: JSON.stringify({ target: query, text: message }),
+  });
+
+  if (!res.ok || !res.data?.ok) {
+    console.error(`\x1b[31merror\x1b[0m: ${res.data?.error || "wire send failed"}`);
+    process.exit(1);
+  }
+
+  const source = res.data.source === "local" ? "local" : `⚡ ${res.data.source}`;
+  console.log(`\x1b[36mwired\x1b[0m ${source} → ${res.data.target}: ${message}`);
 }

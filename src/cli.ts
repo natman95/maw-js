@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 process.env.MAW_CLI = "1";
 
-import { cmdList, cmdPeek, cmdSend } from "./commands/comm";
+import { cmdList, cmdPeek, cmdSend, cmdWire } from "./commands/comm";
 import { cmdView } from "./commands/view";
 import { cmdCompletions } from "./commands/completions";
 import { cmdOverview } from "./commands/overview";
@@ -43,6 +43,7 @@ function usage() {
   maw ls                      List sessions + windows
   maw peek [agent]            Peek agent screen (or all)
   maw hey <agent> <msg...>    Send message to agent (alias: tell)
+  maw wire <agent> <msg...>   Send via federation (curl over WireGuard)
   maw wake <oracle> [task]    Wake oracle in tmux window + claude
   maw wake <oracle> --issue N Wake oracle with GitHub issue as prompt
   maw wake <oracle> --incubate org/repo  Clone repo + worktree
@@ -150,6 +151,10 @@ if (cmd === "--version" || cmd === "-v") {
   const msgArgs = args.slice(2).filter(a => a !== "--force");
   if (!args[1] || !msgArgs.length) { console.error("usage: maw hey <agent> <message> [--force]"); process.exit(1); }
   await cmdSend(args[1], msgArgs.join(" "), force);
+} else if (cmd === "wire") {
+  const msgArgs = args.slice(2);
+  if (!args[1] || !msgArgs.length) { console.error("usage: maw wire <agent> <message>"); process.exit(1); }
+  await cmdWire(args[1], msgArgs.join(" "));
 } else if (cmd === "talk-to" || cmd === "talkto" || cmd === "talk") {
   const force = args.includes("--force");
   const msgArgs = args.slice(2).filter(a => a !== "--force");
