@@ -65,6 +65,11 @@
   <div class="loading">loading...</div>
 </div>
 
+<h2>Live Fleet <span class="refresh" onclick="loadFeed()">refresh</span></h2>
+<div class="card" id="fleet">
+  <div class="loading">listening for MQTT events...</div>
+</div>
+
 <h2>How to Join the Federation</h2>
 
 <div class="step">
@@ -221,6 +226,51 @@ async function load() {
 
 load();
 setInterval(load, 10000);
+
+// Live fleet from feed-history
+const fleetAgents = new Map();
+async function loadFeed() {
+  try {
+    const res = await fetch(`${API}/api/feed-history`).then(r => r.json()).catch(() => []);
+    const events = Array.isArray(res) ? res : (res.events || []);
+    for (const e of events) {
+      const key = `${e.host}:${e.oracle}`;
+      const existing = fleetAgents.get(key);
+      if (!existing || (e.ts || 0) > (existing.ts || 0)) {
+        fleetAgents.set(key, e);
+      }
+    }
+    renderFleet();
+  } catch {}
+}
+
+function renderFleet() {
+  const el = document.getElementById('fleet');
+  if (fleetAgents.size === 0) {
+    el.innerHTML = '<div style="color:#555;font-size:13px;">No fleet events yet</div>';
+    return;
+  }
+  const byHost = {};
+  for (const [, e] of fleetAgents) {
+    const host = e.host || 'unknown';
+    if (!byHost[host]) byHost[host] = [];
+    byHost[host].push(e);
+  }
+  let html = '';
+  for (const [host, agents] of Object.entries(byHost).sort()) {
+    html += `<div style="margin-bottom:8px;"><span style="color:#64b5f6;font-size:12px;">${host}</span></div>`;
+    for (const a of agents.sort((x,y) => (x.oracle||'').localeCompare(y.oracle||''))) {
+      const status = a.message || a.event || '?';
+      const color = status === 'working' ? '#4caf50' : status === 'waiting' ? '#ff9800' : '#666';
+      const ago = a.ts ? Math.round((Date.now() - a.ts) / 1000) + 's ago' : '';
+      html += `<div class="agent-row"><span class="agent-dot" style="background:${color}"></span><span class="agent-name">${a.oracle || '?'}</span><span class="agent-node" style="margin-left:auto;">${status} <span style="color:#444;font-size:11px;">${ago}</span></span></div>`;
+    }
+  }
+  el.innerHTML = html;
+}
+
+loadFeed();
+setInterval(loadFeed, 5000);
 </script>
 
 </body>
