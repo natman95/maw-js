@@ -102,6 +102,28 @@ export async function cmdPeek(query?: string) {
 }
 
 export async function cmdSend(query: string, message: string, force = false) {
+  const config = loadConfig();
+
+  // Node prefix syntax: "mba:homekeeper" → force route to mba node
+  if (query.includes(":") && !query.includes("/")) {
+    const [nodeName, agentName] = query.split(":", 2);
+    const peer = config.namedPeers?.find(p => p.name === nodeName);
+    const peerUrl = peer?.url || config.peers?.find(p => p.includes(nodeName));
+    if (peerUrl) {
+      const res = await curlFetch(`${peerUrl}/api/send`, {
+        method: "POST",
+        body: JSON.stringify({ target: agentName, text: message }),
+      });
+      if (res.ok && res.data?.ok) {
+        console.log(`\x1b[36mrouted\x1b[0m ⚡ ${nodeName} → ${res.data.target || agentName}: ${message}`);
+        await runHook("after_send", { to: query, message });
+        return;
+      }
+      console.error(`\x1b[31merror\x1b[0m: failed to reach ${agentName} on node ${nodeName} (${peerUrl})`);
+      process.exit(1);
+    }
+  }
+
   const sessions = await listSessions();
   const searchIn = resolveSearchSessions(query, sessions);
   const target = findWindow(searchIn, query);
@@ -126,7 +148,6 @@ export async function cmdSend(query: string, message: string, force = false) {
   }
 
   // Not found locally → check agent registry for remote routing
-  const config = loadConfig();
   const agentNode = config.agents?.[query] || config.agents?.[query.replace(/-oracle$/, "")];
   if (agentNode && agentNode !== (config.node || "local")) {
     // Route via federation (same as maw wire but auto-detected)
