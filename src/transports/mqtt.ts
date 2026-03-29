@@ -159,7 +159,7 @@ export class MqttTransport implements Transport {
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        const ws = new WebSocket(this.config.broker);
+        const ws = new WebSocket(this.config.broker, ["mqtt"]);
         ws.binaryType = "arraybuffer";
 
         const timeout = setTimeout(() => {
