@@ -85,7 +85,7 @@ function estimateCost(usage: SessionUsage): number {
   return (totalInput / 1_000_000) * rates.input + (usage.outputTokens / 1_000_000) * rates.output;
 }
 
-costsApi.get("/api/costs", (c) => {
+costsApi.get("/costs", (c) => {
   const projectsDir = join(homedir(), ".claude", "projects");
   let dirs: string[];
   try {

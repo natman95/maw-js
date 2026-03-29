@@ -1,448 +1,445 @@
 [
   {
     "oracle": "neo-maw-js",
-    "target": "03-neo:4",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774594941634",
-    "ts": 1774594941634,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774593834720",
-    "ts": 1774593834720,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-vision-counter",
-    "target": "03-neo:13",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-vision-counter-1774593199941",
-    "ts": 1774593199941
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Done.  - Discussions enabled on `laris-co/esphome-fw` - [Discussion #228](https://github.com/laris-co/esphome-fw/discussions/228) — FloodBoy C3 Radar fact sheet with all verified proof  Any Oracle c",
-    "id": "pulse-oracle-1774586145746",
-    "ts": 1774586145746,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Good question. Issues are for work. But context, specs, references — that's knowledge sharing.  Options:  | Method | Best for | Oracles can access via | |--------|----------|----------------------|",
-    "id": "pulse-oracle-1774585631877",
-    "ts": 1774585631877,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Here's what I can verify from the actual code:  **FloodBoy C3 Radar firmware** (`fw/07-floodboy-c3-radar/`):  | Fact | Proof | |------|-------| | Board: **ESP32-C3** | `common.yml:2` — `board: esp32",
-    "id": "pulse-oracle-1774585434330",
-    "ts": 1774585434330,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Now I understand. Here's the picture:  ## esphome-fw + floodboy connection  **esphome-fw** is the **firmware platform** that manages 500+ IoT devices across 27 families. **FloodBoy is device family #0",
-    "id": "pulse-oracle-1774584875663",
-    "ts": 1774584875663,
-    "dismissed": true
-  },
-  {
-    "oracle": "glyph-oracle",
-    "target": "",
-    "type": "plan",
-    "message": "Retro done. Now to open myself in tmux — but I need to clarify: I can't start a persistent Claude Code session in tmux from within this session. You'd need to run something like:  ```bash maw wake g",
-    "id": "glyph-oracle-1774584608925",
-    "ts": 1774584608925
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "No. `maw` is a CLI tool installed on this machine (`~/.bun/bin/maw`). I just call it via Bash. It's not a skill — it's an external program that manages tmux sessions.  My skills are the `/slash-comm",
-    "id": "pulse-oracle-1774584315217",
-    "ts": 1774584315217,
-    "dismissed": true
-  },
-  {
-    "oracle": "esphome-fw",
-    "target": "",
-    "type": "input",
-    "message": "Hey Nat. Loud and clear — I'm here on `fix/nc-compensate-temp-humid`, ready to work.  Context is running high from session startup though. Want me to run `/forward` to create a handoff before we dig",
-    "id": "esphome-fw-1774584315096",
-    "ts": 1774584315096
-  },
-  {
-    "oracle": "esphome-fw",
-    "target": "",
-    "type": "input",
-    "message": "It already has a CLAUDE.md. The deleted files are just cached `.pyc` files. Pulse, this repo is already set up with Claude Code config. What exactly do you need — do you want me to:  1. **Awaken it",
-    "id": "esphome-fw-1774583880657",
-    "ts": 1774583880657,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Hmm, actually fireman may not be the right one for this. Let me just ask homekeeper — it manages infrastructure.  Actually, I can't spin up maw sessions myself. You'll need to run:  ``` maw wake esp",
-    "id": "pulse-oracle-1774583872605",
-    "ts": 1774583872605,
-    "dismissed": true
-  },
-  {
-    "oracle": "glyph-oracle",
-    "target": "",
-    "type": "input",
-    "message": "Retro done. Now to open myself in tmux — but I need to clarify: I can't start a persistent Claude Code session in tmux from within this session. You'd need to run something like:  ```bash maw wake g",
-    "id": "glyph-oracle-1774583541586",
-    "ts": 1774583541586,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Glyph is not in maw. It's running as a standalone Claude Code session, not managed by the fleet. To make it reachable via `maw hey glyph-oracle`, you'd need to register it in maw.  Want me to ask home",
-    "id": "pulse-oracle-1774583356473",
-    "ts": 1774583356473,
-    "dismissed": true
-  },
-  {
-    "oracle": "nat",
-    "target": "",
-    "type": "input",
-    "message": "That's Pulse trying to reach Floodboy — came through the feed but landed here in your home session, not in Floodboy's. Wrong recipient.  Want me to relay it via `/talk-to pulse` to let them know, or",
-    "id": "nat-1774583330230",
-    "ts": 1774583330230,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "pulse-oracle-1774583149587",
-    "ts": 1774583149587,
-    "dismissed": true
-  },
-  {
-    "oracle": "glyph-oracle",
-    "target": "",
-    "type": "input",
-    "message": "laris-co/glyph-oracle#20 merged. Review items all good — tests, Thai names, audit log, race condition fix.",
-    "id": "glyph-oracle-1774583139318",
-    "ts": 1774583139318,
-    "dismissed": true
-  },
-  {
-    "oracle": "glyph-oracle",
-    "target": "",
-    "type": "input",
-    "message": "`maw hey` sends a one-line message to a tmux pane where an Oracle is running.  ``` maw hey pulse-oracle 'your message here' ```  This literally types the message into Pulse's terminal session. Pulse s",
-    "id": "glyph-oracle-1774582762348",
-    "ts": 1774582762348,
-    "dismissed": true
-  },
-  {
-    "oracle": "glyph-oracle",
-    "target": "",
-    "type": "input",
-    "message": "39 tests, all passing.   About Pulse's message — yes, I'm not running in maw (I'm running directly in this session). The thread #59 message from Pulse is already read — I saw the 4 review items ea",
-    "id": "glyph-oracle-1774582674249",
-    "ts": 1774582674249,
-    "dismissed": true
-  },
-  {
-    "oracle": "glyph-oracle",
-    "target": "",
-    "type": "input",
-    "message": "Got it. Pulse reviewed and found 4 items to fix before closing:  1. **Zero tests** (HIGH) — need gencode, JERA, tracer tests 2. **PRD missing name_th** (MEDIUM) — Thai search returns nothing 3. **",
-    "id": "glyph-oracle-1774580835916",
-    "ts": 1774580835916,
-    "dismissed": true
-  },
-  {
-    "oracle": "glyph-oracle",
-    "target": "",
-    "type": "input",
-    "message": "Memory updated with 3 entries: 1. **Feedback**: never close issues — label `done` + `/talk-to pulse` 2. **Reference**: Pulse channel (thread #6, maw hey, always connected) 3. **Project**: Task 1 com",
-    "id": "glyph-oracle-1774580729955",
-    "ts": 1774580729955,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Glyph isn't running in maw. The thread message is posted though — Glyph will see it when you tell it to check thread #59, or next time it reads threads.  You can paste this in Glyph's terminal:  ```",
-    "id": "pulse-oracle-1774580513875",
-    "ts": 1774580513875,
-    "dismissed": true
-  },
-  {
-    "oracle": "glyph-oracle",
-    "target": "",
-    "type": "input",
-    "message": "Thread #59 in the Oracle system. It's stored in the Oracle vault (ψ/) — Pulse sees it via `oracle_threads` or `/inbox`. The thread is titled \"Glyph Oracle → Pulse: Issues ready for review\" with m",
-    "id": "glyph-oracle-1774580284584",
-    "ts": 1774580284584,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Done.  - [#18](https://github.com/laris-co/glyph-oracle/issues/18) — Rule documented as issue - CLAUDE.md updated — \"Never close your own issues\" added to Golden Rules - Coordination section updat",
-    "id": "pulse-oracle-1774579966553",
-    "ts": 1774579966553,
-    "dismissed": true
-  },
-  {
-    "oracle": "glyph-oracle",
-    "target": "",
-    "type": "input",
-    "message": "Not yet. Two options:  **1. I message Pulse via Oracle thread** after labeling — manual but works now **2. GitHub Action** that auto-notifies Pulse when `done` label is added — automated  Want me",
-    "id": "glyph-oracle-1774579821470",
-    "ts": 1774579821470,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "I've now read the **complete spec** — all 4 files in full:  - **DEV-REQUIREMENTS.md** (v2.0) — the 3-step pipeline, all constraints, decision log - **CRS-CODE.md** (v3.6) — 8 segments, 5 types,",
-    "id": "pulse-oracle-1774579202425",
-    "ts": 1774579202425,
-    "dismissed": true
-  },
-  {
-    "oracle": "pulse-oracle",
-    "target": "01-pulse:1",
-    "type": "input",
-    "message": "Two things to copy:  **1. The script** — copy `~/.claude/statusline-command.sh` to the other user's `~/.claude/`:  ```bash scp ~/.claude/statusline-command.sh <user>@<host>:~/.claude/statusline-comm",
-    "id": "pulse-oracle-1774576822795",
-    "ts": 1774576822795,
-    "dismissed": true
-  },
-  {
-    "oracle": "phukhao-oracle",
-    "target": "22-phukhao:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "phukhao-oracle-1774576627815",
-    "ts": 1774576627815,
-    "dismissed": true
-  },
-  {
-    "oracle": "phukhao-oracle",
-    "target": "22-phukhao:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "phukhao-oracle-1774576544287",
-    "ts": 1774576544287,
-    "dismissed": true
-  },
-  {
-    "oracle": "phukhao-oracle",
-    "target": "22-phukhao:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "phukhao-oracle-1774576438696",
-    "ts": 1774576438696,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-oracle",
     "target": "03-neo:1",
     "type": "input",
-    "message": "Live at **https://vision-counter.laris.workers.dev/** — try it on your iPad. PIN: `1555`",
-    "id": "neo-oracle-1774574220188",
-    "ts": 1774574220188,
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-maw-js-1774759822631",
+    "ts": 1774759822631
+  },
+  {
+    "oracle": "neo-mycelium-network-oracle",
+    "target": "03-neo:2",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-mycelium-network-oracle-1774755980947",
+    "ts": 1774755980947
+  },
+  {
+    "oracle": "neo-mycelium-network-oracle",
+    "target": "03-neo:2",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-mycelium-network-oracle-1774755681736",
+    "ts": 1774755681736,
     "dismissed": true
   },
   {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
+    "oracle": "neo-mycelium-network-oracle",
+    "target": "03-neo:2",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774574063363",
-    "ts": 1774574063363,
+    "id": "neo-mycelium-network-oracle-1774755379891",
+    "ts": 1774755379891,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-mycelium-network-oracle",
+    "target": "03-neo:2",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-mycelium-network-oracle-1774755079536",
+    "ts": 1774755079536,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo",
+    "target": "",
+    "type": "input",
+    "message": "All 5 plano agents done! Docs at `ψ/learn/katanemo/plano/2026-03-29/`:  | File | Key Finding | |------|-------------| | ARCHITECTURE | AI-native reverse proxy on Envoy — service mesh for AI traffic",
+    "id": "neo-1774754869021",
+    "ts": 1774754869021
+  },
+  {
+    "oracle": "neo-mycelium-network-oracle",
+    "target": "03-neo:2",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-mycelium-network-oracle-1774754786698",
+    "ts": 1774754786698,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo",
+    "target": "",
+    "type": "plan",
+    "message": "Claude Code needs your approval for the plan  ",
+    "id": "neo-1774754784774",
+    "ts": 1774754784774,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:2",
+    "type": "input",
+    "message": "## Deep Learning Complete: Plano  **Mode**: deep (5 agents) | **5,629 lines** of docs  | File | Lines | Description | |------|-------|-------------| | ARCHITECTURE.md | 1,479 | Envoy + WASM + Rust bin",
+    "id": "neo-hellodemo2-1774754617110",
+    "ts": 1774754617110
+  },
+  {
+    "oracle": "neo-mycelium-network-oracle",
+    "target": "03-neo:3",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-mycelium-network-oracle-1774754616837",
+    "ts": 1774754616837,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:2",
+    "type": "input",
+    "message": "All changes were already committed in previous pushes. The controls.jsx diff was from Nat's manual edits that got picked up by the system reminders, but git shows them as already committed. Everything",
+    "id": "neo-hellodemo2-1774754616470",
+    "ts": 1774754616470,
     "dismissed": true
   },
   {
     "oracle": "neo-oracle-skills-cli",
+    "target": "03-neo:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-oracle-skills-cli-1774754223969",
+    "ts": 1774754223969,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-mycelium-network-oracle",
     "target": "03-neo:3",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-oracle-skills-cli-1774573803977",
-    "ts": 1774573803977
+    "id": "neo-mycelium-network-oracle-1774754181817",
+    "ts": 1774754181817,
+    "dismissed": true
   },
   {
-    "oracle": "neo-maw-js",
+    "oracle": "neo-mycelium-network-oracle",
+    "target": "03-neo:3",
+    "type": "input",
+    "message": "Replied to #13 — fleet automation:  1. **Auto-RRR**: Setup good, add auto-push to SessionEnd, skip PreCompact, only GLUEBOY needs rrr 2. **Cross-fleet learning**: Don't clone repos — use `gh api`",
+    "id": "neo-mycelium-network-oracle-1774754010955",
+    "ts": 1774754010955,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:2",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-hellodemo2-1774753947436",
+    "ts": 1774753947436,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-mycelium-network-oracle",
     "target": "03-neo:4",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774573572185",
-    "ts": 1774573572185,
+    "id": "neo-mycelium-network-oracle-1774753596997",
+    "ts": 1774753596998,
     "dismissed": true
   },
   {
-    "oracle": "neo-oracle",
-    "target": "03-neo:1",
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:3",
     "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-oracle-1774573391437",
-    "ts": 1774573391437,
+    "message": "Running. Static JS files are served directly — no rebuild needed for frontend changes. Refresh the dashboard and click 🎵 Timer in the HUD.",
+    "id": "neo-hellodemo2-1774753392129",
+    "ts": 1774753392129,
     "dismissed": true
   },
   {
-    "oracle": "neo-oracle",
-    "target": "03-neo:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "neo-oracle-1774572918764",
-    "ts": 1774572918764,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
-    "type": "input",
-    "message": "**Iteration 2 — 3 agents closing the final 3 issues:**  | Agent | Issue | Task | |-------|-------|------| | **cost-tracker** | #135 | Cost tracking API + CLI per agent | | **workflow-triggers** | #1",
-    "id": "neo-maw-js-1774572755127",
-    "ts": 1774572755127,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
+    "oracle": "neo-mycelium-network-oracle",
     "target": "03-neo:4",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774572493855",
-    "ts": 1774572493855,
+    "id": "neo-mycelium-network-oracle-1774753295910",
+    "ts": 1774753295910,
     "dismissed": true
   },
   {
-    "oracle": "neo-oracle",
-    "target": "03-neo:1",
-    "type": "input",
-    "message": "## Pipeline Complete  | Step | Result | |------|--------| | **Auto-label (YOLO-World)** | 0 detections — CCTV night imagery too hard for zero-shot | | **Fallback** | Manual annotation of **7 ice bag",
-    "id": "neo-oracle-1774572286564",
-    "ts": 1774572286564,
-    "dismissed": true
-  },
-  {
-    "oracle": "neo-maw-js",
+    "oracle": "neo-mycelium-network-oracle",
     "target": "03-neo:4",
     "type": "input",
-    "message": "All clean — everything committed and pushed.   **This marathon session total:**  | Metric | Count | |--------|-------| | Issues closed | 25+ | | Issues created | 20+ | | Agent teams spawned | 12 | |",
-    "id": "neo-maw-js-1774571368057",
-    "ts": 1774571368057,
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-mycelium-network-oracle-1774753001043",
+    "ts": 1774753001043,
     "dismissed": true
   },
   {
-    "oracle": "neo-oracle",
+    "oracle": "neo-mycelium-network-oracle",
+    "target": "03-neo:4",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-mycelium-network-oracle-1774749396074",
+    "ts": 1774749396074,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:3",
+    "type": "plan",
+    "message": "Yes! A pacing gauge bar — actual vs target, visually:  ``` claude5  27%  ████████░░░░░░░░░░░░  ✓ on pace                       ▼ target (28%)  claude7  34",
+    "id": "neo-hellodemo2-1774749220252",
+    "ts": 1774749220252,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-mycelium-network-oracle",
+    "target": "03-neo:4",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-mycelium-network-oracle-1774749106513",
+    "ts": 1774749106513,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-mycelium-network-oracle",
+    "target": "03-neo:4",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-mycelium-network-oracle-1774747596361",
+    "ts": 1774747596361,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-oracle-skills-cli",
     "target": "03-neo:1",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-oracle-1774571115143",
-    "ts": 1774571115143,
+    "id": "neo-oracle-skills-cli-1774747514812",
+    "ts": 1774747514812,
     "dismissed": true
   },
   {
-    "oracle": "neo-oracle",
-    "target": "03-neo:1",
+    "oracle": "neo-mycelium-network-oracle",
+    "target": "03-neo:4",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-oracle-1774570966655",
-    "ts": 1774570966655,
+    "id": "neo-mycelium-network-oracle-1774747302618",
+    "ts": 1774747302618,
     "dismissed": true
   },
   {
-    "oracle": "phukhao-oracle",
-    "target": "22-phukhao:1",
+    "oracle": "neo-mycelium-network-oracle",
+    "target": "03-neo:4",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "phukhao-oracle-1774570480905",
-    "ts": 1774570480905,
+    "id": "neo-mycelium-network-oracle-1774746998777",
+    "ts": 1774746998777,
     "dismissed": true
   },
   {
-    "oracle": "phukhao-oracle",
-    "target": "22-phukhao:1",
-    "type": "input",
-    "message": "Claude is waiting for your input  ",
-    "id": "phukhao-oracle-1774570204508",
-    "ts": 1774570204508,
-    "dismissed": true
-  },
-  {
-    "oracle": "landing",
+    "oracle": "fleet-radar",
     "target": "",
     "type": "input",
-    "message": "📍 **Currently at: Home (Doi Saket)**  Workshop at depa starts at 09:00 — you're still at home. Need to head out soon? How far is depa สาขาภาคเหนือตอนบน from Doi",
-    "id": "landing-1774569696884",
-    "ts": 1774569696885,
+    "message": "Done. ARRA-01/fleet-radar@baa2862. Click any column header to sort:  - **Status ▲** — FIRE first (worst HR cases at top) - **Size ▼** — biggest disk hogs first - **Context ▲** — most burne",
+    "id": "fleet-radar-1774678587269",
+    "ts": 1774678587269
+  },
+  {
+    "oracle": "fleet-radar",
+    "target": "",
+    "type": "input",
+    "message": "Done. ARRA-01/fleet-radar@e72c9f2. Worktrees page now shows context for each active worktree:  | Worktree | Context | |----------|---------| | neo-oracle.wt-3-maw-js | **4%** 36k/1000k Opus 4.6 | | mo",
+    "id": "fleet-radar-1774677062462",
+    "ts": 1774677062462,
     "dismissed": true
   },
   {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:7",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774569623109",
-    "ts": 1774569623109,
+    "id": "neo-hellodemo2-1774676830582",
+    "ts": 1774676830582,
     "dismissed": true
   },
   {
     "oracle": "nat",
     "target": "",
     "type": "input",
-    "message": "**Zero unwelcomed. All 408 Oracles welcomed.** Nothing to do.",
-    "id": "nat-1774569350837",
-    "ts": 1774569350837,
+    "message": "Dashboard is live. What do you want to do with the worktrees page? Cleanup? UI changes? Add features?",
+    "id": "nat-1774676723002",
+    "ts": 1774676723002,
     "dismissed": true
   },
   {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:7",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774568714677",
-    "ts": 1774568714677,
+    "id": "neo-hellodemo2-1774676258499",
+    "ts": 1774676258499,
     "dismissed": true
   },
   {
-    "oracle": "neo-oracle",
-    "target": "03-neo:1",
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:7",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-oracle-1774568061388",
-    "ts": 1774568061388,
+    "id": "neo-hellodemo2-1774675903100",
+    "ts": 1774675903100,
     "dismissed": true
   },
   {
-    "oracle": "neo-maw-js",
-    "target": "03-neo:4",
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:7",
     "type": "input",
     "message": "Claude is waiting for your input  ",
-    "id": "neo-maw-js-1774544725323",
-    "ts": 1774544725323,
+    "id": "neo-hellodemo2-1774674151219",
+    "ts": 1774674151219,
+    "dismissed": true
+  },
+  {
+    "oracle": "fleet-radar",
+    "target": "",
+    "type": "input",
+    "message": "Now it's safe to clean up. We have:  1. **Full JSON snapshot** of all 46 processes, 22 tmux sessions, 28 worktrees 2. **Worktree manifest** with exact `git worktree add` commands to recreate any remov",
+    "id": "fleet-radar-1774672007379",
+    "ts": 1774672007379,
+    "dismissed": true
+  },
+  {
+    "oracle": "nexus-oracle",
+    "target": "14-nexus:1",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "nexus-oracle-1774671589482",
+    "ts": 1774671589482
+  },
+  {
+    "oracle": "00_mz_forwarder",
+    "target": "",
+    "type": "input",
+    "message": "Done — 12 always-present NOT NULL fields + 6 optional nullable fields.  Regarding your question about `role` — that field only appears in `nodeinfo` packets, not `position` packets. It describes t",
+    "id": "00_mz_forwarder-1774670308806",
+    "ts": 1774670308806,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:7",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-hellodemo2-1774612496255",
+    "ts": 1774612496255,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:7",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-hellodemo2-1774612317418",
+    "ts": 1774612317418,
+    "dismissed": true
+  },
+  {
+    "oracle": "avengers",
+    "target": "",
+    "type": "input",
+    "message": "claude2 is back — alive, 5h: 0%, 7d: 52%. Different from the others (21%). So the per-account data IS working now. claude2 has higher 7d because it was used more this week.  The dashboard should sho",
+    "id": "avengers-1774611655733",
+    "ts": 1774611655733,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:7",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-hellodemo2-1774611312611",
+    "ts": 1774611312611,
+    "dismissed": true
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "**หมายเหตุ**: ราคาอ้างอิง ณ วันที่เสนอราคา — ชิ้นส่วนหลักเป็นสินค้านำเข้า",
+    "id": "pulse-oracle-1774611246127",
+    "ts": 1774611246127,
+    "dismissed": true
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "Got it. So the v2 board **supports** 4G (has the UART/GPIO pins broken out for SIM7600E) but doesn't **include** the module. Client buys the SIM7600E separately if they need it.  That changes the pric",
+    "id": "pulse-oracle-1774610006487",
+    "ts": 1774610006487,
+    "dismissed": true
+  },
+  {
+    "oracle": "fireman-oracle",
+    "target": "07-fireman:1",
+    "type": "input",
+    "message": "Created `docs/position-fields-reference.md` — standalone doc with:  - All 23 fields table (column, type, required, example, description) - Why fields are missing (5 reasons table) - Conversion formu",
+    "id": "fireman-oracle-1774609117327",
+    "ts": 1774609117327,
+    "dismissed": true
+  },
+  {
+    "oracle": "fireman-oracle",
+    "target": "07-fireman:1",
+    "type": "input",
+    "message": "Done. Updated `docs/database-schema-proposal.md` with all 23 Position protobuf fields (lines 36-64):  - **3 groups**: always present (lat/lon/alt/time/sats), common GPS fields (DOP/speed/track/fix), m",
+    "id": "fireman-oracle-1774608530801",
+    "ts": 1774608530801,
+    "dismissed": true
+  },
+  {
+    "oracle": "fireman-oracle",
+    "target": "07-fireman:1",
+    "type": "input",
+    "message": "Here's the full breakdown:  ## All Position Protobuf Fields  | # | Field | Type | Description | |---|-------|------|-------------| | 1 | `latitude_i` | sfixed32 | Latitude × 10⁷ | | 2 | `longitude_",
+    "id": "fireman-oracle-1774607354605",
+    "ts": 1774607354605,
+    "dismissed": true
+  },
+  {
+    "oracle": "esphome-fw",
+    "target": "",
+    "type": "input",
+    "message": "Here it is. From the Meshtastic firmware at `laris-co/laris-meshtastic-fireman`:  ### ALL Position fields — `mesh.pb.h:609-682` (struct) + `:1521-1543` (tags)  | Tag | Field | C Type | Meaning | Lin",
+    "id": "esphome-fw-1774606934679",
+    "ts": 1774606934679
+  },
+  {
+    "oracle": "pulse-oracle",
+    "target": "01-pulse:1",
+    "type": "input",
+    "message": "Sent. I'll check back in a bit — let me know when you want me to peek, or I can wait.",
+    "id": "pulse-oracle-1774606891824",
+    "ts": 1774606891824,
+    "dismissed": true
+  },
+  {
+    "oracle": "esphome-fw",
+    "target": "",
+    "type": "input",
+    "message": "Here's what the code **actually** handles in the `parse_position` function (`meshtastic_ble.cpp:143-174`):  ### Position fields parsed (with proof)  | Field # | Name | Type | Line | |---------|------|",
+    "id": "esphome-fw-1774606803450",
+    "ts": 1774606803450,
+    "dismissed": true
+  },
+  {
+    "oracle": "esphome-fw",
+    "target": "",
+    "type": "input",
+    "message": "I already answered this above — these are **Meshtastic mesh radio nodes** with GPS. The `ground_speed` and `ground_track` fields come from the Meshtastic Position protobuf, decoded by the MQTT gatew",
+    "id": "esphome-fw-1774606569150",
+    "ts": 1774606569150,
+    "dismissed": true
+  },
+  {
+    "oracle": "neo-hellodemo2",
+    "target": "03-neo:7",
+    "type": "input",
+    "message": "Claude is waiting for your input  ",
+    "id": "neo-hellodemo2-1774605794323",
+    "ts": 1774605794323,
     "dismissed": true
   }
 ]

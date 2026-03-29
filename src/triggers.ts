@@ -5,7 +5,7 @@
  * Actions support template variables: {agent}, {repo}, {issue}, {event}.
  */
 
-import { execSync } from "child_process";
+// No execSync — use async Bun.spawn to avoid blocking event loop
 import { loadConfig, type TriggerConfig, type TriggerEvent } from "./config";
 import { logAudit } from "./audit";
 
@@ -67,7 +67,7 @@ export function getTriggerHistory(): { index: number; result: TriggerFireResult 
  * Filters by repo if the trigger has a repo constraint.
  * Returns array of results for each trigger fired.
  */
-export function fire(event: TriggerEvent, ctx: TriggerContext = {}): TriggerFireResult[] {
+export async function fire(event: TriggerEvent, ctx: TriggerContext = {}): Promise<TriggerFireResult[]> {
   const triggers = getTriggers();
   const results: TriggerFireResult[] = [];
 
@@ -91,11 +91,10 @@ export function fire(event: TriggerEvent, ctx: TriggerContext = {}): TriggerFire
     const result: TriggerFireResult = { trigger: t, action, ok: false, ts: Date.now() };
 
     try {
-      const output = execSync(action, {
-        encoding: "utf-8",
-        timeout: 30_000,
-        env: { ...process.env },
-      }).trim();
+      const proc = Bun.spawn(["bash", "-c", action], { stdout: "pipe", stderr: "pipe", env: { ...process.env } });
+      const output = (await new Response(proc.stdout).text()).trim();
+      const code = await proc.exited;
+      if (code !== 0) throw new Error(`exit ${code}`);
       result.ok = true;
       result.output = output;
     } catch (err: any) {

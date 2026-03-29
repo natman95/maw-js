@@ -16,7 +16,7 @@ const sessions = new Map<string, PtySession>();
 const attaching = new Set<string>();
 
 function isLocalHost(): boolean {
-  const host = process.env.MAW_HOST || loadConfig().host || "white.local";
+  const host = process.env.MAW_HOST || loadConfig().host || "local";
   return host === "local" || host === "localhost";
 }
 
@@ -100,7 +100,7 @@ async function attach(ws: ServerWebSocket<any>, target: string, cols: number, ro
     const cmd = `stty rows ${r} cols ${c} 2>/dev/null; TERM=xterm-256color ${tmuxCmd()} attach-session -t '${ptySessionName}'`;
     args = ["script", "-qfc", cmd, "/dev/null"];
   } else {
-    const host = process.env.MAW_HOST || loadConfig().host || "white.local";
+    const host = process.env.MAW_HOST || loadConfig().host || "local";
     args = ["ssh", "-tt", host, `TERM=xterm-256color ${tmuxCmd()} attach-session -t '${ptySessionName}'`];
   }
 
