@@ -33,10 +33,14 @@ import { handlePtyMessage, handlePtyClose } from "./pty";
 export function startServer(port = +(process.env.MAW_PORT || loadConfig().port || 3456)) {
   const engine = new MawEngine({ feedBuffer, feedListeners });
 
-  // Connect transport router
-  const router = createTransportRouter();
-  router.connectAll().catch(err => console.error("[transport] connect failed:", err));
-  engine.setTransportRouter(router);
+  // Connect transport router (non-blocking — server starts even if transports fail)
+  try {
+    const router = createTransportRouter();
+    router.connectAll().catch(err => console.error("[transport] connect failed:", err));
+    engine.setTransportRouter(router);
+  } catch (err) {
+    console.error("[transport] router init failed:", err);
+  }
 
   // Hook workflow triggers into feed events
   setupTriggerListener(feedListeners);
