@@ -48,12 +48,18 @@ export class MawEngine {
   setTransportRouter(router: TransportRouter) {
     this.transportRouter = router;
     router.onMessage(async (msg) => {
-      const { findWindow } = await import("../ssh");
-      const target = findWindow(this.sessionCache.sessions, msg.to);
+      const { findWindow, sendKeys, listSessions } = await import("../ssh");
+      // Use cached sessions if available, otherwise fetch fresh
+      const sessions = this.sessionCache.sessions.length > 0
+        ? this.sessionCache.sessions
+        : await listSessions().catch(() => []);
+      const baseName = msg.to.replace(/-oracle$/, "");
+      const target = findWindow(sessions, msg.to) || findWindow(sessions, baseName);
       if (target) {
-        const { sendKeys } = await import("../ssh");
         await sendKeys(target, msg.body);
-        console.log(`[transport] ${msg.transport}: ${msg.from} → ${msg.to} (${target})`);
+        console.log(`[transport] ${msg.transport}: ${msg.from} → ${target}`);
+      } else {
+        console.log(`[transport] no target for "${msg.to}" (${sessions.length} sessions)`);
       }
     });
 
