@@ -28,6 +28,7 @@ import { cmdCosts } from "./commands/costs";
 import { cmdTriggers } from "./commands/triggers";
 import { cmdHealth } from "./commands/health";
 import { cmdBroadcast } from "./commands/broadcast";
+import { cmdWorkspaceCreate, cmdWorkspaceJoin, cmdWorkspaceShare, cmdWorkspaceUnshare, cmdWorkspaceLs, cmdWorkspaceAgents, cmdWorkspaceInvite, cmdWorkspaceLeave, cmdWorkspaceStatus } from "./commands/workspace";
 import { logAudit } from "./audit";
 
 const args = process.argv.slice(2);
@@ -107,6 +108,16 @@ function usage() {
   maw avengers status         ARRA-01 rate limit monitor (all accounts)
   maw avengers best           Account with most capacity
   maw avengers traffic        Traffic stats across accounts
+  maw workspace create <name> Create workspace on hub
+  maw workspace join <code>   Join with invite code
+  maw workspace share <a...>  Share agents to workspace
+  maw workspace unshare <a..> Remove agents from workspace
+  maw workspace ls            List joined workspaces
+  maw workspace agents [id]   List all agents in workspace
+  maw workspace invite [id]   Show join code
+  maw workspace leave [id]    Leave workspace
+  maw workspace status        Connection status to hub(s)
+  maw ws ...                  Alias for workspace
   maw serve [port]            Start web UI (default: 3456)
 
 \x1b[33mWake modes:\x1b[0m
@@ -353,6 +364,65 @@ if (cmd === "--version" || cmd === "-v") {
   } else {
     console.error("usage: maw federation status");
     process.exit(1);
+  }
+} else if (cmd === "workspace" || cmd === "ws") {
+  const sub = args[1]?.toLowerCase();
+  if (sub === "create") {
+    if (!args[2]) { console.error("usage: maw workspace create <name> [--hub <url>]"); process.exit(1); }
+    let hub: string | undefined;
+    for (let i = 3; i < args.length; i++) {
+      if (args[i] === "--hub" && args[i + 1]) { hub = args[++i]; }
+    }
+    await cmdWorkspaceCreate(args[2], hub);
+  } else if (sub === "join") {
+    if (!args[2]) { console.error("usage: maw workspace join <code> [--hub <url>]"); process.exit(1); }
+    let hub: string | undefined;
+    for (let i = 3; i < args.length; i++) {
+      if (args[i] === "--hub" && args[i + 1]) { hub = args[++i]; }
+    }
+    await cmdWorkspaceJoin(args[2], hub);
+  } else if (sub === "share") {
+    const agents: string[] = [];
+    let wsId: string | undefined;
+    for (let i = 2; i < args.length; i++) {
+      if ((args[i] === "--workspace" || args[i] === "--ws") && args[i + 1]) { wsId = args[++i]; }
+      else agents.push(args[i]);
+    }
+    if (agents.length === 0) { console.error("usage: maw workspace share <agent...> [--workspace <id>]"); process.exit(1); }
+    await cmdWorkspaceShare(agents, wsId);
+  } else if (sub === "unshare") {
+    const agents: string[] = [];
+    let wsId: string | undefined;
+    for (let i = 2; i < args.length; i++) {
+      if ((args[i] === "--workspace" || args[i] === "--ws") && args[i + 1]) { wsId = args[++i]; }
+      else agents.push(args[i]);
+    }
+    if (agents.length === 0) { console.error("usage: maw workspace unshare <agent...> [--workspace <id>]"); process.exit(1); }
+    await cmdWorkspaceUnshare(agents, wsId);
+  } else if (sub === "ls" || sub === "list") {
+    await cmdWorkspaceLs();
+  } else if (sub === "agents") {
+    await cmdWorkspaceAgents(args[2]);
+  } else if (sub === "invite") {
+    await cmdWorkspaceInvite(args[2]);
+  } else if (sub === "leave") {
+    await cmdWorkspaceLeave(args[2]);
+  } else if (sub === "status") {
+    await cmdWorkspaceStatus();
+  } else if (!sub) {
+    await cmdWorkspaceLs();
+  } else {
+    console.log(`\x1b[36mmaw workspace\x1b[0m \u2014 Multi-node workspace management\n`);
+    console.log(`  maw workspace create <name>          Create workspace on hub`);
+    console.log(`  maw workspace join <code>            Join with invite code`);
+    console.log(`  maw workspace share <agent...>       Share agents to workspace`);
+    console.log(`  maw workspace unshare <agent...>     Remove agents from workspace`);
+    console.log(`  maw workspace ls                     List joined workspaces`);
+    console.log(`  maw workspace agents [workspace-id]  List all agents in workspace`);
+    console.log(`  maw workspace invite [workspace-id]  Show join code`);
+    console.log(`  maw workspace leave [workspace-id]   Leave workspace`);
+    console.log(`  maw workspace status                 Connection status to hub(s)\n`);
+    console.log(`\x1b[90mAlias: maw ws ...\x1b[0m`);
   }
 } else if (cmd === "reunion") {
   await cmdReunion(args[1]);
