@@ -15,7 +15,11 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 // Read config directly (no maw imports — keeps broker standalone)
 const CONFIG_PATH = join(process.env.HOME || "/home/nat", ".config/maw/maw.config.json");
-let config: any = {};
+interface BrokerConfig {
+  mqtt?: { port?: number; wsPort?: number };
+  federationToken?: string;
+}
+let config: BrokerConfig = {};
 try { config = JSON.parse(readFileSync(CONFIG_PATH, "utf-8")); } catch {}
 
 const MQTT_PORT = config.mqtt?.port || 1883;
@@ -56,23 +60,23 @@ const tcpServer = createServer(aedes.handle);
 tcpServer.listen(MQTT_PORT, "0.0.0.0", () => {
   console.log(`[broker] MQTT TCP on :${MQTT_PORT}`);
 });
-tcpServer.on("error", (err: any) => {
+tcpServer.on("error", (err: Error) => {
   console.error(`[broker] TCP :${MQTT_PORT} failed: ${err.message}`);
 });
 
 // --- WebSocket listener (:9001) for browsers ---
 
 const wss = new WebSocketServer({ port: WS_PORT, host: "0.0.0.0" });
-wss.on("error", (err: any) => console.error(`[broker] WS :${WS_PORT} failed: ${err.message}`));
+wss.on("error", (err: Error) => console.error(`[broker] WS :${WS_PORT} failed: ${err.message}`));
 wss.on("connection", (ws) => {
   const duplex = new Duplex({
     read() {},
     write(chunk, _encoding, cb) {
-      try { ws.send(chunk); cb(); } catch (e: any) { cb(e); }
+      try { ws.send(chunk); cb(); } catch (e: Error) { cb(e); }
     },
     final(cb) { ws.close(); cb(); },
   });
-  ws.on("message", (data) => duplex.push(Buffer.isBuffer(data) ? data : Buffer.from(data as any)));
+  ws.on("message", (data) => duplex.push(Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer)));
   ws.on("close", () => { duplex.push(null); duplex.destroy(); });
   ws.on("error", () => duplex.destroy());
   aedes.handle(duplex);

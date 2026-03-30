@@ -6,7 +6,7 @@ function pm2BrokerStatus(): { online: boolean; pid?: number; uptime?: string } {
   try {
     const raw = execSync("pm2 jlist 2>/dev/null", { encoding: "utf-8" });
     const procs = JSON.parse(raw);
-    const broker = procs.find((p: any) => p.name === "maw-broker");
+    const broker = procs.find((p: { name: string }) => p.name === "maw-broker");
     if (!broker) return { online: false };
     const online = broker.pm2_env?.status === "online";
     const upMs = online ? Date.now() - broker.pm2_env?.pm_uptime : 0;
@@ -75,8 +75,8 @@ export async function cmdBrokerStart(): Promise<void> {
     try {
       execSync(`pm2 start ${mosquittoPath} --name maw-broker -- -c ${confPath}`, { cwd: MAW_ROOT, stdio: "pipe" });
       console.log(`\x1b[32m✓\x1b[0m broker started (mosquitto) on :${mqttPort} (TCP) + :${wsPort} (WS)`);
-    } catch (e: any) {
-      console.error(`\x1b[31m✗\x1b[0m mosquitto start failed: ${e.message}`);
+    } catch (e: unknown) {
+      console.error(`\x1b[31m✗\x1b[0m mosquitto start failed: ${e instanceof Error ? e.message : e}`);
       return;
     }
   } else {
@@ -84,8 +84,8 @@ export async function cmdBrokerStart(): Promise<void> {
     try {
       execSync(`pm2 start ecosystem.config.cjs --only maw-broker`, { cwd: MAW_ROOT, stdio: "pipe" });
       console.log(`\x1b[32m✓\x1b[0m broker started (aedes) on :${mqttPort} (TCP) + :${wsPort} (WS)`);
-    } catch (e: any) {
-      console.error(`\x1b[31m✗\x1b[0m broker start failed: ${e.message}`);
+    } catch (e: unknown) {
+      console.error(`\x1b[31m✗\x1b[0m broker start failed: ${e instanceof Error ? e.message : e}`);
       return;
     }
   }
