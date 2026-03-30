@@ -14,6 +14,8 @@ wasm-vm/
 
 # Bun global link artifacts
 ~/
+~/.bun/
+.wrangler/
 fleet/*.json
 !fleet/*.example.json
 ψ/
