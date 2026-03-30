@@ -326,6 +326,13 @@ export async function cmdWake(oracle: string, opts: { task?: string; newWt?: str
       const safeRepoPath = repoPath.replace(/'/g, "'\\''");
       const safeWtPath = wtPath.replace(/'/g, "'\\''");
       const safeBranch = branch.replace(/'/g, "'\\''");
+
+      // Empty repos (no HEAD) can't create worktrees — bootstrap with an initial commit
+      try { await ssh(`git -C '${safeRepoPath}' rev-parse HEAD 2>/dev/null`); } catch {
+        await ssh(`git -C '${safeRepoPath}' commit --allow-empty -m "init: bootstrap for worktree"`);
+        console.log(`\x1b[33m⚡\x1b[0m created initial commit (repo was empty)`);
+      }
+
       try { await ssh(`git -C '${safeRepoPath}' branch -D '${safeBranch}' 2>/dev/null`); } catch { /* branch doesn't exist — fine */ }
       await ssh(`git -C '${safeRepoPath}' worktree add '${safeWtPath}' -b '${safeBranch}'`);
       console.log(`\x1b[32m+\x1b[0m worktree: ${wtPath} (${branch})`);

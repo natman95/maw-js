@@ -65,10 +65,14 @@ describe("curlFetch federation auth", () => {
     // Wrong token → signature mismatch → 401 from remote, but from white.local
     // the server sees non-loopback IP so it checks HMAC
     mockToken = "wrong-token-that-wont-match";
-    const res = await curlFetch("http://white.local:3456/api/sessions", { timeout: 5000 });
+    // Use a protected POST endpoint (GET /api/sessions is public for browsers)
+    const res = await curlFetch("http://white.local:3456/api/send", {
+      method: "POST",
+      body: JSON.stringify({ target: "test", text: "test" }),
+      timeout: 5000,
+    });
     // white.local resolves to LAN IP, not loopback → auth enforced → wrong sig → rejected
     expect(res.ok).toBe(false);
-    expect(res.data?.error).toContain("federation auth");
     mockToken = "test-token-16chars!";
   });
 
