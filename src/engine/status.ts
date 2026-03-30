@@ -72,13 +72,11 @@ export class StatusDetector {
 
     const cmds = await tmux.getPaneCommands(agents.map(a => a.target));
 
-    // Only capture agents without recent real feed events (avoid infinite loop:
-    // capture → hash change → synthetic event → UI update → screen change → capture)
-    const now0 = Date.now();
+    // Only capture agents NOT running Claude (shells, idle panes).
+    // Claude agents get status from real hooks — no capture needed.
     const needsCapture = agents.filter(a => {
-      const oName = a.name.replace(/-oracle$/, "");
-      const lastReal = realFeedLastSeen.get(oName) || 0;
-      return now0 - lastReal >= REAL_FEED_TTL;
+      const cmd = (cmds[`${a.session}:${a.target.split(":")[1]}`] || cmds[a.target] || "").toLowerCase();
+      return !/claude|codex|node/i.test(cmd);
     });
     const captures = await Promise.allSettled(
       needsCapture.map(async a => ({ target: a.target, content: await capture(a.target, 20) }))
@@ -94,16 +92,12 @@ export class StatusDetector {
       const isAgent = /claude|codex|node/i.test(cmd);
       const isShell = /^(zsh|bash|sh|fish)$/.test(cmd.trim());
 
-      // Skip capture + hash for agents with real feed events.
-      // Real Claude hooks are authoritative — StatusDetector only needed
-      // for agents without hooks (crashed detection, idle shells).
-      const oracleName = name.replace(/-oracle$/, "");
-      const lastReal = realFeedLastSeen.get(oracleName) || 0;
-      if (isAgent && now - lastReal < REAL_FEED_TTL) {
-        // Still update wasRunning for crash detection
+      // Skip ALL agents running Claude — real hooks handle their status.
+      // StatusDetector only needed for: crash detection (was Claude, now shell) + idle shells.
+      if (isAgent) {
         const prev = this.state.get(target);
-        this.state.set(target, { hash: prev?.hash || "", changedAt: prev?.changedAt || now, status: prev?.status || "busy", wasRunning: true });
-        continue; // Skip capture entirely — no hash, no synthetic events
+        this.state.set(target, { hash: prev?.hash || "", changedAt: prev?.changedAt || now, status: prev?.status || "ready", wasRunning: true });
+        continue;
       }
 
       const content = contentMap.get(target) || "";
