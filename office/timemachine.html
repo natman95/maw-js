@@ -101,6 +101,16 @@
   }
   .session-pill-name { color: #ffd54f; font-size: 0.8em; font-weight: 600; margin-bottom: 4px; }
   .session-pill-windows { color: #666; font-size: 0.7em; line-height: 1.5; }
+  .window-tag-inline { display: inline; }
+  .window-tag-inline.added { color: #4caf50; animation: tagPulse 0.6s ease-out; }
+  .window-tag-inline.removed { color: #f44336; text-decoration: line-through; opacity: 0.6; animation: tagFadeOut 0.6s ease-out; }
+  .session-pill.added { border-color: rgba(76,175,80,0.4); animation: pillSlideIn 0.5s ease-out; }
+  .session-pill.removed { border-color: rgba(244,67,54,0.3); opacity: 0.4; animation: pillFadeOut 0.5s ease-out; }
+
+  @keyframes tagPulse { from { color: #81c784; transform: scale(1.1); } to { color: #4caf50; transform: scale(1); } }
+  @keyframes tagFadeOut { from { opacity: 1; } to { opacity: 0.6; } }
+  @keyframes pillSlideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+  @keyframes pillFadeOut { from { opacity: 0.8; } to { opacity: 0.4; } }
 
   /* Timeline sidebar */
   .timeline {
@@ -283,6 +293,25 @@ function showIndex(idx) {
       ? data.sessions.filter(sess => sess.name === selectedSession)
       : data.sessions;
 
+    // Compute diff with next snapshot (older one)
+    const nextSnap = allSnaps[i + 1] ? allDetails[allSnaps[i + 1].file] : null;
+    const prevWindows = new Set();
+    const prevSessions = new Set();
+    if (nextSnap) {
+      const nf = selectedSession ? nextSnap.sessions.filter(s => s.name === selectedSession) : nextSnap.sessions;
+      nf.forEach(s => { prevSessions.add(s.name); s.windows.forEach(w => prevWindows.add(s.name + ':' + w.name)); });
+    }
+    const currWindows = new Set();
+    const currSessions = new Set();
+    filtered.forEach(s => { currSessions.add(s.name); s.windows.forEach(w => currWindows.add(s.name + ':' + w.name)); });
+
+    // Sessions that existed before but not now
+    const removedSessions = nextSnap ? [...prevSessions].filter(s => !currSessions.has(s)) : [];
+    const removedSessionsData = removedSessions.map(name => {
+      const nf = selectedSession ? nextSnap.sessions.filter(s => s.name === selectedSession) : nextSnap.sessions;
+      return nf.find(s => s.name === name);
+    }).filter(Boolean);
+
     const d = new Date(s.timestamp);
     const dateStr = `${d.toLocaleDateString('en-GB')} ${days[d.getDay()]} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
     const isActive = offset === 0;
@@ -302,12 +331,23 @@ function showIndex(idx) {
       </div>
       <div class="card-stats">${filtered.length} sessions, ${filtered.reduce((a,s) => a + s.windows.length, 0)} windows</div>
       <div class="sessions-grid">
-        ${filtered.map(sess => `
-          <div class="session-pill">
-            <div class="session-pill-name">${sess.name}</div>
-            <div class="session-pill-windows">${sess.windows.map(w => w.name).join(', ')}</div>
+        ${filtered.map(sess => {
+          const isNewSession = isActive && nextSnap && !prevSessions.has(sess.name);
+          return `<div class="session-pill${isNewSession ? ' added' : ''}">
+            <div class="session-pill-name">${sess.name}${isNewSession ? ' <span style="color:#4caf50;font-size:0.8em">NEW</span>' : ''}</div>
+            <div class="session-pill-windows">${sess.windows.map(w => {
+              const key = sess.name + ':' + w.name;
+              const isNew = isActive && nextSnap && !prevWindows.has(key);
+              return `<span class="window-tag-inline${isNew ? ' added' : ''}">${w.name}</span>`;
+            }).join(', ')}</div>
+          </div>`;
+        }).join('')}
+        ${isActive ? removedSessionsData.map(sess => `
+          <div class="session-pill removed">
+            <div class="session-pill-name">${sess.name} <span style="color:#f44336;font-size:0.8em">GONE</span></div>
+            <div class="session-pill-windows">${sess.windows.map(w => `<span class="window-tag-inline removed">${w.name}</span>`).join(', ')}</div>
           </div>
-        `).join('')}
+        `).join('') : ''}
       </div>
     </div>`;
   }
