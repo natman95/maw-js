@@ -7,6 +7,7 @@ import { TransportRouter } from "../transport";
 import { TmuxTransport } from "./tmux";
 import { MqttTransport } from "./mqtt";
 import { HttpTransport } from "./http";
+import { HubTransport, loadWorkspaceConfigs } from "./hub";
 import { LoRaTransport } from "./lora";
 import type { MqttConfig } from "./mqtt";
 
@@ -41,7 +42,13 @@ export function createTransportRouter(): TransportRouter {
     );
   }
 
-  // 3. HTTP federation as fallback
+  // 3. Hub transport — workspace WebSocket connections (priority 30)
+  const workspaceConfigs = loadWorkspaceConfigs();
+  if (workspaceConfigs.length > 0) {
+    router.register(new HubTransport(config.node));
+  }
+
+  // 4. HTTP federation as fallback
   if (config.peers && config.peers.length > 0) {
     router.register(
       new HttpTransport({
@@ -51,7 +58,7 @@ export function createTransportRouter(): TransportRouter {
     );
   }
 
-  // 4. LoRa (future hardware — stub, canReach() always false)
+  // 5. LoRa (future hardware — stub, canReach() always false)
   router.register(new LoRaTransport());
 
   return router;
@@ -72,5 +79,6 @@ export function resetTransportRouter() {
 
 export { TmuxTransport } from "./tmux";
 export { MqttTransport } from "./mqtt";
+export { HubTransport } from "./hub";
 export { HttpTransport } from "./http";
 export { LoRaTransport } from "./lora";
