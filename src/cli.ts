@@ -139,7 +139,14 @@ if (cmd === "--version" || cmd === "-v") {
   const pkg = require("../package.json");
   let hash = "";
   try { hash = require("child_process").execSync("git rev-parse --short HEAD", { cwd: import.meta.dir }).toString().trim(); } catch { /* expected: may not be in a git repo */ }
-  console.log(`maw v${pkg.version}${hash ? ` (${hash})` : ""}`);
+  let buildDate = "";
+  try {
+    const raw = require("child_process").execSync("git log -1 --format=%ci", { cwd: import.meta.dir }).toString().trim();
+    const d = new Date(raw);
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    buildDate = `${days[d.getDay()]} ${raw.slice(0, 16)}`;
+  } catch {}
+  console.log(`maw v${pkg.version}${hash ? ` (${hash})` : ""}${buildDate ? ` built ${buildDate}` : ""}`);
 } else if (!cmd || cmd === "--help" || cmd === "-h") {
   usage();
 } else if (cmd === "ls" || cmd === "list") {
@@ -172,6 +179,33 @@ if (cmd === "--version" || cmd === "-v") {
   await cmdFleetSyncConfigs();
 } else if (cmd === "fleet" && (args[1] === "sync-windows" || args[1] === "syncwin")) {
   await cmdFleetSync();
+} else if (cmd === "fleet" && (args[1] === "snapshots" || args[1] === "snapshot-ls")) {
+  const { listSnapshots } = await import("./snapshot");
+  const snaps = listSnapshots();
+  if (snaps.length === 0) { console.log("no snapshots yet"); process.exit(0); }
+  console.log(`\x1b[36m📸 ${snaps.length} snapshots\x1b[0m\n`);
+  for (const s of snaps) {
+    const d = new Date(s.timestamp);
+    const local = d.toLocaleString("en-GB", { timeZone: "Asia/Bangkok", hour12: false });
+    console.log(`  ${s.file.replace(".json", "")}  ${local}  \x1b[90m${s.trigger}\x1b[0m  ${s.sessionCount} sessions, ${s.windowCount} windows`);
+  }
+} else if (cmd === "fleet" && args[1] === "restore") {
+  const { loadSnapshot, latestSnapshot } = await import("./snapshot");
+  const snap = args[2] ? loadSnapshot(args[2]) : latestSnapshot();
+  if (!snap) { console.error("no snapshot found"); process.exit(1); }
+  const d = new Date(snap.timestamp);
+  const local = d.toLocaleString("en-GB", { timeZone: "Asia/Bangkok", hour12: false });
+  console.log(`\x1b[36m📸 Snapshot: ${local} (${snap.trigger})\x1b[0m\n`);
+  for (const s of snap.sessions) {
+    console.log(`\x1b[33m${s.name}\x1b[0m (${s.windows.length} windows)`);
+    for (const w of s.windows) {
+      console.log(`  ${w.name}`);
+    }
+  }
+} else if (cmd === "fleet" && args[1] === "snapshot") {
+  const { takeSnapshot } = await import("./snapshot");
+  const path = await takeSnapshot("manual");
+  console.log(`\x1b[32m📸\x1b[0m snapshot saved: ${path}`);
 } else if (cmd === "fleet" && !args[1]) {
   await cmdFleetLs();
 } else if (cmd === "done" || cmd === "finish") {

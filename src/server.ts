@@ -10,6 +10,28 @@ import { feedBuffer, feedListeners } from "./api/feed";
 import { mountViews } from "./views/index";
 import { setupTriggerListener } from "./trigger-listener";
 import { createTransportRouter } from "./transports";
+import { handlePtyMessage, handlePtyClose } from "./pty";
+
+// --- Version info (computed once at startup) ---
+
+function getVersionString(): string {
+  try {
+    const pkg = require("../package.json");
+    let hash = ""; try { hash = require("child_process").execSync("git rev-parse --short HEAD", { cwd: import.meta.dir }).toString().trim(); } catch {}
+    let buildDate = "";
+    try {
+      const raw = require("child_process").execSync("git log -1 --format=%ci", { cwd: import.meta.dir }).toString().trim();
+      const d = new Date(raw);
+      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      buildDate = `${days[d.getDay()]} ${raw.slice(0, 16)}`;
+    } catch {}
+    return `v${pkg.version}${hash ? ` (${hash})` : ""}${buildDate ? ` built ${buildDate}` : ""}`;
+  } catch { return ""; }
+}
+
+export const VERSION = getVersionString();
+
+// --- Hono app ---
 
 const app = new Hono();
 app.use("/api/*", async (c, next) => {
@@ -26,12 +48,13 @@ app.onError((err, c) => c.json({ error: err.message }, 500));
 
 export { app };
 
-// --- WebSocket + Server ---
-
-import { handlePtyMessage, handlePtyClose } from "./pty";
+// --- Server ---
 
 export function startServer(port = +(process.env.MAW_PORT || loadConfig().port || 3456)) {
   const engine = new MawEngine({ feedBuffer, feedListeners });
+
+  const HTTP_URL = `http://localhost:${port}`;
+  const WS_URL = `ws://localhost:${port}/ws`;
 
   // Connect transport router (non-blocking — server starts even if transports fail)
   try {
@@ -75,7 +98,7 @@ export function startServer(port = +(process.env.MAW_PORT || loadConfig().port |
 
   // HTTP server (always)
   const server = Bun.serve({ port, fetch: fetchHandler, websocket: wsHandler });
-  console.log(`maw serve → http://localhost:${port} (ws://localhost:${port}/ws)`);
+  console.log(`maw ${VERSION} serve → ${HTTP_URL} (${WS_URL})`);
 
   // HTTPS server (if mkcert certs exist)
   const certPath = join(import.meta.dir, "../white.local+3.pem");
