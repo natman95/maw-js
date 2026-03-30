@@ -118,16 +118,20 @@
     z-index: 10; display: flex; flex-direction: column; align-items: center; gap: 2px;
   }
   .tl-tick {
-    width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.15);
-    cursor: pointer; transition: all 0.2s; position: relative;
+    width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.15);
+    cursor: pointer; transition: width 0.15s, height 0.15s, background 0.15s, margin 0.15s;
+    position: relative; flex-shrink: 0;
   }
-  .tl-tick:hover { background: rgba(100,181,246,0.5); transform: scale(1.5); }
-  .tl-tick.active { background: #64b5f6; transform: scale(1.8); box-shadow: 0 0 8px rgba(100,181,246,0.5); }
+  .tl-tick.active { background: #64b5f6; width: 12px; height: 12px; box-shadow: 0 0 8px rgba(100,181,246,0.5); }
   .tl-tick .tl-label {
-    position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
-    white-space: nowrap; color: #666; font-size: 0.7em; opacity: 0; transition: opacity 0.2s; pointer-events: none;
+    position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+    white-space: nowrap; color: #666; font-size: 0.7em; opacity: 0; transition: opacity 0.15s; pointer-events: none;
   }
-  .tl-tick:hover .tl-label, .tl-tick.active .tl-label { opacity: 1; color: #aaa; }
+  .tl-tick.active .tl-label { opacity: 1; color: #aaa; }
+  .tl-tick.mag-1 { width: 14px; height: 14px; background: rgba(100,181,246,0.6); }
+  .tl-tick.mag-1 .tl-label { opacity: 1; color: #ccc; }
+  .tl-tick.mag-2 { width: 10px; height: 10px; background: rgba(100,181,246,0.35); }
+  .tl-tick.mag-3 { width: 8px; height: 8px; background: rgba(255,255,255,0.25); }
 
   /* Header */
   .header {
@@ -379,6 +383,24 @@ document.addEventListener('wheel', (e) => {
 document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') navigate(-1);
   if (e.key === 'ArrowDown' || e.key === 'ArrowRight') navigate(1);
+});
+
+// Fisheye magnifier on timeline
+const timeline = document.getElementById('timeline');
+timeline.addEventListener('mousemove', (e) => {
+  const ticks = timeline.querySelectorAll('.tl-tick');
+  ticks.forEach(tick => {
+    const rect = tick.getBoundingClientRect();
+    const tickCenter = rect.top + rect.height / 2;
+    const dist = Math.abs(e.clientY - tickCenter);
+    tick.classList.remove('mag-1', 'mag-2', 'mag-3');
+    if (dist < 15) tick.classList.add('mag-1');
+    else if (dist < 35) tick.classList.add('mag-2');
+    else if (dist < 55) tick.classList.add('mag-3');
+  });
+});
+timeline.addEventListener('mouseleave', () => {
+  timeline.querySelectorAll('.tl-tick').forEach(t => t.classList.remove('mag-1', 'mag-2', 'mag-3'));
 });
 
 load();
