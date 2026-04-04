@@ -3,12 +3,12 @@ module.exports = {
     {
       name: 'maw',
       script: 'src/server.ts',
-      interpreter: '/home/nat/.bun/bin/bun',
+      interpreter: '/root/.bun/bin/bun',
       watch: ['src'],
       watch_delay: 500,
       ignore_watch: ['node_modules', 'ui'],
       env: {
-        MAW_HOST: 'local',
+        MAW_HOST: 'vps',
         MAW_PORT: '3456',
       },
     },
@@ -36,7 +36,7 @@ module.exports = {
     {
       name: 'maw-broker',
       script: 'src/broker.ts',
-      interpreter: '/home/nat/.bun/bin/bun',
+      interpreter: '/root/.bun/bin/bun',
       autorestart: true,
       watch: false,
       env: {
