@@ -66,17 +66,19 @@ export async function cmdWake(oracle: string, opts: { task?: string; newWt?: str
     await tmux.sendText(`${session}:${mainWindowName}`, buildCommandInDir(mainWindowName, repoPath));
     console.log(`\x1b[32m+\x1b[0m created session '${session}' (main: ${mainWindowName})`);
 
-    const allWt = await findWorktrees(parentDir, repoName);
-    const usedNames = new Set<string>();
-    for (const wt of allWt) {
-      const taskPart = wt.name.replace(/^\d+-/, "");
-      let wtWindowName = `${oracle}-${taskPart}`;
-      if (usedNames.has(wtWindowName)) wtWindowName = `${oracle}-${wt.name}`;
-      usedNames.add(wtWindowName);
-      await tmux.newWindow(session, wtWindowName, { cwd: wt.path });
-      await new Promise(r => setTimeout(r, 300));
-      await tmux.sendText(`${session}:${wtWindowName}`, buildCommandInDir(wtWindowName, wt.path));
-      console.log(`\x1b[32m+\x1b[0m window: ${wtWindowName}`);
+    if (!opts.task && !opts.newWt) {
+      const allWt = await findWorktrees(parentDir, repoName);
+      const usedNames = new Set<string>();
+      for (const wt of allWt) {
+        const taskPart = wt.name.replace(/^\d+-/, "");
+        let wtWindowName = `${oracle}-${taskPart}`;
+        if (usedNames.has(wtWindowName)) wtWindowName = `${oracle}-${wt.name}`;
+        usedNames.add(wtWindowName);
+        await tmux.newWindow(session, wtWindowName, { cwd: wt.path });
+        await new Promise(r => setTimeout(r, 300));
+        await tmux.sendText(`${session}:${wtWindowName}`, buildCommandInDir(wtWindowName, wt.path));
+        console.log(`\x1b[32m+\x1b[0m window: ${wtWindowName}`);
+      }
     }
   } else {
     await setSessionEnv(session);
