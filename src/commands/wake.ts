@@ -11,7 +11,7 @@ import {
 // Re-export for external consumers
 export { fetchIssuePrompt, findWorktrees, detectSession, resolveFleetSession };
 
-export async function ensureSessionRunning(session: string, excludeNames?: Set<string>): Promise<number> {
+export async function ensureSessionRunning(session: string, excludeNames?: Set<string>, cwdMap?: Record<string, string>): Promise<number> {
   let retried = 0;
   let windows: { index: number; name: string; active: boolean }[];
   try { windows = await tmux.listWindows(session); } catch { return 0; }
@@ -26,7 +26,9 @@ export async function ensureSessionRunning(session: string, excludeNames?: Set<s
     if (paneCmd === "zsh" || paneCmd === "bash" || paneCmd === "sh" || paneCmd === "") {
       try {
         await new Promise(r => setTimeout(r, cfgTimeout("wakeRetry")));
-        await tmux.sendText(target, buildCommand(win.name));
+        const cwd = cwdMap?.[win.name];
+        const cmd = cwd ? buildCommandInDir(win.name, cwd) : buildCommand(win.name);
+        await tmux.sendText(target, cmd);
         console.log(`\x1b[33m↻\x1b[0m retry: ${win.name} (was ${paneCmd || "empty"})`);
         retried++;
       } catch { /* window may have been killed */ }

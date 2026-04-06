@@ -167,7 +167,13 @@ export async function cmdWakeAll(opts: { kill?: boolean; all?: boolean; resume?:
     console.log("  \x1b[36mVerifying sessions...\x1b[0m");
     await new Promise(r => setTimeout(r, 3000));
     let totalRetried = 0;
-    for (const sess of sessions) { if (!sess.skip_command) totalRetried += await ensureSessionRunning(sess.name); }
+    const ghqRoot = loadConfig().ghqRoot;
+    for (const sess of sessions) {
+      if (sess.skip_command) continue;
+      const cwdMap: Record<string, string> = {};
+      for (const w of sess.windows) cwdMap[w.name] = `${ghqRoot}/${w.repo}`;
+      totalRetried += await ensureSessionRunning(sess.name, undefined, cwdMap);
+    }
     console.log(totalRetried > 0 ? `  \x1b[33m${totalRetried} window(s) retried.\x1b[0m` : "  \x1b[32m✓ All windows running.\x1b[0m");
   }
 
