@@ -483,6 +483,11 @@ export function buildCommand(agentName: string): string {
   return `${prefix} ${cmd}`;
 }
 
+/** Wrap buildCommand with cd to ensure correct working directory after reboot */
+export function buildCommandInDir(agentName: string, cwd: string): string {
+  return `cd '${cwd}' && ${buildCommand(agentName)}`;
+}
+
 /** Get env vars from config (for tmux set-environment) */
 export function getEnvVars(): Record<string, string> {
   return loadConfig().env || {};
