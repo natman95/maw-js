@@ -6,6 +6,9 @@ import { cmdMegaStatus, cmdMegaStop } from "../commands/mega";
 import { cmdFederationStatus } from "../commands/federation";
 import { cmdReunion } from "../commands/reunion";
 import { cmdSoulSync } from "../commands/soul-sync";
+import { cmdFleetHealth } from "../commands/fleet-health";
+import { cmdArchive } from "../commands/archive";
+import { cmdFind } from "../commands/find";
 
 export async function routeFleet(cmd: string, args: string[]): Promise<boolean> {
   if (cmd === "fleet") {
@@ -18,6 +21,8 @@ export async function routeFleet(cmd: string, args: string[]): Promise<boolean> 
       await cmdFleetRenumber();
     } else if (sub === "validate") {
       await cmdFleetValidate();
+    } else if (sub === "health") {
+      await cmdFleetHealth();
     } else if (sub === "sync") {
       await cmdFleetSyncConfigs();
     } else if (sub === "sync-windows" || sub === "syncwin") {
@@ -133,6 +138,17 @@ export async function routeFleet(cmd: string, args: string[]): Promise<boolean> 
     } else {
       await cmdSoulSync(args[1]);
     }
+    return true;
+  }
+  if (cmd === "archive") {
+    if (!args[1]) { console.error("usage: maw archive <oracle> [--dry-run]"); process.exit(1); }
+    await cmdArchive(args[1], { dryRun: args.includes("--dry-run") });
+    return true;
+  }
+  if (cmd === "find" || cmd === "search") {
+    if (!args[1]) { console.error("usage: maw find <keyword> [--oracle <name>]"); process.exit(1); }
+    const oracleIdx = args.indexOf("--oracle");
+    await cmdFind(args[1], { oracle: oracleIdx !== -1 ? args[oracleIdx + 1] : undefined });
     return true;
   }
   return false;

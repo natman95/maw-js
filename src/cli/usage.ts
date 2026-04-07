@@ -28,6 +28,9 @@ export function usage() {
   maw bud <name>               Bud new oracle from current (yeast model)
   maw bud <name> --from <o>   Bud from specific parent oracle
   maw take <sess>:<win> [tgt] Move tmux window to another session (handover)
+  maw archive <oracle>         Graceful oracle death (soul-sync → disable → archive)
+  maw find <keyword>           Search ψ/memory/ across all oracles
+  maw fleet health             Fleet health: dormancy, zombies, islands
   maw done <window>            Auto-save (/rrr + commit + push) then clean up
   maw done <window> --force   Skip auto-save, kill immediately
   maw done <window> --dry-run Show what would happen
