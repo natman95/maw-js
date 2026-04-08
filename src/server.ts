@@ -127,6 +127,12 @@ export async function startServer(port = +(process.env.MAW_PORT || loadConfig().
     startDiscordBridge(mawLogListeners, feedListeners);
   } catch {}
 
+  // Discord bot — bidirectional Oracle↔Discord communication
+  try {
+    const { startDiscordBot } = require("./engine/discord-bot");
+    startDiscordBot(mawLogListeners, feedListeners);
+  } catch {}
+
   const wsHandler = {
     open: (ws: any) => {
       if (ws.data.mode === "pty") return;
