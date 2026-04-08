@@ -28,7 +28,8 @@
     "drizzle-orm": "^0.45.2",
     "puppeteer-core": "^24.40.0",
     "zod": "^4.3.6",
-    "discord.js": "^14.26.2"
+    "discord.js": "^14.26.2",
+    "dotenv": "^17.4.1"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
