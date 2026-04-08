@@ -121,6 +121,12 @@ export async function startServer(port = +(process.env.MAW_PORT || loadConfig().
     console.error("[plugins] failed to init:", err);
   }
 
+  // Discord bridge — forward chat + deploy events to Discord webhook
+  try {
+    const { startDiscordBridge } = require("./engine/discord-bridge");
+    startDiscordBridge(mawLogListeners, feedListeners);
+  } catch {}
+
   const wsHandler = {
     open: (ws: any) => {
       if (ws.data.mode === "pty") return;
