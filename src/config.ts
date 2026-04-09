@@ -327,6 +327,16 @@ function validateConfig(raw: Record<string, unknown>): Partial<MawConfig> {
     }
   }
 
+  // telegram: pass through (bridge config, not validated here)
+  if ("telegram" in raw && raw.telegram && typeof raw.telegram === "object") {
+    result.telegram = raw.telegram;
+  }
+
+  // nanoclaw: pass through (bridge config)
+  if ("nanoclaw" in raw && raw.nanoclaw && typeof raw.nanoclaw === "object") {
+    result.nanoclaw = raw.nanoclaw;
+  }
+
   return result as Partial<MawConfig>;
 }
 
