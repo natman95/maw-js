@@ -19,9 +19,8 @@ mock.module("../src/paths", () => ({
   MAW_ROOT: "/tmp",
 }));
 
-mock.module("../src/config", () => ({
-  loadConfig: () => ({ node: "test-node" }),
-}));
+import { mockConfigModule } from "./helpers/mock-config";
+mock.module("../src/config", () => mockConfigModule(() => ({ node: "test-node" })));
 
 // Mock listSessions to return predictable data
 let mockSessions: MockSession[] = [

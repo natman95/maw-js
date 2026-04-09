@@ -9,9 +9,8 @@ mock.module("../src/paths", () => ({
 }));
 
 let mockToken: string | undefined = "test-token-16chars!";
-mock.module("../src/config", () => ({
-  loadConfig: () => ({ federationToken: mockToken, node: "test" }),
-}));
+import { mockConfigModule } from "./helpers/mock-config";
+mock.module("../src/config", () => mockConfigModule(() => ({ federationToken: mockToken, node: "test" })));
 
 const { curlFetch } = await import("../src/curl-fetch");
 

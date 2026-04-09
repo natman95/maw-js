@@ -28,6 +28,13 @@ if (cmd === "--version" || cmd === "-v") {
     buildDate = `${raw.slice(0, 10)} ${days[d.getDay()]} ${raw.slice(11, 16)}`;
   } catch {}
   console.log(`maw v${pkg.version}${hash ? ` (${hash})` : ""}${buildDate ? ` built ${buildDate}` : ""}`);
+} else if (cmd === "update" || cmd === "upgrade") {
+  const { execSync } = require("child_process");
+  const { repository } = require("../package.json");
+  const ref = args[1] || "alpha";
+  console.log(`\n  🍺 maw update ${ref}\n`);
+  execSync(`bun add -g github:${repository}#${ref}`, { stdio: "inherit" });
+  console.log(`\n  ✅ done\n`);
 } else if (!cmd || cmd === "--help" || cmd === "-h") {
   usage();
 } else {

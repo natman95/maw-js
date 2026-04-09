@@ -1,23 +1,8 @@
 import { describe, test, expect, mock, beforeEach } from "bun:test";
-// Import the real D defaults BEFORE mocking the module, so our mock can
-// delegate cfgInterval/cfgTimeout/cfgLimit to the real defaults. This keeps
-// transitively-loaded modules (tmux.ts uses cfgLimit) working when this
-// test file runs before theirs and the mock persists in the module cache.
-import { D as RealD } from "../src/config";
+import { mockConfigModule } from "./helpers/mock-config";
 
-// Mock config so getPeers() reads fixtures, not the real ~/.config/maw/maw.config.json.
-// getPeers() only calls loadConfig() — no network side effects — so we don't need
-// to mock curl-fetch (and mocking it globally would leak into curl-fetch.test.ts).
-let mockConfig: any = {};
-mock.module("../src/config", () => ({
-  loadConfig: () => mockConfig,
-  resetConfig: () => {},
-  cfg: (key: string) => (mockConfig as any)[key],
-  cfgInterval: (key: keyof typeof RealD.intervals) => RealD.intervals[key],
-  cfgTimeout: (key: keyof typeof RealD.timeouts) => RealD.timeouts[key],
-  cfgLimit: (key: keyof typeof RealD.limits) => RealD.limits[key],
-  D: RealD,
-}));
+let mockConfig: Partial<import("../src/config").MawConfig> = {};
+mock.module("../src/config", () => mockConfigModule(() => mockConfig));
 
 const { getPeers } = await import("../src/peers");
 

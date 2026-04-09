@@ -2,7 +2,7 @@ import { cmdWake, fetchIssuePrompt } from "../commands/wake";
 import { cmdWakeAll, cmdSleep } from "../commands/fleet";
 import { cmdDone } from "../commands/done";
 import { cmdSleepOne } from "../commands/sleep";
-import { cmdOracleList, cmdOracleAbout } from "../commands/oracle";
+import { cmdOracleList, cmdOracleAbout, cmdOracleScan, cmdOracleFleet } from "../commands/oracle";
 import { cmdTake } from "../commands/take";
 import { cmdBud } from "../commands/bud";
 
@@ -70,7 +70,7 @@ export async function routeAgent(cmd: string, args: string[]): Promise<boolean> 
     return true;
   }
   if (cmd === "bud") {
-    if (!args[1]) { console.error("usage: maw bud <name> [--from <oracle>] [--repo org/repo] [--issue N] [--fast] [--dry-run]"); process.exit(1); }
+    if (!args[1] || args[1] === "--help" || args[1] === "-h") { console.error("usage: maw bud <name> [--from <oracle>] [--repo org/repo] [--issue N] [--fast] [--dry-run]"); process.exit(1); }
     const budOpts: { from?: string; repo?: string; issue?: number; fast?: boolean; dryRun?: boolean; note?: string } = {};
     for (let i = 2; i < args.length; i++) {
       if (args[i] === "--from" && args[i + 1]) budOpts.from = args[++i];
@@ -87,8 +87,20 @@ export async function routeAgent(cmd: string, args: string[]): Promise<boolean> 
     const subcmd = args[1]?.toLowerCase();
     if (!subcmd || subcmd === "ls" || subcmd === "list") {
       await cmdOracleList();
+    } else if (subcmd === "scan") {
+      const json = args.includes("--json");
+      const force = args.includes("--force");
+      await cmdOracleScan({ json, force });
+    } else if (subcmd === "fleet") {
+      const json = args.includes("--json");
+      const stale = args.includes("--stale");
+      const orgIdx = args.indexOf("--org");
+      const org = orgIdx >= 0 ? args[orgIdx + 1] : undefined;
+      await cmdOracleFleet({ json, stale, org });
+    } else if (subcmd === "about" && args[2]) {
+      await cmdOracleAbout(args[2]);
     } else {
-      console.error("usage: maw oracle ls");
+      console.error("usage: maw oracle [ls|scan|fleet|about <name>]");
       process.exit(1);
     }
     return true;
