@@ -83,6 +83,8 @@ export interface MawConfig {
   namedPeers?: PeerConfig[];
   /** Agent → node mapping (e.g. { "homekeeper": "mba", "neo": "white" }) */
   agents?: Record<string, string>;
+  /** GitHub org for maw bud (default: Soul-Brews-Studio) */
+  githubOrg?: string;
   /** Fixed Claude session UUIDs per agent */
   sessionIds?: Record<string, string>;
   /** Path to ψ/ directory */
@@ -314,6 +316,11 @@ function validateConfig(raw: Record<string, unknown>): Partial<MawConfig> {
     }
   }
 
+  // githubOrg: string (#204)
+  if ("githubOrg" in raw && typeof raw.githubOrg === "string") {
+    result.githubOrg = raw.githubOrg;
+  }
+
   // telegram: pass through (bridge config, not validated here)
   if ("telegram" in raw && raw.telegram && typeof raw.telegram === "object") {
     result.telegram = raw.telegram;
@@ -444,6 +451,11 @@ function matchGlob(pattern: string, name: string): boolean {
 export function buildCommand(agentName: string): string {
   const config = loadConfig();
   let cmd = config.commands.default || "claude";
+
+  // Strip --dangerously-skip-permissions when running as root (#181)
+  if (process.getuid?.() === 0) {
+    cmd = cmd.replace(/\s*--dangerously-skip-permissions\b/, "");
+  }
 
   // Match specific patterns first (skip "default")
   for (const [pattern, command] of Object.entries(config.commands)) {

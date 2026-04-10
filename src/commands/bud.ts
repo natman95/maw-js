@@ -132,13 +132,28 @@ Rule 6: Oracle Never Pretends to Be Human
     console.log(`  \x1b[32m✓\x1b[0m CLAUDE.md generated`);
   }
 
-  // 4. Create fleet config
+  // 4. Create or update fleet config (#202 — idempotent, always writes lineage)
   const entries = loadFleetEntries();
-  const maxNum = entries.reduce((max, e) => Math.max(max, e.num), 0);
-  const budNum = maxNum + 1;
-  const fleetFile = join(FLEET_DIR, `${String(budNum).padStart(2, "0")}-${name}.json`);
+  const existing = entries.find(e => e.session.name.replace(/^\d+-/, "") === name);
+  let fleetFile: string;
 
-  if (!existsSync(fleetFile)) {
+  if (existing) {
+    // Update existing fleet config with lineage if missing
+    fleetFile = join(FLEET_DIR, existing.file);
+    const config = JSON.parse(readFileSync(fleetFile, "utf-8"));
+    let updated = false;
+    if (!config.budded_from) { config.budded_from = parentName; updated = true; }
+    if (!config.budded_at) { config.budded_at = new Date().toISOString(); updated = true; }
+    if (updated) {
+      writeFileSync(fleetFile, JSON.stringify(config, null, 2) + "\n");
+      console.log(`  \x1b[32m✓\x1b[0m fleet config updated with lineage: ${fleetFile}`);
+    } else {
+      console.log(`  \x1b[90m○\x1b[0m fleet config exists: ${fleetFile}`);
+    }
+  } else {
+    const maxNum = entries.reduce((max, e) => Math.max(max, e.num), 0);
+    const budNum = maxNum + 1;
+    fleetFile = join(FLEET_DIR, `${String(budNum).padStart(2, "0")}-${name}.json`);
     const fleetConfig = {
       name: `${String(budNum).padStart(2, "0")}-${name}`,
       windows: [{ name: `${name}-oracle`, repo: `${org}/${budRepoName}` }],

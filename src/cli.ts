@@ -31,8 +31,10 @@ if (cmd === "--version" || cmd === "-v") {
 } else if (cmd === "update" || cmd === "upgrade") {
   const { execSync } = require("child_process");
   const { repository } = require("../package.json");
-  const ref = args[1] || "alpha";
+  const ref = args[1] || "main";
   console.log(`\n  🍺 maw update ${ref}\n`);
+  // Remove first to avoid bun dependency loop (#214)
+  try { execSync(`bun remove -g maw`, { stdio: "pipe" }); } catch {}
   execSync(`bun add -g github:${repository}#${ref}`, { stdio: "inherit" });
   console.log(`\n  ✅ done\n`);
 } else if (!cmd || cmd === "--help" || cmd === "-h") {
