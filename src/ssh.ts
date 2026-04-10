@@ -60,6 +60,12 @@ export async function selectWindow(target: string, host?: string): Promise<void>
   await hostExec(`${tmuxCmd()} select-window -t '${target}' 2>/dev/null`, host);
 }
 
+export async function switchClient(session: string, host?: string): Promise<void> {
+  if (process.env.TMUX) {
+    await ssh(`${tmuxCmd()} switch-client -t '${session}' 2>/dev/null`, host).catch(() => {});
+  }
+}
+
 /** Get the command running in a tmux pane (e.g. "claude", "zsh") */
 export async function getPaneCommand(target: string, host?: string): Promise<string> {
   const { Tmux } = await import("./tmux");

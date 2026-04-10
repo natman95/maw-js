@@ -6,6 +6,7 @@ import { runHook } from "../hooks";
 import { scanWorktrees } from "../worktrees";
 import { curlFetch } from "../curl-fetch";
 import { findPeerForTarget } from "../peers";
+import { resolveTarget } from "../routing";
 
 /** Resolve which sessions to search for an oracle query (#86). */
 function resolveSearchSessions(query: string, sessions: Session[]): Session[] {
@@ -124,39 +125,14 @@ export async function cmdPeek(query?: string) {
 
 export async function cmdSend(query: string, message: string, force = false) {
   const config = loadConfig();
-
-  // Try local resolution FIRST (#186) — only fall through to federation if no
-  // local session:window match. Federation is for cross-machine routing; local
-  // session:window targeting must take precedence so a peer name can't hijack
-  // a local match.
   const sessions = await listSessions();
-  const searchIn = resolveSearchSessions(query, sessions);
-  const target = findWindow(searchIn, query);
 
-  // Node prefix syntax: "mba:homekeeper" → route to mba node IF no local match
-  if (!target && query.includes(":") && !query.includes("/")) {
-    const [nodeName, agentName] = query.split(":", 2);
-    const peer = config.namedPeers?.find(p => p.name === nodeName);
-    const peerUrl = peer?.url || config.peers?.find(p => p.includes(nodeName));
-    if (peerUrl) {
-      const res = await curlFetch(`${peerUrl}/api/send`, {
-        method: "POST",
-        body: JSON.stringify({ target: agentName, text: message }),
-      });
-      if (res.ok && res.data?.ok) {
-        console.log(`\x1b[32mdelivered\x1b[0m ⚡ ${nodeName} → ${res.data.target || agentName}: ${message}`);
-        if (res.data.lastLine) console.log(`\x1b[90m  ⤷ ${res.data.lastLine.slice(0, cfgLimit("messageTruncate"))}\x1b[0m`);
-        await runHook("after_send", { to: query, message });
-        return;
-      }
-      console.error(`\x1b[31mfailed\x1b[0m ⚡ ${nodeName} → ${agentName}: ${res.data?.error || "send failed"}`);
-      process.exit(1);
-    }
-  }
+  // --- Unified resolution via resolveTarget (#201) ---
+  const result = resolveTarget(query, config, sessions);
 
-  // Local target found → send via tmux
-  if (target) {
-    // Detect active Claude session (#17)
+  // Local target (or self-node) → send via tmux
+  if (result?.type === "local" || result?.type === "self-node") {
+    const target = result.target;
     if (!force) {
       const cmd = await getPaneCommand(target);
       const isAgent = /claude|codex|node/i.test(cmd);
@@ -166,22 +142,33 @@ export async function cmdSend(query: string, message: string, force = false) {
         process.exit(1);
       }
     }
-
     await sendKeys(target, message);
     await runHook("after_send", { to: query, message });
-    // Delivery confirmation: capture last line after brief delay
     await Bun.sleep(150);
     let lastLine = "";
-    try {
-      const content = await capture(target, 3);
-      lastLine = content.split("\n").filter(l => l.trim()).pop() || "";
-    } catch {}
+    try { const content = await capture(target, 3); lastLine = content.split("\n").filter(l => l.trim()).pop() || ""; } catch {}
     console.log(`\x1b[32mdelivered\x1b[0m → ${target}: ${message}`);
     if (lastLine) console.log(`\x1b[90m  ⤷ ${lastLine.slice(0, cfgLimit("messageTruncate"))}\x1b[0m`);
     return;
   }
 
-  // Not found locally → auto-check federated peers (#150)
+  // Remote peer → federation HTTP
+  if (result?.type === "peer") {
+    const res = await curlFetch(`${result.peerUrl}/api/send`, {
+      method: "POST",
+      body: JSON.stringify({ target: result.target, text: message }),
+    });
+    if (res.ok && res.data?.ok) {
+      console.log(`\x1b[32mdelivered\x1b[0m ⚡ ${result.node} → ${res.data.target || result.target}: ${message}`);
+      if (res.data.lastLine) console.log(`\x1b[90m  ⤷ ${res.data.lastLine.slice(0, cfgLimit("messageTruncate"))}\x1b[0m`);
+      await runHook("after_send", { to: query, message });
+      return;
+    }
+    console.error(`\x1b[31mfailed\x1b[0m ⚡ ${result.node} → ${result.target}: ${res.data?.error || "send failed"}`);
+    process.exit(1);
+  }
+
+  // Fallback: async peer discovery (network scan — slow path)
   const peerUrl = await findPeerForTarget(query, sessions);
   if (peerUrl) {
     const res = await curlFetch(`${peerUrl}/api/send`, {
@@ -196,26 +183,7 @@ export async function cmdSend(query: string, message: string, force = false) {
     }
   }
 
-  // Not found on peers either → check agent registry for remote routing
-  const agentNode = config.agents?.[query] || config.agents?.[query.replace(/-oracle$/, "")];
-  if (agentNode && agentNode !== (config.node ?? "local")) {
-    // Route via federation (same as maw wire but auto-detected)
-    const port = loadConfig().port;
-    const res = await curlFetch(`http://localhost:${port}/api/send`, {
-      method: "POST",
-      body: JSON.stringify({ target: query, text: message }),
-    });
-    if (res.ok && res.data?.ok) {
-      const source = res.data.source === "local" ? "local" : `⚡ ${res.data.source}`;
-      console.log(`\x1b[32mdelivered\x1b[0m ${source} → ${res.data.target}: ${message}`);
-      if (res.data.lastLine) console.log(`\x1b[90m  ⤷ ${res.data.lastLine.slice(0, cfgLimit("messageTruncate"))}\x1b[0m`);
-      await runHook("after_send", { to: query, message });
-      return;
-    }
-    console.error(`\x1b[31mfailed\x1b[0m: agent ${query} → node "${agentNode}" — ${res.data?.error || "send failed"}`);
-    process.exit(1);
-  }
-
+  // Not found
   console.error(`\x1b[31merror\x1b[0m: window not found: ${query}`);
   if (config.agents && Object.keys(config.agents).length > 0) {
     console.error(`\x1b[33mhint\x1b[0m:  known agents: ${Object.keys(config.agents).join(", ")}`);

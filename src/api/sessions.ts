@@ -4,6 +4,7 @@ import { findWindow } from "../find-window";
 import { getAggregatedSessions, findPeerForTarget, sendKeysToPeer } from "../peers";
 import { loadConfig } from "../config";
 import { curlFetch } from "../curl-fetch";
+import { resolveTarget } from "../routing";
 import { processMirror } from "../commands/overview";
 
 export const sessionsApi = new Hono();
@@ -40,45 +41,39 @@ sessionsApi.post("/send", async (c) => {
     const { target, text } = await c.req.json();
     if (!target || !text) return c.json({ error: "target and text required" }, 400);
 
+    const config = loadConfig();
     const local = await listSessions();
 
-    // Step 1: Fuzzy resolve locally first
-    const baseName = target.replace(/-oracle$/, "");
-    const resolved = findWindow(local, target) || findWindow(local, baseName);
+    // --- Unified resolution via resolveTarget (#201) ---
+    const result = resolveTarget(target, config, local);
 
-    if (resolved) {
-      await sendKeys(resolved, text);
-      // Brief delay for tmux to process, then capture last line as delivery proof
+    // Also try with -oracle stripped (backwards compat)
+    const altResult = !result ? resolveTarget(target.replace(/-oracle$/, ""), config, local) : null;
+    const resolved = result || altResult;
+
+    // Local or self-node → send via tmux
+    if (resolved?.type === "local" || resolved?.type === "self-node") {
+      await sendKeys(resolved.target, text);
       await Bun.sleep(150);
       let lastLine = "";
-      try {
-        const content = await capture(resolved, 3);
-        lastLine = content.split("\n").filter(l => l.trim()).pop() || "";
-      } catch {}
-      return c.json({ ok: true, target: resolved, text, source: "local", lastLine });
+      try { const content = await capture(resolved.target, 3); lastLine = content.split("\n").filter(l => l.trim()).pop() || ""; } catch {}
+      return c.json({ ok: true, target: resolved.target, text, source: "local", lastLine });
     }
 
-    // Step 2: Check agent registry for remote routing
-    const config = loadConfig();
-    const targetName = baseName.split(":").pop() || baseName;
-    const agentNode = config.agents?.[targetName] || config.agents?.[target];
-    if (agentNode && agentNode !== (config.node ?? "local")) {
-      const peer = config.namedPeers?.find(p => p.name === agentNode);
-      const peerUrl = peer?.url || config.peers?.find(p => p.includes(agentNode));
-      if (peerUrl) {
-        const res = await curlFetch(`${peerUrl}/api/send`, {
-          method: "POST",
-          body: JSON.stringify({ target, text }),
-          timeout: 10000,
-        });
-        if (res.ok && res.data?.ok) {
-          return c.json({ ok: true, target: res.data.target || target, text, source: peerUrl, lastLine: res.data.lastLine || "" });
-        }
-        return c.json({ error: `Agent ${targetName} → ${agentNode} send failed`, target, source: peerUrl }, 502);
+    // Remote peer → federation HTTP
+    if (resolved?.type === "peer") {
+      const res = await curlFetch(`${resolved.peerUrl}/api/send`, {
+        method: "POST",
+        body: JSON.stringify({ target: resolved.target, text }),
+        timeout: 10000,
+      });
+      if (res.ok && res.data?.ok) {
+        return c.json({ ok: true, target: res.data.target || target, text, source: resolved.peerUrl, lastLine: res.data.lastLine || "" });
       }
+      return c.json({ error: `${resolved.node} → ${resolved.target} send failed`, target, source: resolved.peerUrl }, 502);
     }
 
-    // Step 3: Check peers via aggregated sessions
+    // Fallback: async peer discovery
     const peerUrl = await findPeerForTarget(target, local);
     if (peerUrl) {
       const ok = await sendKeysToPeer(peerUrl, target, text);

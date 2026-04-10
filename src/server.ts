@@ -82,6 +82,11 @@ export function startServer(port = +(process.env.MAW_PORT || loadConfig().port |
     startMqttBridge(feedListeners, feedBuffer);
   } catch {}
 
+  // Telegram bridge — grammy bot for human↔oracle messaging
+  import("./bridges/telegram")
+    .then(({ startTelegramBridge }) => startTelegramBridge())
+    .catch((e) => console.error("[telegram] bridge failed:", e.message));
+
 
   const wsHandler = {
     open: (ws: any) => {

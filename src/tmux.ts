@@ -155,6 +155,11 @@ export class Tmux {
     await this.tryRun("select-window", "-t", target);
   }
 
+  /** Switch the current tmux client to a different session. Only works when inside tmux. */
+  async switchClient(session: string): Promise<void> {
+    await this.tryRun("switch-client", "-t", session);
+  }
+
   async killWindow(target: string): Promise<void> {
     await this.tryRun("kill-window", "-t", target);
   }

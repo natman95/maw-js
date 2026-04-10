@@ -51,10 +51,10 @@ export function findWindow(sessions: Session[], query: string): string | null {
     if (sess) {
       // Empty window part → return session's first window
       if (!winPart) {
-        if (sess.windows.length > 0) return `${sess.name}:${sess.windows[0].name}`;
+        if (sess.windows.length > 0) return `${sess.name}:${sess.windows[0].index}`;
       } else {
         for (const w of sess.windows) {
-          if (w.name.toLowerCase().includes(winPart)) return `${sess.name}:${w.name}`;
+          if (w.name.toLowerCase().includes(winPart)) return `${sess.name}:${w.index}`;
         }
       }
     }
@@ -64,13 +64,13 @@ export function findWindow(sessions: Session[], query: string): string | null {
   // Match window names first (most specific)
   for (const s of sessions) {
     for (const w of s.windows) {
-      if (w.name.toLowerCase().includes(q)) return `${s.name}:${w.name}`;
+      if (w.name.toLowerCase().includes(q)) return `${s.name}:${w.index}`;
     }
   }
   // Match session names — return first window of matching session
   for (const s of sessions) {
     if (s.name.toLowerCase().includes(q) && s.windows.length > 0) {
-      return `${s.name}:${s.windows[0].name}`;
+      return `${s.name}:${s.windows[0].index}`;
     }
   }
   // If query has ":" and the SESSION part matched a real session but the

@@ -186,10 +186,14 @@ export async function cmdWake(oracle: string, opts: { task?: string; newWt?: str
         await tmux.selectWindow(`${session}:${existingWindow}`);
         const escaped = opts.prompt.replace(/'/g, "'\\''");
         await tmux.sendText(`${session}:${existingWindow}`, `${buildCommandInDir(existingWindow, targetPath)} -p '${escaped}'`);
+        if (!opts.noAttach && process.env.TMUX) await tmux.switchClient(session);
         return `${session}:${existingWindow}`;
       }
       console.log(`\x1b[33m⚡\x1b[0m '${existingWindow}' already running in ${session}`);
-      if (!opts.noAttach) await tmux.selectWindow(`${session}:${existingWindow}`);
+      if (!opts.noAttach) {
+        await tmux.selectWindow(`${session}:${existingWindow}`);
+        if (process.env.TMUX) await tmux.switchClient(session);
+      }
       return `${session}:${existingWindow}`;
     }
   } catch { /* session might be fresh */ }
@@ -205,6 +209,7 @@ export async function cmdWake(oracle: string, opts: { task?: string; newWt?: str
   }
 
   console.log(`\x1b[32m✅\x1b[0m woke '${windowName}' in ${session} → ${targetPath}`);
+  if (!opts.noAttach && process.env.TMUX) await tmux.switchClient(session);
   takeSnapshot("wake").catch(() => {});
   return `${session}:${windowName}`;
 }
