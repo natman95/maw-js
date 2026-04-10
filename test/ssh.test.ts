@@ -29,17 +29,17 @@ const MOCK_SESSIONS: Session[] = [
 
 describe("findWindow", () => {
   test("finds by window name substring", () => {
-    expect(findWindow(MOCK_SESSIONS, "neo")).toBe("1-oracles:0");
+    expect(findWindow(MOCK_SESSIONS, "neo")).toBe("1-oracles:neo-oracle");
   });
 
   test("finds case-insensitive", () => {
-    expect(findWindow(MOCK_SESSIONS, "NEO")).toBe("1-oracles:0");
-    expect(findWindow(MOCK_SESSIONS, "Pulse")).toBe("1-oracles:1");
+    expect(findWindow(MOCK_SESSIONS, "NEO")).toBe("1-oracles:neo-oracle");
+    expect(findWindow(MOCK_SESSIONS, "Pulse")).toBe("1-oracles:pulse-oracle");
   });
 
   test("finds across sessions", () => {
-    expect(findWindow(MOCK_SESSIONS, "claude")).toBe("0:0");
-    expect(findWindow(MOCK_SESSIONS, "xiaoer")).toBe("3-brewing:0");
+    expect(findWindow(MOCK_SESSIONS, "claude")).toBe("0:claude");
+    expect(findWindow(MOCK_SESSIONS, "xiaoer")).toBe("3-brewing:xiaoer");
   });
 
   test("returns null for no match", () => {
@@ -51,11 +51,11 @@ describe("findWindow", () => {
   });
 
   test("partial match works", () => {
-    expect(findWindow(MOCK_SESSIONS, "herm")).toBe("1-oracles:2");
+    expect(findWindow(MOCK_SESSIONS, "herm")).toBe("1-oracles:hermes-oracle");
   });
 
   test("returns first match when multiple match", () => {
     // "oracle" matches all in 1-oracles session
-    expect(findWindow(MOCK_SESSIONS, "oracle")).toBe("1-oracles:0");
+    expect(findWindow(MOCK_SESSIONS, "oracle")).toBe("1-oracles:neo-oracle");
   });
 });

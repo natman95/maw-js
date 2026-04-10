@@ -4,7 +4,6 @@ import { MawEngine } from "./engine";
 import type { WSData } from "./types";
 import { loadConfig } from "./config";
 import { existsSync, readFileSync } from "fs";
-import { join } from "path";
 import { api } from "./api";
 import { feedBuffer, feedListeners } from "./api/feed";
 import { mountViews } from "./views/index";
@@ -42,6 +41,15 @@ app.use("/api/*", cors());
 
 app.route("/api", api);
 
+// Fleet topology visualization
+app.get("/topology", async (c) => {
+  const path = require("path").resolve(process.cwd(), "ψ/outbox/fleet-topology.html");
+  try {
+    const html = require("fs").readFileSync(path, "utf-8");
+    return c.html(html);
+  } catch { return c.text("fleet-topology.html not found", 404); }
+});
+
 mountViews(app);
 
 app.onError((err, c) => c.json({ error: err.message }, 500));
@@ -67,6 +75,13 @@ export function startServer(port = +(process.env.MAW_PORT || loadConfig().port |
 
   // Hook workflow triggers into feed events
   setupTriggerListener(feedListeners);
+
+  // MQTT bridge — publish feed events to MQTT topics (if broker configured)
+  try {
+    const { startMqttBridge } = require("./engine/mqtt-bridge");
+    startMqttBridge(feedListeners, feedBuffer);
+  } catch {}
+
 
   const wsHandler = {
     open: (ws: any) => {
@@ -97,15 +112,25 @@ export function startServer(port = +(process.env.MAW_PORT || loadConfig().port |
   };
 
   // HTTP server (always)
-  const server = Bun.serve({ port, fetch: fetchHandler, websocket: wsHandler });
-  console.log(`maw ${VERSION} serve → ${HTTP_URL} (${WS_URL})`);
+  // Security: bind to localhost unless peers are configured (federation needs network access)
+  const config = loadConfig();
+  const hasPeers = (config.peers?.length ?? 0) > 0 || (config.namedPeers?.length ?? 0) > 0;
+  const hostname = hasPeers ? "0.0.0.0" : "127.0.0.1";
 
-  // HTTPS server (if mkcert certs exist)
-  const certPath = join(import.meta.dir, "../white.local+3.pem");
-  const keyPath = join(import.meta.dir, "../white.local+3-key.pem");
-  if (existsSync(certPath) && existsSync(keyPath)) {
+  if (hasPeers && !config.federationToken) {
+    console.warn(`\x1b[31m⚠ WARNING: peers configured but no federationToken set!\x1b[0m`);
+    console.warn(`\x1b[31m  Port ${port} is exposed to network WITHOUT authentication.\x1b[0m`);
+    console.warn(`\x1b[31m  Add "federationToken" (min 16 chars) to maw.config.json\x1b[0m`);
+  }
+
+  const server = Bun.serve({ port, hostname, fetch: fetchHandler, websocket: wsHandler });
+  console.log(`maw ${VERSION} serve → ${HTTP_URL} (${WS_URL}) [${hostname}]`);
+
+  // HTTPS server (if TLS configured)
+  const tlsCfg = loadConfig().tls;
+  if (tlsCfg?.cert && tlsCfg?.key && existsSync(tlsCfg.cert) && existsSync(tlsCfg.key)) {
     const tlsPort = port + 1;
-    const tls = { cert: readFileSync(certPath), key: readFileSync(keyPath) };
+    const tls = { cert: readFileSync(tlsCfg.cert), key: readFileSync(tlsCfg.key) };
     Bun.serve({ port: tlsPort, tls, fetch: fetchHandler, websocket: wsHandler });
     console.log(`maw serve → https://localhost:${tlsPort} (wss://localhost:${tlsPort}/ws) [TLS]`);
   }

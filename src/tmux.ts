@@ -1,5 +1,5 @@
-import { ssh } from "./ssh";
-import { loadConfig } from "./config";
+import { hostExec } from "./ssh";
+import { loadConfig, cfgLimit } from "./config";
 
 /** Resolve tmux socket path from env or config. */
 export function resolveSocket(): string | undefined {
@@ -43,11 +43,11 @@ export class Tmux {
     this.socket = socket !== undefined ? socket : resolveSocket();
   }
 
-  /** Base runner — executes `tmux [-S socket] <subcommand> [args...]` via ssh. */
+  /** Base runner — executes `tmux [-S socket] <subcommand> [args...]` via hostExec. */
   async run(subcommand: string, ...args: (string | number)[]): Promise<string> {
     const socketFlag = this.socket ? `-S ${q(this.socket)} ` : "";
-    const cmd = `tmux ${socketFlag}${subcommand} ${args.map(q).join(" ")} 2>/dev/null`;
-    return ssh(cmd, this.host);
+    const cmd = `tmux ${socketFlag}${subcommand} ${args.map(q).join(" ")}`;
+    return hostExec(cmd, this.host);
   }
 
   /** Like run() but swallows errors — for best-effort cleanup ops. */
@@ -134,7 +134,10 @@ export class Tmux {
   }
 
   async newWindow(session: string, name: string, opts: { cwd?: string } = {}): Promise<void> {
-    const args: (string | number)[] = ["-t", session, "-n", name];
+    // Trailing colon on -t forces "next free index" semantics.
+    // Without it, `-t session` is interpreted as `-t session:<current_window>`,
+    // and tmux tries to create AT that index → "index 1 in use" error.
+    const args: (string | number)[] = ["-t", `${session}:`, "-n", name];
     if (opts.cwd) args.push("-c", opts.cwd);
     await this.run("new-window", ...args);
   }
@@ -195,15 +198,15 @@ export class Tmux {
     if (lines > 50) {
       return this.run("capture-pane", "-t", target, "-e", "-p", "-S", -lines);
     }
-    // For shorter captures, pipe through tail (needs raw ssh)
+    // For shorter captures, pipe through tail (needs raw hostExec)
     const socketFlag = this.socket ? `-S ${q(this.socket)} ` : "";
     const cmd = `tmux ${socketFlag}capture-pane -t ${q(target)} -e -p 2>/dev/null | tail -${lines}`;
-    return ssh(cmd, this.host);
+    return hostExec(cmd, this.host);
   }
 
   async resizePane(target: string, cols: number, rows: number): Promise<void> {
-    const c = Math.max(1, Math.min(500, Math.floor(cols)));
-    const r = Math.max(1, Math.min(200, Math.floor(rows)));
+    const c = Math.max(1, Math.min(cfgLimit("ptyCols"), Math.floor(cols)));
+    const r = Math.max(1, Math.min(cfgLimit("ptyRows"), Math.floor(rows)));
     await this.tryRun("resize-pane", "-t", target, "-x", c, "-y", r);
   }
 
@@ -237,7 +240,7 @@ export class Tmux {
     const escaped = text.replace(/'/g, "'\\''");
     const socketFlag = this.socket ? `-S ${q(this.socket)} ` : "";
     const cmd = `printf '%s' '${escaped}' | tmux ${socketFlag}load-buffer -`;
-    await ssh(cmd, this.host);
+    await hostExec(cmd, this.host);
   }
 
   async pasteBuffer(target: string): Promise<void> {
@@ -289,5 +292,5 @@ export class Tmux {
   }
 }
 
-/** Default tmux instance (uses default host from ssh config). */
+/** Default tmux instance (uses default host from hostExec config). */
 export const tmux = new Tmux();

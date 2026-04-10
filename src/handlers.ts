@@ -1,4 +1,4 @@
-import { sendKeys, selectWindow, ssh, getPaneCommand } from "./ssh";
+import { sendKeys, selectWindow, hostExec, getPaneCommand } from "./ssh";
 import { tmux } from "./tmux";
 import { buildCommand } from "./config";
 import type { MawWS, Handler, MawEngine } from "./types";

@@ -31,6 +31,7 @@ let mockSessions: MockSession[] = [
 
 mock.module("../src/ssh", () => ({
   listSessions: async (): Promise<MockSession[]> => mockSessions,
+  hostExec: async (): Promise<string> => "",
   ssh: async (): Promise<string> => "",
 }));
 

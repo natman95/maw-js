@@ -1,6 +1,6 @@
 import { join } from "path";
 import { existsSync, mkdirSync, rmSync } from "fs";
-import { ssh } from "../ssh";
+import { hostExec } from "../ssh";
 import { FLEET_DIR } from "../paths";
 
 interface FleetWindow {
@@ -58,7 +58,7 @@ export async function cmdFleetInit() {
   // Scan ghq for oracle repos
   console.log(`\n  \x1b[36mScanning for oracle repos...\x1b[0m\n`);
 
-  const ghqOut = await ssh("ghq list --full-path");
+  const ghqOut = await hostExec("ghq list --full-path");
   const allRepos = ghqOut.trim().split("\n").filter(Boolean);
 
   // Find oracle repos
@@ -85,7 +85,7 @@ export async function cmdFleetInit() {
     // Find worktrees (strip number prefix from window name)
     const worktrees: { name: string; path: string; repo: string }[] = [];
     try {
-      const wtOut = await ssh(`ls -d ${parentDir}/${repoName}.wt-* 2>/dev/null || true`);
+      const wtOut = await hostExec(`ls -d ${parentDir}/${repoName}.wt-* 2>/dev/null || true`);
       const usedNames = new Set<string>();
       for (const wtPath of wtOut.split("\n").filter(Boolean)) {
         const wtBase = wtPath.split("/").pop()!;

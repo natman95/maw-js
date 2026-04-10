@@ -72,8 +72,14 @@ export class StatusDetector {
 
     const cmds = await tmux.getPaneCommands(agents.map(a => a.target));
 
+    // Only capture agents NOT running Claude (shells, idle panes).
+    // Claude agents get status from real hooks — no capture needed.
+    const needsCapture = agents.filter(a => {
+      const cmd = (cmds[`${a.session}:${a.target.split(":")[1]}`] || cmds[a.target] || "").toLowerCase();
+      return !/claude|codex|node/i.test(cmd);
+    });
     const captures = await Promise.allSettled(
-      agents.map(async a => ({ target: a.target, content: await capture(a.target, 20) }))
+      needsCapture.map(async a => ({ target: a.target, content: await capture(a.target, 20) }))
     );
     const contentMap = new Map<string, string>();
     for (const r of captures) {
@@ -85,6 +91,15 @@ export class StatusDetector {
       const cmd = (cmds[target] || "").toLowerCase();
       const isAgent = /claude|codex|node/i.test(cmd);
       const isShell = /^(zsh|bash|sh|fish)$/.test(cmd.trim());
+
+      // Skip ALL agents running Claude — real hooks handle their status.
+      // StatusDetector only needed for: crash detection (was Claude, now shell) + idle shells.
+      if (isAgent) {
+        const prev = this.state.get(target);
+        this.state.set(target, { hash: prev?.hash || "", changedAt: prev?.changedAt || now, status: prev?.status || "ready", wasRunning: true });
+        continue;
+      }
+
       const content = contentMap.get(target) || "";
       const hash = Bun.hash(stripStatusBar(content)).toString(36);
       const prev = this.state.get(target);
@@ -131,6 +146,8 @@ export class StatusDetector {
         }
       }
     }
+
+    this.pruneState(sessions);
   }
 
   /** Get status for a target */
@@ -157,5 +174,26 @@ export class StatusDetector {
   clearCrashed(target: string) {
     const s = this.state.get(target);
     if (s) { s.wasRunning = false; s.status = "idle"; }
+  }
+
+  /** Remove entries for targets no longer in active sessions (#145). */
+  pruneState(sessions: SessionInfo[]) {
+    const activeTargets = new Set<string>();
+    const activeOracles = new Set<string>();
+    for (const s of sessions) {
+      for (const w of s.windows) {
+        activeTargets.add(`${s.name}:${w.index}`);
+        activeOracles.add(w.name.replace(/-oracle$/, ""));
+      }
+    }
+    for (const key of this.state.keys()) {
+      if (!activeTargets.has(key)) this.state.delete(key);
+    }
+    const now = Date.now();
+    for (const [oracle, ts] of realFeedLastSeen) {
+      if (!activeOracles.has(oracle) || now - ts > 3_600_000) {
+        realFeedLastSeen.delete(oracle);
+      }
+    }
   }
 }
