@@ -36,6 +36,8 @@ export async function resolveOracle(oracle: string): Promise<{ repoPath: string;
     return { repoPath, repoName: repoPath.split("/").pop()!, parentDir: repoPath.replace(/\/[^/]+$/, "") };
   }
 
+  // Fleet configs — oracle known in a fleet, repo may need to be cloned (#237)
+  let fleetRepo: string | null = null;
   try {
     for (const file of readdirSync(FLEET_DIR).filter(f => f.endsWith(".json"))) {
       const config = JSON.parse(readFileSync(join(FLEET_DIR, file), "utf-8"));
@@ -46,9 +48,39 @@ export async function resolveOracle(oracle: string): Promise<{ repoPath: string;
           const repoPath = fullPath.trim();
           return { repoPath, repoName: repoPath.split("/").pop()!, parentDir: repoPath.replace(/\/[^/]+$/, "") };
         }
+        // Fleet knows the slug but it's not cloned yet — remember for step 3
+        fleetRepo = win.repo;
       }
     }
   } catch { /* fleet dir may not exist */ }
+
+  // Clone from GitHub — wake should prefer local-first (#237)
+  // If fleet told us the exact org/slug, use that. Otherwise, probe configured orgs for `<oracle>-oracle`.
+  try {
+    const cfg = loadConfig() as any;
+    const candidates: string[] = [];
+    if (fleetRepo) candidates.push(fleetRepo);
+    const orgs: string[] = cfg.githubOrgs || (cfg.githubOrg ? [cfg.githubOrg] : ["Soul-Brews-Studio"]);
+    for (const org of orgs) candidates.push(`${org}/${oracle}-oracle`);
+
+    for (const slug of candidates) {
+      // Probe — skip missing repos silently so we can fall through to federation
+      try { await hostExec(`gh repo view '${slug}' --json name 2>/dev/null`); }
+      catch { continue; }
+      console.log(`\x1b[36m🌱\x1b[0m ${oracle} not found locally — cloning github.com/${slug} into ghq...`);
+      try { await hostExec(`ghq get -u 'github.com/${slug}'`); }
+      catch (e: any) {
+        console.error(`\x1b[33m⚠\x1b[0m  clone failed for ${slug}: ${String(e?.message || e).split("\n")[0]}`);
+        continue;
+      }
+      const cloned = await hostExec(`ghq list --full-path | grep -i '/${slug.split("/").pop()}$' | head -1`);
+      if (cloned?.trim()) {
+        const repoPath = cloned.trim();
+        console.log(`\x1b[32m✓\x1b[0m cloned to ${repoPath}`);
+        return { repoPath, repoName: repoPath.split("/").pop()!, parentDir: repoPath.replace(/\/[^/]+$/, "") };
+      }
+    }
+  } catch { /* probe/clone best-effort — fall through to federation */ }
 
   // Federation fallback: check peers
   try {
@@ -77,7 +109,7 @@ export async function resolveOracle(oracle: string): Promise<{ repoPath: string;
     }
   } catch { /* no peers */ }
 
-  console.error(`oracle repo not found: ${oracle} (tried local repos, fleet configs, and ${((loadConfig() as any).peers || []).length} peers)`);
+  console.error(`oracle repo not found: ${oracle} (tried local ghq, fleet configs, GitHub clone, and ${((loadConfig() as any).peers || []).length} peers)`);
   process.exit(1);
 }
 

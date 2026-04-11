@@ -85,6 +85,8 @@ export interface MawConfig {
   agents?: Record<string, string>;
   /** GitHub org for maw bud (default: Soul-Brews-Studio) */
   githubOrg?: string;
+  /** GitHub orgs to scan for oracle repos (default: Soul-Brews-Studio, laris-co) */
+  githubOrgs?: string[];
   /** Fixed Claude session UUIDs per agent */
   sessionIds?: Record<string, string>;
   /** Path to ψ/ directory */

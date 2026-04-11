@@ -3,6 +3,16 @@ import { tmux } from "../tmux";
 import { buildCommand, buildCommandInDir, cfgTimeout } from "../config";
 import { restoreTabOrder } from "../tab-order";
 import { takeSnapshot } from "../snapshot";
+import { execSync } from "child_process";
+
+/** Attach to tmux session — switch-client if inside tmux, attach if fresh shell */
+async function attachToSession(session: string) {
+  if (process.env.TMUX) {
+    await tmux.switchClient(session);
+  } else {
+    execSync(`tmux attach-session -t ${session}`, { stdio: "inherit" });
+  }
+}
 import {
   resolveOracle, findWorktrees, getSessionMap, resolveFleetSession,
   detectSession, setSessionEnv, sanitizeBranchName, fetchIssuePrompt,
@@ -186,13 +196,13 @@ export async function cmdWake(oracle: string, opts: { task?: string; newWt?: str
         await tmux.selectWindow(`${session}:${existingWindow}`);
         const escaped = opts.prompt.replace(/'/g, "'\\''");
         await tmux.sendText(`${session}:${existingWindow}`, `${buildCommandInDir(existingWindow, targetPath)} -p '${escaped}'`);
-        if (!opts.noAttach && process.env.TMUX) await tmux.switchClient(session);
+        if (!opts.noAttach) await attachToSession(session);
         return `${session}:${existingWindow}`;
       }
       console.log(`\x1b[33m⚡\x1b[0m '${existingWindow}' already running in ${session}`);
       if (!opts.noAttach) {
         await tmux.selectWindow(`${session}:${existingWindow}`);
-        if (process.env.TMUX) await tmux.switchClient(session);
+        await attachToSession(session);
       }
       return `${session}:${existingWindow}`;
     }
@@ -209,7 +219,7 @@ export async function cmdWake(oracle: string, opts: { task?: string; newWt?: str
   }
 
   console.log(`\x1b[32m✅\x1b[0m woke '${windowName}' in ${session} → ${targetPath}`);
-  if (!opts.noAttach && process.env.TMUX) await tmux.switchClient(session);
+  if (!opts.noAttach) await attachToSession(session);
   takeSnapshot("wake").catch(() => {});
   return `${session}:${windowName}`;
 }

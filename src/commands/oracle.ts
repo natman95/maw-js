@@ -3,7 +3,7 @@ import { findWorktrees, detectSession, resolveFleetSession } from "./wake";
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
 import { FLEET_DIR } from "../paths";
-import { scanAndCache, readCache, isCacheStale, type OracleEntry } from "../oracle-registry";
+import { scanAndCache, scanFull, scanRemote, readCache, isCacheStale, type OracleEntry } from "../oracle-registry";
 
 /** Like resolveOracle but returns null instead of process.exit */
 async function resolveOracleSafe(oracle: string): Promise<{ repoPath: string; repoName: string; parentDir: string } | { parentDir: ""; repoName: ""; repoPath: "" }> {
@@ -208,19 +208,48 @@ export async function cmdOracleList() {
 
 // --- Fleet-wide scan + cache (#208) ---
 
-export async function cmdOracleScan(opts: { force?: boolean; json?: boolean } = {}) {
+export async function cmdOracleScan(opts: { force?: boolean; json?: boolean; local?: boolean; remote?: boolean } = {}) {
   const start = Date.now();
-  const cache = scanAndCache();
-  const elapsed = ((Date.now() - start) / 1000).toFixed(1);
 
-  if (opts.json) {
-    console.log(JSON.stringify(cache, null, 2));
+  const mode = opts.remote ? "remote" : opts.local ? "local" : "both";
+
+  if (mode === "remote") {
+    // Remote only — GitHub API
+    console.log(`\n  \x1b[36m📡\x1b[0m Scanning GitHub orgs for *-oracle repos...\n`);
+    const entries = await scanRemote();
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    if (opts.json) { console.log(JSON.stringify(entries, null, 2)); return; }
+    console.log(`  \x1b[32m✓\x1b[0m Found ${entries.length} oracles remotely (${elapsed}s)\n`);
+    for (const e of entries) {
+      const psi = e.has_psi ? "\x1b[32mψ/\x1b[0m" : "\x1b[90m  \x1b[0m";
+      console.log(`    ${psi} ${e.org}/${e.name}`);
+    }
+    console.log();
     return;
   }
 
-  console.log(`\n  \x1b[32m✓\x1b[0m Scanned ${cache.oracles.length} oracles locally (${elapsed}s)\n`);
-  console.log(`  Cache written to \x1b[90m~/.config/maw/oracles.json\x1b[0m`);
-  console.log(`  Scanned at: ${cache.local_scanned_at}\n`);
+  if (mode === "local") {
+    // Local only — current behavior
+    const cache = scanAndCache("local");
+    const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+    if (opts.json) { console.log(JSON.stringify(cache, null, 2)); return; }
+    console.log(`\n  \x1b[32m✓\x1b[0m Scanned ${cache.oracles.length} oracles locally (${elapsed}s)\n`);
+    console.log(`  Cache written to \x1b[90m~/.config/maw/oracles.json\x1b[0m`);
+    console.log(`  Scanned at: ${cache.local_scanned_at}\n`);
+    return;
+  }
+
+  // Both — full picture
+  console.log(`\n  \x1b[36m📡\x1b[0m Full scan: local + GitHub remote...\n`);
+  const cache = await scanFull();
+  const elapsed = ((Date.now() - start) / 1000).toFixed(1);
+
+  if (opts.json) { console.log(JSON.stringify(cache, null, 2)); return; }
+
+  const localCount = cache.oracles.filter(o => o.local_path).length;
+  const remoteOnly = cache.oracles.filter(o => !o.local_path).length;
+  console.log(`  \x1b[32m✓\x1b[0m ${cache.oracles.length} oracles (${localCount} local, ${remoteOnly} remote-only) (${elapsed}s)\n`);
+  console.log(`  Cache written to \x1b[90m~/.config/maw/oracles.json\x1b[0m\n`);
 }
 
 export async function cmdOracleFleet(opts: { org?: string; stale?: boolean; json?: boolean } = {}) {

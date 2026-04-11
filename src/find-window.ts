@@ -29,25 +29,28 @@ export interface Session {
  *   3. Substring match
  * Returns the first session that matches, or null.
  */
-function matchSession(sessions: Session[], part: string): Session | null {
+function matchSession(sessions: Session[], part: string, strict = false): Session | null {
   const p = part.toLowerCase();
   if (!p) return null;
   // 1. Exact
   for (const s of sessions) if (s.name.toLowerCase() === p) return s;
   // 2. Oracle-name (strip "NN-" prefix)
   for (const s of sessions) if (s.name.toLowerCase().replace(/^\d+-/, "") === p) return s;
-  // 3. Substring
-  for (const s of sessions) if (s.name.toLowerCase().includes(p)) return s;
+  // 3. Substring (skip in strict mode — prevents "white" matching "whitekeeper")
+  if (!strict) {
+    for (const s of sessions) if (s.name.toLowerCase().includes(p)) return s;
+  }
   return null;
 }
 
 export function findWindow(sessions: Session[], query: string): string | null {
   const q = query.toLowerCase();
 
-  // session:window syntax — substring-match each half semantically (#186)
+  // session:window syntax — strict session match to prevent node:agent collision (#186)
+  // "white:mawjs" must NOT match "105-whitekeeper" via substring
   if (query.includes(":")) {
     const [sessPart, winPart] = q.split(":", 2);
-    const sess = matchSession(sessions, sessPart);
+    const sess = matchSession(sessions, sessPart, true);
     if (sess) {
       // Empty window part → return session's first window
       if (!winPart) {
@@ -79,7 +82,7 @@ export function findWindow(sessions: Session[], query: string): string | null {
   // falls through to federation routing (node:agent like "oracle-world:mawjs").
   if (query.includes(":")) {
     const [sessPart] = query.toLowerCase().split(":", 2);
-    const sessExists = matchSession(sessions, sessPart);
+    const sessExists = matchSession(sessions, sessPart, true);
     return sessExists ? query : null;
   }
   return null;

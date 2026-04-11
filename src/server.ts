@@ -58,7 +58,7 @@ export { app };
 
 // --- Server ---
 
-export function startServer(port = +(process.env.MAW_PORT || loadConfig().port || 3456)) {
+export async function startServer(port = +(process.env.MAW_PORT || loadConfig().port || 3456)) {
   const engine = new MawEngine({ feedBuffer, feedListeners });
 
   const HTTP_URL = `http://localhost:${port}`;
@@ -76,16 +76,30 @@ export function startServer(port = +(process.env.MAW_PORT || loadConfig().port |
   // Hook workflow triggers into feed events
   setupTriggerListener(feedListeners);
 
-  // MQTT publish — broadcast feed events to configurable broker (subscribe via CF Worker bridge)
+  // Plugin system — built-in + user plugins
   try {
-    const { mqttPublish } = require("./mqtt-publish");
-    const node = loadConfig().node ?? "local";
-    feedListeners.add((event: any) => {
-      const oracle = event.oracle || "unknown";
-      mqttPublish(`maw/v1/oracle/${oracle}/feed`, event);
-      mqttPublish(`maw/v1/node/${node}/feed`, event);
-    });
-  } catch {}
+    const { PluginSystem, loadPlugins } = require("./plugins");
+    const { homedir } = require("os");
+    const { join, resolve, dirname } = require("path");
+    const plugins = new PluginSystem();
+
+    // Built-in plugins (ship with maw-js)
+    const builtinDir = resolve(dirname(new URL(import.meta.url).pathname), "plugins", "builtin");
+    await loadPlugins(plugins, builtinDir, "builtin");
+
+    // User plugins (file-drop: ~/.oracle/plugins/)
+    await loadPlugins(plugins, join(homedir(), ".oracle", "plugins"), "user");
+
+    // Single feedListener wires everything through the plugin pipeline
+    feedListeners.add((event) => plugins.emit(event));
+
+    // Plugin debug API + page
+    app.get("/api/plugins", (c) => c.json(plugins.stats()));
+    const { pluginsView } = require("./views/plugins");
+    app.route("/plugins", pluginsView(plugins));
+  } catch (err) {
+    console.error("[plugins] failed to init:", err);
+  }
 
   const wsHandler = {
     open: (ws: any) => {

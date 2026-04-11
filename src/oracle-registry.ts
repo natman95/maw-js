@@ -201,15 +201,106 @@ export function scanLocal(): OracleEntry[] {
   });
 }
 
-/** Scan local, write cache, return entries */
-export function scanAndCache(): RegistryCache {
+// --- Remote scan (GitHub API) ---
+
+export async function scanRemote(orgs?: string[]): Promise<OracleEntry[]> {
   const config = loadConfig();
-  const entries = scanLocal();
+  const defaultOrgs = config.githubOrgs || ["Soul-Brews-Studio", "laris-co"];
+  const targetOrgs = orgs || defaultOrgs;
+  const now = new Date().toISOString();
+  const entries: OracleEntry[] = [];
+  const seen = new Set<string>();
+
+  for (const org of targetOrgs) {
+    try {
+      // Use gh CLI for auth-handled pagination
+      const out = execSync(
+        `gh api "/orgs/${org}/repos?per_page=100&type=all" --paginate --jq '.[] | .full_name + " " + .name'`,
+        { encoding: "utf-8", timeout: 30000 },
+      );
+
+      for (const line of out.trim().split("\n").filter(Boolean)) {
+        const [fullName, repoName] = line.split(" ");
+        if (!repoName) continue;
+
+        // Detection: -oracle suffix
+        if (!repoName.endsWith("-oracle")) continue;
+
+        const key = fullName; // e.g. "Soul-Brews-Studio/mawjs-oracle"
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        // Check for ψ/ directory via API (light — just HEAD check)
+        let hasPsi = false;
+        try {
+          execSync(`gh api "/repos/${fullName}/contents/ψ" --silent 2>/dev/null`, { timeout: 5000 });
+          hasPsi = true;
+        } catch { /* no ψ/ */ }
+
+        entries.push({
+          org,
+          repo: repoName,
+          name: deriveName(repoName),
+          local_path: "",
+          has_psi: hasPsi,
+          has_fleet_config: false,
+          budded_from: null,
+          budded_at: null,
+          federation_node: null,
+          detected_at: now,
+        });
+      }
+    } catch (err) {
+      console.warn(`[oracle-registry] remote scan failed for ${org}: ${(err as Error).message?.slice(0, 80)}`);
+    }
+  }
+
+  return entries.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Scan local, write cache, return entries */
+export function scanAndCache(mode: "local" | "remote" | "both" = "local"): RegistryCache {
+  const config = loadConfig();
+  const localEntries = mode !== "remote" ? scanLocal() : [];
+
   const cache: RegistryCache = {
     schema: 1,
     local_scanned_at: new Date().toISOString(),
     ghq_root: config.ghqRoot,
-    oracles: entries,
+    oracles: localEntries,
+  };
+  writeCache(cache);
+  return cache;
+}
+
+/** Full scan: local + remote merged */
+export async function scanFull(orgs?: string[]): Promise<RegistryCache> {
+  const config = loadConfig();
+  const localEntries = scanLocal();
+  const remoteEntries = await scanRemote(orgs);
+
+  // Merge: local takes priority, remote fills gaps
+  const merged = new Map<string, OracleEntry>();
+  for (const e of localEntries) merged.set(`${e.org}/${e.repo}`, e);
+  for (const e of remoteEntries) {
+    const key = `${e.org}/${e.repo}`;
+    if (!merged.has(key)) {
+      merged.set(key, e);
+    } else {
+      // Enrich local with remote ψ/ check if local didn't have it
+      const local = merged.get(key)!;
+      if (!local.has_psi && e.has_psi) local.has_psi = true;
+    }
+  }
+
+  const cache: RegistryCache = {
+    schema: 1,
+    local_scanned_at: new Date().toISOString(),
+    ghq_root: config.ghqRoot,
+    oracles: [...merged.values()].sort((a, b) => {
+      if (a.org !== b.org) return a.org.localeCompare(b.org);
+      return a.name.localeCompare(b.name);
+    }),
   };
   writeCache(cache);
   return cache;

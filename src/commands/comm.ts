@@ -14,8 +14,8 @@ import { join } from "path";
 /** Log message to ~/.oracle/maw-log.jsonl with normalized from/to */
 async function logMessage(from: string, to: string, msg: string, route: string) {
   const config = loadConfig();
-  const node = config.node ?? "local";
-  const normalizedFrom = from.includes(":") ? from : `${node}:${from}`;
+  if (!config.node) throw new Error("config.node is required — set 'node' in maw.config.json");
+  const normalizedFrom = from.includes(":") ? from : `${config.node}:${from}`;
   const logDir = join(homedir(), ".oracle");
   const line = JSON.stringify({
     ts: new Date().toISOString(),
@@ -26,6 +26,15 @@ async function logMessage(from: string, to: string, msg: string, route: string) 
     route,
   }) + "\n";
   try { await mkdir(logDir, { recursive: true }); await appendFile(join(logDir, "maw-log.jsonl"), line); } catch {}
+}
+
+/** Emit feed event to server plugin pipeline (CLI → server bridge) */
+function emitFeed(event: string, oracle: string, node: string, message: string, port: number) {
+  fetch(`http://localhost:${port}/api/feed`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event, oracle, host: node, message, ts: Date.now() }),
+  }).catch(() => {});
 }
 
 /** Resolve which sessions to search for an oracle query (#86). */
@@ -143,6 +152,17 @@ export async function cmdPeek(query?: string) {
   console.log(content);
 }
 
+/** Resolve the current oracle name from CLAUDE_AGENT_NAME or tmux session */
+function resolveMyName(config: ReturnType<typeof loadConfig>): string {
+  if (process.env.CLAUDE_AGENT_NAME) return process.env.CLAUDE_AGENT_NAME;
+  // Try tmux session name: "08-mawjs" → "mawjs"
+  try {
+    const tmuxSession = require("child_process").execSync("tmux display-message -p '#{session_name}'", { encoding: "utf-8" }).trim();
+    if (tmuxSession) return tmuxSession.replace(/^\d+-/, "");
+  } catch {}
+  return config.node || "cli";
+}
+
 export async function cmdSend(query: string, message: string, force = false) {
   const config = loadConfig();
   const sessions = await listSessions();
@@ -164,8 +184,10 @@ export async function cmdSend(query: string, message: string, force = false) {
     }
     await sendKeys(target, message);
     await runHook("after_send", { to: query, message });
-    const agentName = process.env.CLAUDE_AGENT_NAME || query.split(":").pop() || "cli";
-    logMessage(agentName, query, message, "local");
+    if (!config.node) throw new Error("config.node is required — set 'node' in maw.config.json");
+    const senderName = resolveMyName(config);
+    logMessage(senderName, query, message, "local");
+    emitFeed("MessageSend", senderName, config.node, `${query}: ${message.slice(0, 200)}`, config.port || 3456);
     await Bun.sleep(150);
     let lastLine = "";
     try { const content = await capture(target, 3); lastLine = content.split("\n").filter(l => l.trim()).pop() || ""; } catch {}
@@ -181,8 +203,9 @@ export async function cmdSend(query: string, message: string, force = false) {
       body: JSON.stringify({ target: result.target, text: message }),
     });
     if (res.ok && res.data?.ok) {
-      const agentName = process.env.CLAUDE_AGENT_NAME || "cli";
+      const agentName = resolveMyName(config);
       logMessage(agentName, query, message, `peer:${result.node}`);
+      emitFeed("MessageSend", agentName, config.node!, `${result.node}:${query}: ${message.slice(0, 200)}`, config.port || 3456);
       console.log(`\x1b[32mdelivered\x1b[0m ⚡ ${result.node} → ${res.data.target || result.target}: ${message}`);
       if (res.data.lastLine) console.log(`\x1b[90m  ⤷ ${res.data.lastLine.slice(0, cfgLimit("messageTruncate"))}\x1b[0m`);
       await runHook("after_send", { to: query, message });
