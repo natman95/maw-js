@@ -13,7 +13,8 @@ import { readFileSync, existsSync, appendFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir, hostname } from "os";
 import { CONFIG_DIR } from "../paths";
-import { listSessions, findWindow, sendKeys } from "../ssh";
+import { listSessions, sendKeys } from "../ssh";
+import { findWindow } from "../find-window";
 
 export const mawLogApi = new Hono();
 

@@ -5,7 +5,8 @@
  */
 
 import { Hono } from "hono";
-import { listSessions, findWindow, sendKeys, getPaneCommand, capture } from "../ssh";
+import { listSessions, sendKeys, getPaneCommand, capture } from "../ssh";
+import { findWindow } from "../find-window";
 import { appendFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir, hostname } from "os";

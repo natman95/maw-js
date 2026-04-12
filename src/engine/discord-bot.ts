@@ -11,7 +11,8 @@
  */
 
 import { Client, GatewayIntentBits, type Message, type TextChannel } from "discord.js";
-import { listSessions, findWindow, sendKeys, capture } from "../ssh";
+import { listSessions, sendKeys, capture } from "../ssh";
+import { findWindow } from "../find-window";
 import { setBridgeBotChannel } from "./discord-bridge";
 import { appendFileSync, mkdirSync } from "fs";
 import { join } from "path";
