@@ -1,5 +1,5 @@
 import { loadConfig, cfgTimeout } from "../../../config";
-import { curlFetch } from "../../../core/curl-fetch";
+import { curlFetch } from "../../../core/transport/curl-fetch";
 
 export async function cmdPing(node?: string) {
   const config = loadConfig();

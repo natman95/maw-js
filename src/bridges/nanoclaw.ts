@@ -9,7 +9,7 @@
  */
 
 import { loadConfig } from "../config";
-import { curlFetch } from "../core/curl-fetch";
+import { curlFetch } from "../core/transport/curl-fetch";
 
 interface NanoclawConfig {
   url: string;               // e.g. "http://localhost:3001"

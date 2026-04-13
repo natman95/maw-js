@@ -1,5 +1,5 @@
-import { capture } from "../core/ssh";
-import { tmux } from "../core/tmux";
+import { capture } from "../core/transport/ssh";
+import { tmux } from "../core/transport/tmux";
 import type { FeedEvent } from "../lib/feed";
 import type { MawWS } from "../core/types";
 

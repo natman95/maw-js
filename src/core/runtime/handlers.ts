@@ -1,7 +1,7 @@
-import { sendKeys, selectWindow, hostExec, getPaneCommand } from "./ssh";
-import { tmux } from "./tmux";
-import { buildCommand } from "../config";
-import type { MawWS, Handler, MawEngine } from "./types";
+import { sendKeys, selectWindow, hostExec, getPaneCommand } from "../transport/ssh";
+import { tmux } from "../transport/tmux";
+import { buildCommand } from "../../config";
+import type { MawWS, Handler, MawEngine } from "../types";
 
 /** Run an async action with standard ok/error response */
 async function runAction(ws: MawWS, action: string, target: string, fn: () => Promise<void>) {

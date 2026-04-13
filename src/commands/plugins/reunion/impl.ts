@@ -1,4 +1,4 @@
-import { listSessions, hostExec } from "../../../core/ssh";
+import { listSessions, hostExec } from "../../../core/transport/ssh";
 import { existsSync, readdirSync, copyFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 

@@ -1,5 +1,5 @@
-import { listSessions, hostExec } from "../../../core/ssh";
-import { tmux } from "../../../core/tmux";
+import { listSessions, hostExec } from "../../../core/transport/ssh";
+import { tmux } from "../../../core/transport/tmux";
 import { buildCommandInDir } from "../../../config";
 
 /**

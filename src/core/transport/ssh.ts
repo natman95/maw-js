@@ -1,4 +1,4 @@
-import { loadConfig } from "../config";
+import { loadConfig } from "../../config";
 import { tmuxCmd } from "./tmux";
 
 const DEFAULT_HOST = process.env.MAW_HOST || loadConfig().host || "local";
@@ -21,12 +21,12 @@ export async function hostExec(cmd: string, host = DEFAULT_HOST): Promise<string
 /** @deprecated Use hostExec */
 export const ssh = hostExec;
 
-// Window/Session types and findWindow live in ./find-window.
+// Window/Session types and findWindow live in ../runtime/find-window.
 // They are NOT re-exported here — callers must import them directly
-// from "./find-window". This breaks the module dependency chain that
+// from "../runtime/find-window". This breaks the module dependency chain that
 // Bun's mock.module("../src/ssh") was using to clobber findWindow
 // in tests (see #198). Direct imports bypass the mock entirely.
-import type { Session } from "./find-window";
+import type { Session } from "../runtime/find-window";
 
 export async function listSessions(host?: string): Promise<Session[]> {
   let raw: string;

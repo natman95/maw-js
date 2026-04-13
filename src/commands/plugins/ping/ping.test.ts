@@ -12,7 +12,7 @@ mock.module(join(root, "config"), () => ({
   cfgTimeout: () => 2000,
 }));
 
-mock.module(join(root, "core/curl-fetch"), () => ({
+mock.module(join(root, "core/transport/curl-fetch"), () => ({
   curlFetch: async (_url: string) => ({
     ok: true,
     status: 200,

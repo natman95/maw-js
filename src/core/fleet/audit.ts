@@ -1,6 +1,6 @@
 import { join } from "path";
 import { appendFileSync, readFileSync, existsSync } from "fs";
-import { CONFIG_DIR } from "./paths";
+import { CONFIG_DIR } from "../paths";
 
 const AUDIT_FILE = join(CONFIG_DIR, "audit.jsonl");
 

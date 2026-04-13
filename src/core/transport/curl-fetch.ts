@@ -8,8 +8,8 @@
  * Auto-signs requests with HMAC-SHA256 when federationToken is configured.
  */
 
-import { signHeaders } from "../lib/federation-auth";
-import { loadConfig } from "../config";
+import { signHeaders } from "../../lib/federation-auth";
+import { loadConfig } from "../../config";
 
 const IS_MACOS = process.platform === "darwin";
 

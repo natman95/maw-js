@@ -1,6 +1,6 @@
-import { getFederationStatus, getPeers } from "../../core/peers";
-import { curlFetch } from "../../core/curl-fetch";
-import { listSessions } from "../../core/ssh";
+import { getFederationStatus, getPeers } from "../../core/transport/peers";
+import { curlFetch } from "../../core/transport/curl-fetch";
+import { listSessions } from "../../core/transport/ssh";
 import { loadConfig } from "../../config";
 
 async function fetchPeerAgentCount(url: string): Promise<number> {

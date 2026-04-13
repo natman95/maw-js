@@ -11,7 +11,7 @@
  *   maw.print.*  — colored terminal output helpers
  */
 
-import { loadConfig } from "../config";
+import { loadConfig } from "../../config";
 import type { Static } from "@sinclair/typebox";
 import {
   Identity as IdentitySchema,
@@ -20,7 +20,7 @@ import {
   Session as SessionSchema,
   FeedEvent as FeedEventSchema,
   PluginInfo as PluginInfoSchema,
-} from "../lib/schemas";
+} from "../../lib/schemas";
 
 // --- Types (derived from TypeBox schemas — single source of truth) ---
 

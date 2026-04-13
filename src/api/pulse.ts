@@ -10,7 +10,7 @@
  */
 
 import { Elysia, t} from "elysia";
-import { hostExec } from "../core/ssh";
+import { hostExec } from "../core/transport/ssh";
 import { loadConfig, type MawConfig } from "../config";
 
 export const pulseApi = new Elysia();

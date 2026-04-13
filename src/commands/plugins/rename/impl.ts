@@ -1,4 +1,4 @@
-import { tmux } from "../../../core/tmux";
+import { tmux } from "../../../core/transport/tmux";
 
 /**
  * maw rename <tab-number-or-name> <new-name>

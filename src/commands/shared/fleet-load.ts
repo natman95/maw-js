@@ -1,6 +1,6 @@
 import { join } from "path";
 import { readdirSync } from "fs";
-import { tmux } from "../../core/tmux";
+import { tmux } from "../../core/transport/tmux";
 import { FLEET_DIR } from "../../core/paths";
 
 export interface FleetWindow {

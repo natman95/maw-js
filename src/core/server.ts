@@ -9,11 +9,11 @@ import { serveStatic } from "hono/bun";
 import { api } from "../api";
 import { feedBuffer, feedListeners } from "../api/feed";
 import { mountViews } from "../views/index";
-import { setupTriggerListener } from "./trigger-listener";
+import { setupTriggerListener } from "./runtime/trigger-listener";
 import { createTransportRouter } from "../transports";
-import { listSessions } from "./ssh";
-import { Tmux } from "./tmux";
-import { handlePtyMessage, handlePtyClose } from "./pty";
+import { listSessions } from "./transport/ssh";
+import { Tmux } from "./transport/tmux";
+import { handlePtyMessage, handlePtyClose } from "./transport/pty";
 import { setBunServer } from "../lib/elysia-auth";
 
 // --- Version info (computed once at startup) ---

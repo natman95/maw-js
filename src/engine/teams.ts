@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { tmux } from "../core/tmux";
+import { tmux } from "../core/transport/tmux";
 import type { MawWS } from "../core/types";
 
 interface TeamData {

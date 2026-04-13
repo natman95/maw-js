@@ -1,11 +1,11 @@
 import { join } from "path";
 import { readdirSync, renameSync, existsSync, unlinkSync, symlinkSync, mkdirSync } from "fs";
-import { ssh } from "../../core/ssh";
-import { tmux } from "../../core/tmux";
+import { ssh } from "../../core/transport/ssh";
+import { tmux } from "../../core/transport/tmux";
 import { loadConfig, buildCommand, getEnvVars } from "../../config";
 import { ensureSessionRunning } from "./wake";
 import { FLEET_DIR } from "../../core/paths";
-import { saveTabOrder, restoreTabOrder } from "../../core/tab-order";
+import { saveTabOrder, restoreTabOrder } from "../../core/fleet/tab-order";
 
 interface FleetWindow {
   name: string;

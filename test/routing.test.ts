@@ -5,7 +5,7 @@
  */
 import { describe, test, expect } from "bun:test";
 import { resolveTarget } from "../src/core/routing";
-import type { Session } from "../src/core/find-window";
+import type { Session } from "../src/core/runtime/find-window";
 import type { MawConfig } from "../src/config";
 
 // --- Fixtures ---

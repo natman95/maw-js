@@ -7,7 +7,7 @@
  */
 
 import mqtt from "mqtt";
-import { loadConfig } from "../config";
+import { loadConfig } from "../../config";
 
 let client: mqtt.MqttClient | null = null;
 

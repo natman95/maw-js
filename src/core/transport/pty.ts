@@ -1,5 +1,5 @@
 import { tmux, tmuxCmd } from "./tmux";
-import { loadConfig, cfgTimeout, cfgLimit } from "../config";
+import { loadConfig, cfgTimeout, cfgLimit } from "../../config";
 import type { ServerWebSocket } from "bun";
 
 let nextPtyId = 0;

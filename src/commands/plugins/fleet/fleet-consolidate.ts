@@ -1,6 +1,6 @@
 import { join } from "path";
 import { readdirSync, readFileSync, unlinkSync } from "fs";
-import { hostExec } from "../../../core/ssh";
+import { hostExec } from "../../../core/transport/ssh";
 import { loadConfig } from "../../../config";
 import { FLEET_DIR } from "../../../core/paths";
 

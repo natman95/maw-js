@@ -1,7 +1,7 @@
 import { join } from "path";
-import { CONFIG_DIR } from "./paths";
+import { CONFIG_DIR } from "../paths";
 import { mkdirSync, readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
-import { tmux } from "./tmux";
+import { tmux } from "../transport/tmux";
 
 const TAB_ORDER_DIR = join(CONFIG_DIR, "tab-order");
 

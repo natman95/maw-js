@@ -1,4 +1,4 @@
-import { getTriggers, getTriggerHistory } from "../../core/triggers";
+import { getTriggers, getTriggerHistory } from "../../core/runtime/triggers";
 
 export async function cmdTriggers(): Promise<void> {
   const triggers = getTriggers();

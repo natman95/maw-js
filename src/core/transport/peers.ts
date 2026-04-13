@@ -1,4 +1,4 @@
-import { loadConfig, cfgTimeout } from "../config";
+import { loadConfig, cfgTimeout } from "../../config";
 import type { Session } from "./ssh";
 import { curlFetch } from "./curl-fetch";
 

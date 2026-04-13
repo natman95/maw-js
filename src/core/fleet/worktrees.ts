@@ -1,9 +1,9 @@
-import { hostExec, listSessions } from "./ssh";
-import { tmux } from "./tmux";
-import { loadConfig } from "../config";
+import { hostExec, listSessions } from "../transport/ssh";
+import { tmux } from "../transport/tmux";
+import { loadConfig } from "../../config";
 import { readdirSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
-import { FLEET_DIR } from "./paths";
+import { FLEET_DIR } from "../paths";
 
 export interface WorktreeInfo {
   path: string;

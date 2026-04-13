@@ -10,7 +10,7 @@
  * Fallback → HTTP federation (existing peers[] mechanism)
  */
 
-import type { FeedEvent } from "../lib/feed";
+import type { FeedEvent } from "../../lib/feed";
 
 /** Transport failure reasons (inspired by OpenClaw's FailoverReason) */
 export type TransportFailureReason =

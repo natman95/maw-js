@@ -1,7 +1,7 @@
 import { Elysia, t} from "elysia";
-import { getFederationStatus } from "../core/peers";
+import { getFederationStatus } from "../core/transport/peers";
 import { loadConfig } from "../config";
-import { listSnapshots, loadSnapshot, latestSnapshot } from "../core/snapshot";
+import { listSnapshots, loadSnapshot, latestSnapshot } from "../core/fleet/snapshot";
 import { hostedAgents } from "../commands/shared/federation-sync";
 import { readFileSync, readdirSync } from "fs";
 import { join } from "path";

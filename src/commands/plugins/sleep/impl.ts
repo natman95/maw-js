@@ -1,10 +1,10 @@
-import { tmux } from "../../../core/tmux";
+import { tmux } from "../../../core/transport/tmux";
 import { detectSession } from "../../shared/wake";
-import { saveTabOrder } from "../../../core/tab-order";
+import { saveTabOrder } from "../../../core/fleet/tab-order";
 import { appendFile, mkdir } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
-import { takeSnapshot } from "../../../core/snapshot";
+import { takeSnapshot } from "../../../core/fleet/snapshot";
 
 /**
  * maw sleep <oracle> [window]

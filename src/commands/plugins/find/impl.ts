@@ -1,4 +1,4 @@
-import { hostExec } from "../../../core/ssh";
+import { hostExec } from "../../../core/transport/ssh";
 import { loadConfig } from "../../../config";
 import { loadFleet } from "../../shared/fleet-load";
 import { join } from "path";

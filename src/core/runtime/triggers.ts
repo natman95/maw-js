@@ -6,8 +6,8 @@
  */
 
 // No execSync — use async Bun.spawn to avoid blocking event loop
-import { loadConfig, saveConfig, type TriggerConfig, type TriggerEvent } from "../config";
-import { logAudit } from "./audit";
+import { loadConfig, saveConfig, type TriggerConfig, type TriggerEvent } from "../../config";
+import { logAudit } from "../fleet/audit";
 
 export interface TriggerContext {
   agent?: string;

@@ -5,7 +5,7 @@
  * Also runs periodic idle-timeout checks.
  */
 
-import type { FeedEvent } from "../lib/feed";
+import type { FeedEvent } from "../../lib/feed";
 import { fire, markAgentActive, checkIdleTriggers, getTriggers } from "./triggers";
 
 /**

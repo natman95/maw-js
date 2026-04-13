@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { mkdirSync, rmSync, readdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
-import type { Snapshot, SnapshotSession, SnapshotWindow } from "../src/core/snapshot";
+import type { Snapshot, SnapshotSession, SnapshotWindow } from "../src/core/fleet/snapshot";
 
 // Use temp dir for tests
 const TEST_DIR = join(tmpdir(), `maw-snapshot-test-${Date.now()}`);
@@ -28,7 +28,7 @@ let mockSessions: MockSession[] = [
   { name: "04-homekeeper", windows: [{ name: "homekeeper-oracle", index: 1 }] },
 ];
 
-mock.module("../src/core/ssh", () => ({
+mock.module("../src/core/transport/ssh", () => ({
   listSessions: async (): Promise<MockSession[]> => mockSessions,
   hostExec: async (): Promise<string> => "",
   ssh: async (): Promise<string> => "",
@@ -36,7 +36,7 @@ mock.module("../src/core/ssh", () => ({
   findWindow: (): string | null => null,
 }));
 
-const { takeSnapshot, listSnapshots, loadSnapshot, latestSnapshot, SNAPSHOT_DIR } = await import("../src/core/snapshot");
+const { takeSnapshot, listSnapshots, loadSnapshot, latestSnapshot, SNAPSHOT_DIR } = await import("../src/core/fleet/snapshot");
 
 // In combined suite bun may load snapshot.ts before this file's mock.module runs,
 // leaving SNAPSHOT_DIR pointing at the real config dir instead of TEST_DIR/snapshots.

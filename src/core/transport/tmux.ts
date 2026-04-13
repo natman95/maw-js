@@ -1,5 +1,5 @@
 import { hostExec } from "./ssh";
-import { loadConfig, cfgLimit } from "../config";
+import { loadConfig, cfgLimit } from "../../config";
 
 /** Resolve tmux socket path from env or config. */
 export function resolveSocket(): string | undefined {

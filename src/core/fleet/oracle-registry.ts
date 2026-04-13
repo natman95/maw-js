@@ -11,8 +11,8 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from "fs";
 import { join } from "path";
 import { execSync } from "child_process";
-import { CONFIG_DIR, FLEET_DIR } from "./paths";
-import { loadConfig } from "../config";
+import { CONFIG_DIR, FLEET_DIR } from "../paths";
+import { loadConfig } from "../../config";
 
 // --- Types ---
 

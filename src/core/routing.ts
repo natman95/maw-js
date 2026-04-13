@@ -10,7 +10,7 @@
  * See: Soul-Brews-Studio/maw-js#201
  */
 
-import { findWindow, type Session } from "./find-window";
+import { findWindow, type Session } from "./runtime/find-window";
 import type { MawConfig } from "../config";
 import { resolveFleetSession } from "../commands/shared/wake";
 

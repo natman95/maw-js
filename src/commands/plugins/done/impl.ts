@@ -1,5 +1,5 @@
-import { listSessions, hostExec } from "../../../core/ssh";
-import { tmux } from "../../../core/tmux";
+import { listSessions, hostExec } from "../../../core/transport/ssh";
+import { tmux } from "../../../core/transport/tmux";
 import { loadConfig } from "../../../config";
 import { readdirSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -7,7 +7,7 @@ import { homedir } from "os";
 import { FLEET_DIR } from "../../../core/paths";
 import { cmdReunion } from "../reunion/impl";
 import { cmdSoulSync } from "../../shared/soul-sync";
-import { takeSnapshot } from "../../../core/snapshot";
+import { takeSnapshot } from "../../../core/fleet/snapshot";
 
 export interface DoneOpts {
   force?: boolean;

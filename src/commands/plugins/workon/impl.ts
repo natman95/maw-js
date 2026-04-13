@@ -1,5 +1,5 @@
-import { hostExec } from "../../../core/ssh";
-import { tmux } from "../../../core/tmux";
+import { hostExec } from "../../../core/transport/ssh";
+import { tmux } from "../../../core/transport/tmux";
 import { buildCommand } from "../../../config";
 import { findWorktrees } from "../../shared/wake";
 

@@ -1,9 +1,9 @@
 import { Elysia, t} from "elysia";
-import { listSessions, capture, sendKeys, selectWindow } from "../core/ssh";
-import { findWindow } from "../core/find-window";
-import { getAggregatedSessions, findPeerForTarget, sendKeysToPeer } from "../core/peers";
+import { listSessions, capture, sendKeys, selectWindow } from "../core/transport/ssh";
+import { findWindow } from "../core/runtime/find-window";
+import { getAggregatedSessions, findPeerForTarget, sendKeysToPeer } from "../core/transport/peers";
 import { loadConfig } from "../config";
-import { curlFetch } from "../core/curl-fetch";
+import { curlFetch } from "../core/transport/curl-fetch";
 import { resolveTarget } from "../core/routing";
 import { processMirror } from "../commands/plugins/overview/impl";
 import { resolveFleetSession } from "../commands/shared/wake";

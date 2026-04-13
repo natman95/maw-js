@@ -12,7 +12,7 @@ let mockToken: string | undefined = "test-token-16chars!";
 import { mockConfigModule } from "./helpers/mock-config";
 mock.module("../src/config", () => mockConfigModule(() => ({ federationToken: mockToken, node: "test" })));
 
-const { curlFetch } = await import("../src/core/curl-fetch");
+const { curlFetch } = await import("../src/core/transport/curl-fetch");
 
 // Probe for a live local maw server at `white.local:3456`. Tests that
 // require a running daemon are skipped in environments where it's not
