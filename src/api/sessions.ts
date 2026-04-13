@@ -7,6 +7,8 @@ import { curlFetch } from "../curl-fetch";
 import { resolveTarget } from "../routing";
 import { processMirror } from "../commands/overview";
 import { resolveFleetSession } from "../commands/wake";
+import { validateBody } from "../lib/validate";
+import { WakeBody, SleepBody, SendBody, type TWakeBody, type TSleepBody, type TSendBody } from "../lib/schemas";
 
 export const sessionsApi = new Hono();
 
@@ -57,10 +59,9 @@ sessionsApi.get("/mirror", async (c) => {
   return c.text(processMirror(raw, lines));
 });
 
-sessionsApi.post("/send", async (c) => {
+sessionsApi.post("/send", validateBody(SendBody), async (c) => {
   try {
-    const { target, text } = await c.req.json();
-    if (!target || !text) return c.json({ error: "target and text required" }, 400);
+    const { target, text } = c.get("body") as TSendBody;
 
     const config = loadConfig();
     const local = await listSessions();
@@ -118,10 +119,9 @@ sessionsApi.post("/select", async (c) => {
   return c.json({ ok: true, target });
 });
 
-sessionsApi.post("/wake", async (c) => {
+sessionsApi.post("/wake", validateBody(WakeBody), async (c) => {
   try {
-    const { target, task } = await c.req.json();
-    if (!target) return c.json({ error: "target required" }, 400);
+    const { target, task } = c.get("body") as TWakeBody;
     const { cmdWake } = await import("../commands/wake");
     await cmdWake(target, { noAttach: true, task });
     return c.json({ ok: true, target });
@@ -130,10 +130,9 @@ sessionsApi.post("/wake", async (c) => {
   }
 });
 
-sessionsApi.post("/sleep", async (c) => {
+sessionsApi.post("/sleep", validateBody(SleepBody), async (c) => {
   try {
-    const { target } = await c.req.json();
-    if (!target) return c.json({ error: "target required" }, 400);
+    const { target } = c.get("body") as TSleepBody;
     const { cmdSleepOne } = await import("../commands/sleep");
     await cmdSleepOne(target);
     return c.json({ ok: true, target });

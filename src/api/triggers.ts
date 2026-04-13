@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import { getTriggers, getTriggerHistory, fire, type TriggerContext } from "../triggers";
 import type { TriggerEvent } from "../config";
+import { validateBody } from "../lib/validate";
+import { TriggerFireBody, type TTriggerFireBody } from "../lib/schemas";
 
 export const triggersApi = new Hono();
 
@@ -31,12 +33,10 @@ triggersApi.get("/triggers", (c) => {
 });
 
 /** POST /triggers/fire — manually fire a trigger event */
-triggersApi.post("/triggers/fire", async (c) => {
-  const body = await c.req.json();
+triggersApi.post("/triggers/fire", validateBody(TriggerFireBody), async (c) => {
+  const body = c.get("body") as TTriggerFireBody;
   const event = body.event as TriggerEvent;
   const ctx: TriggerContext = body.context || {};
-
-  if (!event) return c.json({ error: "event is required" }, 400);
 
   const results = fire(event, ctx);
   return c.json({

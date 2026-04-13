@@ -8,6 +8,8 @@
 
 import { Hono } from "hono";
 import { getTransportRouter } from "../transports";
+import { validateBody } from "../lib/validate";
+import { TransportSendBody, type TTransportSendBody } from "../lib/schemas";
 
 export const transportApi = new Hono();
 
@@ -21,12 +23,8 @@ transportApi.get("/transport/status", (c) => {
 });
 
 // POST /api/transport/send — send a message through the transport router
-transportApi.post("/transport/send", async (c) => {
-  const { oracle, host, message, from } = await c.req.json();
-
-  if (!oracle || !message) {
-    return c.json({ error: "oracle and message are required" }, 400);
-  }
+transportApi.post("/transport/send", validateBody(TransportSendBody), async (c) => {
+  const { oracle, host, message, from } = c.get("body") as TTransportSendBody;
 
   const router = getTransportRouter();
   const result = await router.send(
