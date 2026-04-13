@@ -4,29 +4,38 @@ import type { InvokeContext } from "../../../plugin/types";
 let lastWakeCall: { oracle: string; opts: any } | null = null;
 let lastWakeAllCall: { opts: any } | null = null;
 
-const base = import.meta.dir + "/../..";
+// Absolute paths required for bun mock.module to work reliably across test files
+const base = `${import.meta.dir}/../..`;
 
-mock.module(base + "/wake", () => ({
+mock.module(`${base}/wake`, () => ({
   cmdWake: async (oracle: string, opts: any) => {
     lastWakeCall = { oracle, opts };
     console.log(`woke ${oracle}`);
   },
+  isPaneIdle: async () => true,
+  ensureSessionRunning: async () => 0,
+  fetchIssuePrompt: async () => "",
+  fetchGitHubPrompt: async () => "",
+  findWorktrees: () => [],
+  detectSession: () => null,
+  resolveFleetSession: () => null,
 }));
 
-mock.module(base + "/fleet", () => ({
+mock.module(`${base}/fleet`, () => ({
   cmdWakeAll: async (opts: any) => {
     lastWakeAllCall = { opts };
     console.log("wake all");
   },
   cmdSleep: async () => {},
+  cmdWakeAll_: null,
 }));
 
-mock.module(base + "/wake-target", () => ({
+mock.module(`${base}/wake-target`, () => ({
   parseWakeTarget: () => null,
   ensureCloned: async () => {},
 }));
 
-mock.module(base + "/wake-resolve", () => ({
+mock.module(`${base}/wake-resolve`, () => ({
   fetchGitHubPrompt: async (type: string, num: number) => `${type} #${num} prompt`,
 }));
 

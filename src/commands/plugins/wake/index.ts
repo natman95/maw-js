@@ -1,9 +1,5 @@
 import type { InvokeContext, InvokeResult } from "../../../plugin/types";
 import { parseFlags } from "../../../cli/parse-args";
-import { cmdWake } from "../../wake";
-import { cmdWakeAll } from "../../fleet";
-import { parseWakeTarget, ensureCloned } from "../../wake-target";
-import { fetchGitHubPrompt } from "../../wake-resolve";
 
 export const command = {
   name: "wake",
@@ -11,6 +7,12 @@ export const command = {
 };
 
 export default async function handler(ctx: InvokeContext): Promise<InvokeResult> {
+  // Dynamic imports — clean, one await, mockable
+  const { cmdWake } = await import("../../wake");
+  const { cmdWakeAll } = await import("../../fleet");
+  const { parseWakeTarget, ensureCloned } = await import("../../wake-target");
+  const { fetchGitHubPrompt } = await import("../../wake-resolve");
+
   const logs: string[] = [];
   const origLog = console.log;
   const origError = console.error;
@@ -28,25 +30,16 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
         };
       }
 
-      // wake all [--kill] [--all] [--resume]
       if (args[0].toLowerCase() === "all") {
         const flags = parseFlags(args, { "--kill": Boolean, "--all": Boolean, "--resume": Boolean }, 1);
         await cmdWakeAll({ kill: flags["--kill"], all: flags["--all"], resume: flags["--resume"] });
         return { ok: true, output: logs.join("\n") || undefined };
       }
 
-      // wake <oracle|URL|slug> [task] [flags...]
       const flags = parseFlags(args, {
-        "--new": String,
-        "--incubate": String,
-        "--issue": Number,
-        "--pr": Number,
-        "--repo": String,
-        "--task": String,
-        "--fresh": Boolean,
-        "--no-attach": Boolean,
-        "--list": Boolean,
-        "--ls": "--list",
+        "--new": String, "--incubate": String, "--issue": Number,
+        "--pr": Number, "--repo": String, "--task": String,
+        "--fresh": Boolean, "--no-attach": Boolean, "--list": Boolean, "--ls": "--list",
       }, 1);
 
       const wakeOpts: {
@@ -56,7 +49,6 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
       let issueNum: number | null = flags["--issue"] ?? null;
       let repo: string | undefined = flags["--repo"];
 
-      // Detect URL or org/repo slug → clone via ghq
       const parsed = parseWakeTarget(args[0]);
       const oracleName = parsed ? parsed.oracle : args[0];
       if (parsed) {
@@ -69,10 +61,8 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
       if (flags["--fresh"]) wakeOpts.fresh = true;
       if (flags["--no-attach"]) wakeOpts.noAttach = true;
       if (flags["--list"]) wakeOpts.listWt = true;
-      // --task "<prompt>" = fire-and-forget: sends prompt to claude without attaching
       if (flags["--task"]) wakeOpts.noAttach = true;
 
-      // Positional args after oracle name: task, then prompt words
       const positionals = flags._;
       if (positionals.length > 0) wakeOpts.task = positionals[0];
       if (positionals.length > 1) wakeOpts.prompt = positionals.slice(1).join(" ");
@@ -88,7 +78,6 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
         wakeOpts.prompt = await fetchGitHubPrompt("pr", prNum, repo);
         if (!wakeOpts.task) wakeOpts.task = `pr-${prNum}`;
       } else if (flags["--task"]) {
-        // No --issue/--pr: use --task string directly as the prompt
         wakeOpts.prompt = flags["--task"];
       }
 
@@ -96,22 +85,16 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
       return { ok: true, output: logs.join("\n") || undefined };
     }
 
-    // API source: parse body as { oracle, task?, issue?, repo?, fresh?, noAttach? }
+    // API source
     const body = ctx.args as Record<string, unknown>;
     const oracle = body.oracle as string | undefined;
-    if (!oracle) {
-      return { ok: false, error: "missing oracle name" };
-    }
+    if (!oracle) return { ok: false, error: "missing oracle name" };
 
-    const wakeOpts: {
-      task?: string; prompt?: string; fresh?: boolean; noAttach?: boolean;
-    } = {};
+    const wakeOpts: { task?: string; prompt?: string; fresh?: boolean; noAttach?: boolean } = {};
     if (body.task) wakeOpts.task = body.task as string;
     if (body.issue) {
       const issueNum = body.issue as number;
-      const repo = body.repo as string | undefined;
-      console.log(`\x1b[36m⚡\x1b[0m fetching issue #${issueNum}...`);
-      wakeOpts.prompt = await fetchGitHubPrompt("issue", issueNum, repo);
+      wakeOpts.prompt = await fetchGitHubPrompt("issue", issueNum, body.repo as string | undefined);
       if (!wakeOpts.task) wakeOpts.task = `issue-${issueNum}`;
     }
     if (body.fresh) wakeOpts.fresh = true;
@@ -119,7 +102,6 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
 
     await cmdWake(oracle, wakeOpts);
     return { ok: true, output: logs.join("\n") || undefined };
-
   } catch (e: any) {
     return { ok: false, error: e.message };
   } finally {
