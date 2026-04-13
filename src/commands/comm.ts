@@ -165,6 +165,19 @@ function resolveMyName(config: ReturnType<typeof loadConfig>): string {
 
 export async function cmdSend(query: string, message: string, force = false) {
   const config = loadConfig();
+
+  // --- Plugin routing: maw hey plugin:<name> <msg> ---
+  if (query.startsWith("plugin:")) {
+    const name = query.slice("plugin:".length);
+    const { discoverPackages, invokePlugin } = await import("../plugin/registry");
+    const plugin = discoverPackages().find(p => p.manifest.name === name);
+    if (!plugin) { console.error(`plugin not found: ${name}`); process.exit(1); }
+    const result = await invokePlugin(plugin, { source: "peer", args: { message, from: config.node ?? "local" } });
+    if (result.ok) { console.log(result.output ?? "(no output)"); return; }
+    console.error(`plugin error: ${result.error}`);
+    process.exit(1);
+  }
+
   const sessions = await listSessions();
 
   // --- Unified resolution via resolveTarget (#201) ---

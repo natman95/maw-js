@@ -54,6 +54,33 @@ export function copyTree(src: string, dest: string): void {
   }
 }
 
+// ─── Manifest ────────────────────────────────────────────────────────────────
+
+/**
+ * Build plugin.json content for a scaffolded plugin.
+ * `name` field is slugified (underscores → hyphens) to match /^[a-z0-9-]+$/.
+ * Returns a JSON string ready to write to disk.
+ */
+export function buildManifestJson(name: string, lang: "rust" | "as"): string {
+  const slug = name.replace(/_/g, "-");
+  const wasmPath =
+    lang === "rust"
+      ? `./target/wasm32-unknown-unknown/release/${name.replace(/-/g, "_")}.wasm`
+      : "./build/release.wasm";
+  const type = lang === "rust" ? "Rust" : "AssemblyScript";
+  const manifest = {
+    name: slug,
+    version: "0.1.0",
+    wasm: wasmPath,
+    sdk: "^1.0.0",
+    description: `${type} plugin: ${name}`,
+    author: "",
+    cli: { command: slug, help: `Invoke ${name}` },
+    api: { path: `/api/plugins/${slug}`, methods: ["GET", "POST"] },
+  };
+  return JSON.stringify(manifest, null, 2) + "\n";
+}
+
 // ─── Rust scaffold ───────────────────────────────────────────────────────────
 
 export function scaffoldRust(name: string, dest: string, templateDir = TEMPLATE_RUST, sdkPath = SDK_RUST_ABS): void {
@@ -104,6 +131,9 @@ See the SDK at \`${sdkPath}\` for available host functions:
 \`maw::print\`, \`maw::identity\`, \`maw::federation\`, \`maw::send\`, \`maw::fetch\`.
 `,
   );
+
+  // Emit plugin.json manifest
+  writeFileSync(join(dest, "plugin.json"), buildManifestJson(name, "rust"));
 }
 
 // ─── AssemblyScript scaffold ─────────────────────────────────────────────────
@@ -151,6 +181,9 @@ maw plugin install "${dest}"
 \`\`\`
 `,
   );
+
+  // Emit plugin.json manifest
+  writeFileSync(join(dest, "plugin.json"), buildManifestJson(name, "as"));
 }
 
 // ─── Top-level command ───────────────────────────────────────────────────────

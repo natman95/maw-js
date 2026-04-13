@@ -7,7 +7,9 @@ import {
   scaffoldRust,
   scaffoldAs,
   copyTree,
+  buildManifestJson,
 } from "../src/commands/plugin-create";
+import { parseManifest } from "../src/plugin/manifest";
 
 // ─── Temp dir management ─────────────────────────────────────────────────────
 
@@ -222,6 +224,85 @@ describe("scaffoldAs", () => {
   test("throws if template directory does not exist", () => {
     const dest = join(tmpDir(), "my-as-plugin");
     expect(() => scaffoldAs("my-as-plugin", dest, "/nonexistent/as-template")).toThrow();
+  });
+});
+
+// ─── plugin.json manifest emission ───────────────────────────────────────────
+
+describe("plugin.json manifest emission", () => {
+  function makeRustTpl(dir: string): void {
+    writeFileSync(
+      join(dir, "Cargo.toml"),
+      `[package]\nname = "hello-rust"\nversion = "0.1.0"\nedition = "2021"\n\n[lib]\ncrate-type = ["cdylib"]\n\n[dependencies]\nmaw-plugin-sdk = { path = "../../maw-plugin-sdk" }\n`,
+    );
+    mkdirSync(join(dir, "src"), { recursive: true });
+    writeFileSync(join(dir, "src", "lib.rs"), `// stub`);
+  }
+
+  function makeAsTpl(dir: string): void {
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ name: "hello-as", version: "0.1.0" }, null, 2) + "\n",
+    );
+    mkdirSync(join(dir, "assembly"), { recursive: true });
+    writeFileSync(join(dir, "assembly", "index.ts"), `// stub`);
+  }
+
+  test("scaffoldRust writes plugin.json that parseManifest validates", () => {
+    const template = tmpDir();
+    makeRustTpl(template);
+    const dest = join(tmpDir(), "my-rust-plugin");
+
+    scaffoldRust("my-rust-plugin", dest, template, "/fake/sdk");
+
+    // parseManifest requires wasm file on disk — create dummy
+    const wasmDir = join(dest, "target", "wasm32-unknown-unknown", "release");
+    mkdirSync(wasmDir, { recursive: true });
+    writeFileSync(join(wasmDir, "my_rust_plugin.wasm"), "fake");
+
+    const manifestText = readFileSync(join(dest, "plugin.json"), "utf8");
+    const m = parseManifest(manifestText, dest);
+
+    expect(m.name).toBe("my-rust-plugin");
+    expect(m.version).toBe("0.1.0");
+    expect(m.sdk).toBe("^1.0.0");
+    expect(m.wasm).toBe("./target/wasm32-unknown-unknown/release/my_rust_plugin.wasm");
+    expect(m.cli?.command).toBe("my-rust-plugin");
+    expect(m.api?.path).toBe("/api/plugins/my-rust-plugin");
+  });
+
+  test("scaffoldAs writes plugin.json that parseManifest validates", () => {
+    const template = tmpDir();
+    makeAsTpl(template);
+    const dest = join(tmpDir(), "my-as-plugin");
+
+    scaffoldAs("my-as-plugin", dest, template);
+
+    // parseManifest requires wasm file on disk — create dummy
+    const buildDir = join(dest, "build");
+    mkdirSync(buildDir, { recursive: true });
+    writeFileSync(join(buildDir, "release.wasm"), "fake");
+
+    const manifestText = readFileSync(join(dest, "plugin.json"), "utf8");
+    const m = parseManifest(manifestText, dest);
+
+    expect(m.name).toBe("my-as-plugin");
+    expect(m.version).toBe("0.1.0");
+    expect(m.sdk).toBe("^1.0.0");
+    expect(m.wasm).toBe("./build/release.wasm");
+    expect(m.cli?.command).toBe("my-as-plugin");
+    expect(m.api?.path).toBe("/api/plugins/my-as-plugin");
+  });
+
+  test("buildManifestJson normalizes underscores to hyphens in slug fields", () => {
+    const json = buildManifestJson("my_plugin", "rust");
+    const data = JSON.parse(json);
+
+    expect(data.name).toBe("my-plugin");          // slug uses hyphens
+    expect(data.wasm).toContain("my_plugin.wasm"); // wasm crate name uses underscores
+    expect(data.cli.command).toBe("my-plugin");
+    expect(data.api.path).toBe("/api/plugins/my-plugin");
+    expect(data.api.methods).toEqual(["GET", "POST"]);
   });
 });
 

@@ -142,6 +142,14 @@ export async function routeTools(cmd: string, args: string[]): Promise<boolean> 
     console.log(`\x1b[32m✓\x1b[0m trigger added: on ${oracle} ${event}${badge} → ${action}`);
     return true;
   }
+  if (cmd === "plugins") {
+    const { cmdPlugins } = await import("../commands/plugins");
+    const { parseFlags } = await import("./parse-args");
+    const sub = args[1] ?? "ls";
+    const flags = parseFlags(args, { "--json": Boolean, "--force": Boolean }, 2);
+    await cmdPlugins(sub, args.slice(2), flags);
+    return true;
+  }
   if (cmd === "plugin") {
     const sub = args[1]?.toLowerCase();
     if (sub === "create") {
