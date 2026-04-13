@@ -11,7 +11,7 @@
  * MAW_PLUGIN_HOME env var overrides install destination (useful for tests).
  */
 
-import { existsSync, mkdirSync, cpSync, renameSync, readFileSync } from "fs";
+import { existsSync, mkdirSync, cpSync, renameSync, readFileSync, readdirSync, lstatSync } from "fs";
 import { join, resolve } from "path";
 import { homedir } from "os";
 import { execSync } from "child_process";
@@ -65,6 +65,10 @@ export async function cmdPlugins(
         process.exit(1);
       }
       return doRemove(name, discover);
+    case "lean":
+      return doLean(discover);
+    case "nuke":
+      return doNuke();
     default:
       return doLs(flags["--json"] ?? false, discover);
   }
@@ -233,6 +237,45 @@ function doRemove(name: string, discover: () => LoadedPlugin[]): void {
   console.log(
     `\x1b[32m✓\x1b[0m removed ${name} → archived to /tmp/maw-plugin-${name}-*`,
   );
+}
+
+function doLean(discover: () => LoadedPlugin[]): void {
+  const plugins = discover();
+  const home = getPluginHome();
+  const dirs = readdirSync(home);
+  let removed = 0;
+
+  for (const d of dirs) {
+    // Keep core (00-*) plugins
+    if (d.startsWith("00-")) continue;
+    const dir = join(home, d);
+    const stat = require("fs").lstatSync(dir);
+    if (!stat.isDirectory() && !stat.isSymbolicLink()) continue;
+    archiveToTmp(d, dir);
+    removed++;
+    console.log(`  \x1b[90m✗\x1b[0m ${d}`);
+  }
+
+  const remaining = readdirSync(home).length;
+  console.log(`\n\x1b[32m✓\x1b[0m lean — removed ${removed}, kept ${remaining} core plugins`);
+}
+
+function doNuke(): void {
+  const home = getPluginHome();
+  if (!existsSync(home)) { console.log("nothing to nuke"); return; }
+  const dirs = readdirSync(home);
+  const ts = Date.now();
+
+  for (const d of dirs) {
+    const dir = join(home, d);
+    const stat = require("fs").lstatSync(dir);
+    if (!stat.isDirectory() && !stat.isSymbolicLink()) continue;
+    archiveToTmp(d, dir);
+    console.log(`  \x1b[31m✗\x1b[0m ${d}`);
+  }
+
+  console.log(`\n\x1b[31m💥\x1b[0m nuked — all plugins archived to /tmp/`);
+  console.log(`\x1b[90m   next maw run will auto-bootstrap core plugins\x1b[0m`);
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
