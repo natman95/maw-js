@@ -53,3 +53,49 @@ export { registerCommand, matchCommand, listCommands } from "../cli/command-regi
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 export { parseFlags } from "../cli/parse-args";
+
+// ─── definePlugin — the plugin contract ──────────────────────────────────────
+
+import type { InvokeContext, InvokeResult } from "../plugin/types";
+
+/** Plugin configuration — the type IS the interface */
+export interface PluginConfig {
+  /** Plugin name (must match plugin.json name) */
+  name: string;
+  /** The handler — one function, all surfaces (cli/api/peer) */
+  handler: (ctx: InvokeContext) => Promise<InvokeResult>;
+  /** Phase 0: GATE — return false to cancel event pipeline */
+  onGate?: (event: any) => boolean;
+  /** Phase 1: FILTER — modify event before handlers */
+  onFilter?: (event: any) => any;
+  /** Phase 2: HANDLE — observe/react to events */
+  onEvent?: (event: any) => void | Promise<void>;
+  /** Phase 3: LATE — guaranteed cleanup */
+  onLate?: (event: any) => void;
+  /** Called when plugin is first installed */
+  onInstall?: () => void | Promise<void>;
+  /** Called when plugin is removed */
+  onUninstall?: () => void | Promise<void>;
+}
+
+/**
+ * Define a maw-js plugin. Like Vue's defineComponent() — validates
+ * the shape, provides autocomplete, zero runtime overhead.
+ *
+ * ```ts
+ * import { definePlugin } from "maw/sdk";
+ *
+ * export default definePlugin({
+ *   name: "my-plugin",
+ *   handler(ctx) {
+ *     return { ok: true, output: "hello" };
+ *   },
+ *   onEvent(event) { console.log(event); },
+ * });
+ * ```
+ */
+export function definePlugin(config: PluginConfig): PluginConfig {
+  if (!config.name) throw new Error("definePlugin: name is required");
+  if (typeof config.handler !== "function") throw new Error("definePlugin: handler is required");
+  return config;
+}
