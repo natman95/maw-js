@@ -6,7 +6,7 @@ import { join } from "path";
 import { homedir } from "os";
 import { FLEET_DIR } from "../../../core/paths";
 import { cmdReunion } from "../reunion/impl";
-import { cmdSoulSync } from "../../shared/soul-sync";
+import { cmdSoulSync } from "../soul-sync/impl";
 import { takeSnapshot } from "../../../core/fleet/snapshot";
 
 export interface DoneOpts {

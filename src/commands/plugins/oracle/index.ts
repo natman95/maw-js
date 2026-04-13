@@ -1,5 +1,5 @@
 import type { InvokeContext, InvokeResult } from "../../../plugin/types";
-import { cmdOracleList, cmdOracleAbout, cmdOracleScan, cmdOracleFleet } from "../../shared/oracle";
+import { cmdOracleList, cmdOracleAbout, cmdOracleScan, cmdOracleFleet } from "./impl";
 import { parseFlags } from "../../../cli/parse-args";
 
 export const command = {

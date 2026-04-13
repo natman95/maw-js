@@ -1,8 +1,8 @@
 import { existsSync, readdirSync, copyFileSync, mkdirSync, appendFileSync } from "fs";
 import { join, basename } from "path";
-import { hostExec } from "../../core/transport/ssh";
-import { loadConfig } from "../../config";
-import { loadFleet, type FleetSession } from "./fleet-load";
+import { hostExec } from "../../../core/transport/ssh";
+import { loadConfig } from "../../../config";
+import { loadFleet, type FleetSession } from "../../shared/fleet-load";
 
 const SYNC_DIRS = ["memory/learnings", "memory/retrospectives", "memory/traces"];
 

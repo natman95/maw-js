@@ -1,7 +1,7 @@
 import { hostExec } from "../../../core/transport/ssh";
 import { loadConfig } from "../../../config";
 import { loadFleetEntries } from "../../shared/fleet-load";
-import { cmdSoulSync } from "../../shared/soul-sync";
+import { cmdSoulSync } from "../soul-sync/impl";
 import { cmdWake } from "../../shared/wake";
 import { parseWakeTarget, ensureCloned } from "../../shared/wake-target";
 import { FLEET_DIR } from "../../../core/paths";
@@ -314,7 +314,7 @@ Run \`/awaken\` for the full identity setup ceremony.
   if (opts.repo) {
     const localPsi = join(ghqRoot, opts.repo, "ψ", "memory");
     if (existsSync(localPsi)) {
-      const { syncDir } = await import("../../shared/soul-sync");
+      const { syncDir } = await import("../soul-sync/impl");
       for (const sub of ["learnings", "retrospectives", "traces"]) {
         const src = join(localPsi, sub);
         const dst = join(psiDir, "memory", sub);

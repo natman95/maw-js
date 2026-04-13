@@ -1,7 +1,7 @@
 import { hostExec } from "../../../core/transport/ssh";
 import { loadConfig } from "../../../config";
 import { loadFleetEntries } from "../../shared/fleet-load";
-import { cmdSoulSync } from "../../shared/soul-sync";
+import { cmdSoulSync } from "../soul-sync/impl";
 import { FLEET_DIR } from "../../../core/paths";
 import { join } from "path";
 import { existsSync, renameSync } from "fs";

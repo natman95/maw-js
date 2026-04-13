@@ -4,7 +4,7 @@ import type { InvokeContext } from "../../../plugin/types";
 
 const root = join(import.meta.dir, "../../..");
 
-mock.module(join(root, "commands/shared/oracle"), () => ({
+mock.module(join(root, "commands/plugins/oracle/impl"), () => ({
   cmdOracleAbout: async (oracle: string) => {
     console.log(`Oracle — ${oracle}`);
     console.log(`  Repo:      /home/neo/ghq/github.com/Soul-Brews-Studio/${oracle}-oracle`);

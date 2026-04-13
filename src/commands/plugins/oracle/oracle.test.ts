@@ -1,7 +1,7 @@
 import { describe, it, expect, mock, beforeEach } from "bun:test";
 import type { InvokeContext } from "../../../plugin/types";
 
-mock.module("../../shared/oracle", () => ({
+mock.module("./impl", () => ({
   cmdOracleList: async () => {
     console.log("Oracle Fleet  (1/2 awake)");
   },

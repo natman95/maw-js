@@ -1,5 +1,5 @@
 import type { InvokeContext, InvokeResult } from "../../../plugin/types";
-import { cmdTeamShutdown, cmdTeamList } from "../../shared/team";
+import { cmdTeamShutdown, cmdTeamList } from "./impl";
 
 export const command = {
   name: "team",
