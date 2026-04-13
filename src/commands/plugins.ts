@@ -14,6 +14,7 @@
 import { existsSync, mkdirSync, cpSync, renameSync, readFileSync } from "fs";
 import { join, resolve } from "path";
 import { homedir } from "os";
+import { execSync } from "child_process";
 import { discoverPackages } from "../plugin/registry";
 import { parseManifest } from "../plugin/manifest";
 import type { LoadedPlugin } from "../plugin/types";
@@ -135,7 +136,44 @@ function doInfo(name: string, discover: () => LoadedPlugin[]): void {
 }
 
 function doInstall(srcPath: string, force: boolean): void {
-  const src = resolve(srcPath);
+  let src: string;
+
+  // GitHub URL → clone via ghq, then install from local path
+  if (srcPath.startsWith("http") || srcPath.startsWith("github.com/")) {
+    const url = srcPath.startsWith("http") ? srcPath : `https://${srcPath}`;
+    console.log(`\x1b[36m⚡\x1b[0m cloning ${url}...`);
+    try {
+      execSync(`ghq get -u "${url}"`, { stdio: "pipe" });
+    } catch {
+      console.error(`failed to clone: ${url}`);
+      process.exit(1);
+    }
+    const ghqRoot = execSync("ghq root", { encoding: "utf-8" }).trim();
+    const repoPath = url.replace(/^https?:\/\//, "").replace(/\.git$/, "");
+    src = join(ghqRoot, repoPath);
+    if (!existsSync(src)) { console.error(`cloned but not found: ${src}`); process.exit(1); }
+
+    // Monorepo? List available plugins
+    const pkgDir = join(src, "packages");
+    if (existsSync(pkgDir)) {
+      const pkgs = require("fs").readdirSync(pkgDir)
+        .filter((d: string) => existsSync(join(pkgDir, d, "plugin.json")));
+      if (pkgs.length > 0) {
+        console.log(`\n  Found ${pkgs.length} plugins:\n`);
+        for (const pkg of pkgs) {
+          try {
+            const m = JSON.parse(readFileSync(join(pkgDir, pkg, "plugin.json"), "utf-8"));
+            console.log(`    ${pkg.padEnd(25)} ${m.name} v${m.version}`);
+          } catch { console.log(`    ${pkg}`); }
+        }
+        console.log(`\n  Install: maw plugin install ${pkgDir}/<name>`);
+        return;
+      }
+    }
+  } else {
+    src = resolve(srcPath);
+  }
+
   if (!existsSync(src)) {
     console.error(`path not found: ${src}`);
     process.exit(1);
