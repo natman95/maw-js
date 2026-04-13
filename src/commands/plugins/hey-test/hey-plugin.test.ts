@@ -31,10 +31,8 @@ mock.module("../../../plugin/registry", () => ({
   invokePlugin: async (_plugin: LoadedPlugin, _ctx: unknown) => fakeInvokeResult,
 }));
 
-mock.module("../../../config", () => ({ getEnvVars: () => ({}), buildCommand: () => "echo test", saveConfig: () => {}, validateConfig: (c: any) => c,
-  loadConfig: () => ({ node: "local-node", port: 3456 }),
-  cfgLimit: (_key: string) => 200,
-}));
+const { mockConfigModule } = await import("../../../../test/helpers/mock-config");
+mock.module("../../../config", () => mockConfigModule(() => ({ node: "local-node", port: 3456 })));
 
 mock.module("../../../core/transport/ssh", () => ({
   listSessions: async () => [],

@@ -4,13 +4,9 @@ import type { InvokeContext } from "../../../plugin/types";
 
 const root = join(import.meta.dir, "../../..");
 
-mock.module(join(root, "config"), () => ({
-  loadConfig: () => ({ host: "localhost", port: 3456, peers: [] }),
-  cfgTimeout: () => 2000,
-  getEnvVars: () => ({}),
-  buildCommand: () => "echo test",
-  saveConfig: () => {},
-}));
+// Use the shared mock helper to provide ALL config exports (Bun 1.3 mock leaks globally)
+const { mockConfigModule } = await import("../../../../test/helpers/mock-config");
+mock.module(join(root, "config"), () => mockConfigModule(() => ({ host: "localhost", port: 3456, peers: [] })));
 
 // Mock the health impl directly — do NOT mock child_process (leaks globally in Bun 1.3)
 mock.module("./impl", () => ({

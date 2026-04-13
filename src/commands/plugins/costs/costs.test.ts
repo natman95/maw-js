@@ -4,9 +4,8 @@ import type { InvokeContext } from "../../../plugin/types";
 
 const root = join(import.meta.dir, "../../..");
 
-mock.module(join(root, "config"), () => ({
-  loadConfig: () => ({ host: "localhost", port: 3456 }),
-}));
+const { mockConfigModule } = await import("../../../../test/helpers/mock-config");
+mock.module(join(root, "config"), () => mockConfigModule(() => ({ host: "localhost", port: 3456 })));
 
 const mockAgentData = {
   agents: [
