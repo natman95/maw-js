@@ -1,4 +1,4 @@
-import { Elysia, t } from "elysia";
+import { Elysia, t, error } from "elysia";
 import { listSessions, capture, sendKeys, selectWindow } from "../ssh";
 import { findWindow } from "../find-window";
 import { getAggregatedSessions, findPeerForTarget, sendKeysToPeer } from "../peers";

@@ -14,7 +14,7 @@
  *   Issues a localhost-only cookie on first request, verifies on subsequent calls.
  */
 
-import { Elysia, t } from "elysia";
+import { Elysia, t, error } from "elysia";
 import { randomBytes } from "crypto";
 import { loadConfig } from "../config";
 import { signHeaders } from "../lib/federation-auth";

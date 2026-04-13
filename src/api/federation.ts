@@ -1,4 +1,4 @@
-import { Elysia, t } from "elysia";
+import { Elysia, t, error } from "elysia";
 import { getFederationStatus } from "../peers";
 import { loadConfig } from "../config";
 import { listSnapshots, loadSnapshot, latestSnapshot } from "../snapshot";

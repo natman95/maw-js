@@ -7,7 +7,7 @@
  *   GET /api/avengers/traffic   -> traffic stats across accounts
  */
 
-import { Elysia } from "elysia";
+import { Elysia, error } from "elysia";
 import { loadConfig, type MawConfig } from "../config";
 
 export const avengersApi = new Elysia();

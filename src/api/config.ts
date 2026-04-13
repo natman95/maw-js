@@ -1,4 +1,4 @@
-import { Elysia, t } from "elysia";
+import { Elysia, t, error } from "elysia";
 import { readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync, existsSync } from "fs";
 import { join, basename } from "path";
 import { type MawConfig, loadConfig, saveConfig, configForDisplay } from "../config";

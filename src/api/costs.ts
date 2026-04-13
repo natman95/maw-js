@@ -1,4 +1,4 @@
-import { Elysia } from "elysia";
+import { Elysia, error } from "elysia";
 import { readdirSync, readFileSync, statSync } from "fs";
 import { join, basename } from "path";
 import { homedir } from "os";

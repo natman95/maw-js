@@ -9,7 +9,7 @@
  * PATCH /api/pulse/:id      -> update issue (labels, assignee, state)
  */
 
-import { Elysia, t } from "elysia";
+import { Elysia, t, error } from "elysia";
 import { hostExec } from "../ssh";
 import { loadConfig, type MawConfig } from "../config";
 

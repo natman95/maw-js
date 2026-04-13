@@ -1,4 +1,4 @@
-import { Elysia, t } from "elysia";
+import { Elysia, t, error } from "elysia";
 import { loadConfig } from "../config";
 
 const ORACLE_URL = process.env.ORACLE_URL || loadConfig().oracleUrl;

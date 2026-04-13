@@ -10,7 +10,7 @@
  * Storage: JSON files in ~/.config/maw/workspaces/
  */
 
-import { Elysia, t } from "elysia";
+import { Elysia, t, error } from "elysia";
 import { randomBytes, randomUUID, createHmac, timingSafeEqual } from "crypto";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
