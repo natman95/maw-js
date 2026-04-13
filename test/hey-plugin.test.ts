@@ -52,7 +52,7 @@ mock.module("../src/core/routing", () => ({
 mock.module("../src/core/runtime/hooks", () => ({ runHook: async () => {} }));
 mock.module("../src/core/transport/peers", () => ({ findPeerForTarget: async () => undefined }));
 mock.module("../src/core/fleet/worktrees", () => ({ scanWorktrees: async () => [] }));
-mock.module("../src/core/runtime/find-window", () => ({ findWindow: () => undefined }));
+// NOTE: do NOT mock find-window here — it leaks globally and breaks routing tests (#198)
 mock.module("../src/core/transport/curl-fetch", () => ({ curlFetch: async () => ({ ok: false, data: {} }) }));
 mock.module("../src/commands/shared/wake", () => ({ resolveFleetSession: () => undefined }));
 
