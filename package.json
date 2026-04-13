@@ -42,7 +42,7 @@
   },
   "exports": {
     ".": "./src/cli.ts",
-    "./sdk": "./src/sdk.ts",
+    "./sdk": "./src/sdk/index.ts",
     "./schemas": "./src/lib/schemas.ts"
   }
 }
