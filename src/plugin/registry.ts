@@ -75,11 +75,14 @@ export async function invokePlugin(
   plugin: LoadedPlugin,
   ctx: InvokeContext,
 ): Promise<InvokeResult> {
-  // Universal -v / --version flag — shows plugin name, version, source, surfaces
+  // Universal flags — every plugin gets these for free
   if (ctx.source === "cli") {
     const args = ctx.args as string[];
-    if (args[0] === "-v" || args[0] === "--version" || args[0] === "-version") {
-      const m = plugin.manifest;
+    const flag = args[0];
+    const m = plugin.manifest;
+
+    // -v / --version — show plugin metadata
+    if (flag === "-v" || flag === "--version" || flag === "-version") {
       const surfaces = [
         m.cli ? `cli:${m.cli.command}` : null,
         m.api ? `api:${m.api.path}` : null,
@@ -90,6 +93,29 @@ export async function invokePlugin(
         ok: true,
         output: `${m.name} v${m.version} (${plugin.kind}, weight:${m.weight ?? 50})\n  ${m.description || ""}\n  surfaces: ${surfaces}\n  dir: ${plugin.dir}`,
       };
+    }
+
+    // -h / --help — show usage + flags + surfaces
+    if (flag === "-h" || flag === "--help" || flag === "-help") {
+      const lines: string[] = [];
+      lines.push(`${m.name} v${m.version}`);
+      if (m.description) lines.push(`  ${m.description}`);
+      lines.push("");
+      if (m.cli?.help) lines.push(`  usage: ${m.cli.help}`);
+      else if (m.cli) lines.push(`  usage: maw ${m.cli.command}`);
+      if (m.cli?.aliases?.length) lines.push(`  aliases: ${m.cli.aliases.join(", ")}`);
+      if (m.cli?.flags) {
+        lines.push("  flags:");
+        for (const [k, v] of Object.entries(m.cli.flags)) lines.push(`    ${k.padEnd(20)} ${v}`);
+      }
+      lines.push("");
+      lines.push("  surfaces:");
+      if (m.cli) lines.push(`    cli: maw ${m.cli.command}`);
+      if (m.api) lines.push(`    api: ${m.api.methods.join("/")} ${m.api.path}`);
+      if (m.transport?.peer) lines.push(`    peer: maw hey plugin:${m.name}`);
+      if (m.hooks) lines.push(`    hooks: ${Object.keys(m.hooks).join(", ")}`);
+      lines.push(`\n  dir: ${plugin.dir}`);
+      return { ok: true, output: lines.join("\n") };
     }
   }
 
