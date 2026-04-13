@@ -63,6 +63,48 @@ if (cmd === "--version" || cmd === "-v" || cmd === "version") {
   } catch { /* ghq not available or link failed — non-fatal */ }
   let after = "";
   try { after = execSync(`maw --version`, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim(); } catch {}
+
+  // Update plugins from pluginSources
+  try {
+    const { loadConfig } = await import("./config");
+    const config = loadConfig();
+    const sources: string[] = config.pluginSources ?? [];
+    if (sources.length > 0) {
+      console.log(`\n  🔌 updating ${sources.length} plugin source(s)...`);
+      const pluginDir = join(homedir(), ".maw", "plugins");
+      const { existsSync: ex, readdirSync: rd, cpSync: cp, readFileSync: rf } = require("fs");
+      const { mkdirSync: mk } = require("fs");
+      mk(pluginDir, { recursive: true });
+      for (const url of sources) {
+        try {
+          execSync(`ghq get -u "${url}"`, { stdio: "pipe" });
+          const ghqRoot = execSync("ghq root", { encoding: "utf-8" }).trim();
+          const repoPath = url.replace(/^https?:\/\//, "").replace(/\.git$/, "");
+          const src = join(ghqRoot, repoPath);
+          const pkgDir = join(src, "packages");
+          if (ex(pkgDir)) {
+            let count = 0;
+            for (const pkg of rd(pkgDir)) {
+              if (ex(join(pkgDir, pkg, "plugin.json"))) {
+                const dest = join(pluginDir, pkg);
+                cp(join(pkgDir, pkg), dest, { recursive: true });
+                count++;
+              }
+            }
+            const repoName = url.split("/").pop();
+            console.log(`  ✓ ${repoName}: ${count} plugins updated`);
+          } else if (ex(join(src, "plugin.json"))) {
+            const m = JSON.parse(rf(join(src, "plugin.json"), "utf-8"));
+            cp(src, join(pluginDir, m.name), { recursive: true });
+            console.log(`  ✓ ${m.name} updated`);
+          }
+        } catch (e: any) {
+          console.log(`  ✗ ${url}: ${e.message?.slice(0, 60)}`);
+        }
+      }
+    }
+  } catch {}
+
   console.log(`\n  ✅ done`);
   if (after) console.log(`  to:   ${after}\n`);
   else console.log("");
