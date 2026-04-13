@@ -20,7 +20,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Run tests
-        run: bun test
+        run: bun test test/ src/commands/plugins/
 
       - name: Build CLI
         run: bun build --target=bun src/cli.ts
