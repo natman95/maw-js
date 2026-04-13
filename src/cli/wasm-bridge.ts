@@ -78,7 +78,9 @@ export type WasmBridge = ReturnType<typeof buildImportObject>;
 export function buildImportObject(
   getMemory: () => WebAssembly.Memory,
   getAlloc: () => (size: number) => number,
+  opts?: { memoryMaxPages?: number },
 ) {
+  const maxPages = opts?.memoryMaxPages ?? 256; // default 16MB
   let cachedIdentity: string | null = null;
   let cachedFederation: string | null = null;
 
@@ -158,7 +160,14 @@ export function buildImportObject(
         const mem = getMemory();
         const currentPages = mem.buffer.byteLength / 65_536;
         const needed = Math.ceil(size / 65_536);
-        if (needed > 0) mem.grow(needed);
+        if (needed > 0) {
+          if (currentPages + needed > maxPages) {
+            throw new Error(
+              `[wasm-safety] maw_alloc denied: ${currentPages + needed} pages would exceed ${maxPages}-page limit (${maxPages * 64}KB)`,
+            );
+          }
+          mem.grow(needed);
+        }
         return currentPages * 65_536;
       },
     },

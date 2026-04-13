@@ -21,6 +21,10 @@ import {
   type WasmBridge,
 } from "./wasm-bridge";
 
+/* ─── WASM Safety Constants ─── */
+const WASM_MEMORY_MAX_PAGES = 256;       // 16MB max (256 * 64KB)
+const WASM_COMMAND_TIMEOUT_MS = 5_000;   // 5s limit for commands
+
 export interface CommandDescriptor {
   name: string | string[];
   description: string;
@@ -97,12 +101,29 @@ async function loadWasmCommand(path: string, filename: string, scope: "builtin" 
   const bridge = buildImportObject(
     () => wasmMemory,
     () => wasmAlloc,
+    { memoryMaxPages: WASM_MEMORY_MAX_PAGES },
   );
 
-  const instance = new WebAssembly.Instance(mod, bridge);
+  let instance: WebAssembly.Instance;
+  try {
+    instance = new WebAssembly.Instance(mod, bridge);
+  } catch (err: any) {
+    console.error(`[commands] wasm instantiation failed: ${filename}: ${err.message?.slice(0, 120)}`);
+    return;
+  }
+
   wasmMemory = instance.exports.memory as WebAssembly.Memory;
   wasmAlloc = (instance.exports.maw_alloc as (size: number) => number)
     ?? bridge.env.maw_alloc; // fallback to host-side bump allocator
+
+  // Validate exported memory against safety limit
+  const memoryPages = wasmMemory.buffer.byteLength / 65_536;
+  if (memoryPages > WASM_MEMORY_MAX_PAGES) {
+    console.error(
+      `[commands] wasm rejected: ${filename} — initial memory (${memoryPages} pages) exceeds ${WASM_MEMORY_MAX_PAGES}-page limit`,
+    );
+    return;
+  }
 
   const handle = instance.exports.handle as (ptr: number, len: number) => number;
 
@@ -120,7 +141,7 @@ async function loadWasmCommand(path: string, filename: string, scope: "builtin" 
 
   // Store the instance for execution
   wasmInstances.set(path, { handle, memory: wasmMemory, instance, bridge });
-  console.log(`[commands] loaded wasm: ${filename} (host functions: enabled)`);
+  console.log(`[commands] loaded wasm: ${filename} (memory: ${memoryPages}/${WASM_MEMORY_MAX_PAGES} pages)`);
 }
 
 /** Execute a matched command — lazy import + parseFlags + call handler */
@@ -129,33 +150,63 @@ export async function executeCommand(desc: CommandDescriptor, remaining: string[
     const wasm = wasmInstances.get(desc.path!);
     if (!wasm) { console.error(`[commands] WASM instance not found: ${desc.path}`); return; }
 
-    // Pre-cache identity + federation so sync host functions return real data
-    await preCacheBridge(wasm.bridge);
+    const t0 = performance.now();
+    try {
+      // Pre-cache identity + federation so sync host functions return real data
+      await preCacheBridge(wasm.bridge);
 
-    // Write args as JSON to shared memory via allocator
-    const json = JSON.stringify(remaining);
-    const bytes = textEncoder.encode(json);
-    const argPtr = (wasm.instance.exports.maw_alloc as Function)?.(bytes.length)
-      ?? 0; // fallback: write at offset 0 for legacy modules
-    new Uint8Array(wasm.memory.buffer).set(bytes, argPtr);
+      // Validate memory hasn't grown beyond limit between calls
+      if (wasm.memory.buffer.byteLength > WASM_MEMORY_MAX_PAGES * 65_536) {
+        console.error(`[commands] WASM memory exceeded ${WASM_MEMORY_MAX_PAGES}-page limit — refusing to execute`);
+        wasmInstances.delete(desc.path!);
+        return;
+      }
 
-    // Call handle(ptr, len)
-    const resultPtr = wasm.handle(argPtr, bytes.length);
+      // Write args as JSON to shared memory via allocator
+      const json = JSON.stringify(remaining);
+      const bytes = textEncoder.encode(json);
+      const argPtr = (wasm.instance.exports.maw_alloc as Function)?.(bytes.length)
+        ?? 0; // fallback: write at offset 0 for legacy modules
+      new Uint8Array(wasm.memory.buffer).set(bytes, argPtr);
 
-    // Read result: if module uses length-prefixed protocol, read len from first 4 bytes
-    if (resultPtr > 0) {
-      const view = new DataView(wasm.memory.buffer);
-      const len = view.getUint32(resultPtr, true);
-      if (len > 0 && len < 1_000_000) {
-        const result = readString(wasm.memory, resultPtr + 4, len);
-        if (result) console.log(result);
+      // Call handle(ptr, len)
+      const resultPtr = wasm.handle(argPtr, bytes.length);
+
+      // Read result: if module uses length-prefixed protocol, read len from first 4 bytes
+      if (resultPtr > 0) {
+        const view = new DataView(wasm.memory.buffer);
+        const len = view.getUint32(resultPtr, true);
+        if (len > 0 && len < 1_000_000) {
+          const result = readString(wasm.memory, resultPtr + 4, len);
+          if (result) console.log(result);
+        } else {
+          // Fallback: null-terminated string (legacy modules)
+          const raw = new Uint8Array(wasm.memory.buffer);
+          let end = resultPtr;
+          while (end < raw.length && raw[end] !== 0) end++;
+          const result = textDecoder.decode(raw.slice(resultPtr, end));
+          if (result) console.log(result);
+        }
+      }
+    } catch (err: any) {
+      const msg = err.message || String(err);
+      if (msg.includes("unreachable") || msg.includes("RuntimeError")) {
+        console.error(`[commands] WASM trap in "${desc.name}": ${msg}`);
+      } else if (msg.includes("out of bounds") || msg.includes("memory")) {
+        console.error(`[commands] WASM memory error in "${desc.name}": ${msg}`);
+      } else if (msg.includes("wasm-safety")) {
+        console.error(`[commands] WASM safety limit in "${desc.name}": ${msg}`);
       } else {
-        // Fallback: null-terminated string (legacy modules)
-        const raw = new Uint8Array(wasm.memory.buffer);
-        let end = resultPtr;
-        while (end < raw.length && raw[end] !== 0) end++;
-        const result = textDecoder.decode(raw.slice(resultPtr, end));
-        if (result) console.log(result);
+        console.error(`[commands] WASM error in "${desc.name}": ${msg}`);
+      }
+      // Invalidate instance — state may be corrupted after a trap
+      wasmInstances.delete(desc.path!);
+    } finally {
+      const elapsed = performance.now() - t0;
+      if (elapsed > WASM_COMMAND_TIMEOUT_MS) {
+        console.warn(
+          `[commands] WASM "${desc.name}" took ${(elapsed / 1000).toFixed(1)}s (limit: ${WASM_COMMAND_TIMEOUT_MS / 1000}s)`,
+        );
       }
     }
     return;

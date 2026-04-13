@@ -261,21 +261,42 @@ async function loadWasmPlugin(system: PluginSystem, path: string, filename: stri
 
   // Check for handle + memory pattern (shared memory plugin)
   if (exportNames.includes("handle") && exportNames.includes("memory")) {
-    const instance = new WebAssembly.Instance(mod);
+    const PLUGIN_MEMORY_MAX_PAGES = 256; // 16MB
+    let instance: WebAssembly.Instance;
+    try {
+      instance = new WebAssembly.Instance(mod);
+    } catch (err: any) {
+      console.error(`[plugin] wasm instantiation failed: ${filename}: ${err.message?.slice(0, 120)}`);
+      return;
+    }
     const memory = instance.exports.memory as WebAssembly.Memory;
     const handle = instance.exports.handle as (ptr: number, len: number) => void;
     const encoder = new TextEncoder();
 
+    // Validate initial memory
+    const memPages = memory.buffer.byteLength / 65_536;
+    if (memPages > PLUGIN_MEMORY_MAX_PAGES) {
+      console.error(`[plugin] wasm rejected: ${filename} — memory (${memPages} pages) exceeds limit`);
+      return;
+    }
+
     system.load((hooks) => {
       hooks.on("*", (event) => {
-        const json = encoder.encode(JSON.stringify(event));
-        const buf = new Uint8Array(memory.buffer);
-        buf.set(json, 0);
-        handle(0, json.length);
+        try {
+          if (memory.buffer.byteLength > PLUGIN_MEMORY_MAX_PAGES * 65_536) return;
+          const json = encoder.encode(JSON.stringify(event));
+          if (json.length > memory.buffer.byteLength) return;
+          const buf = new Uint8Array(memory.buffer);
+          buf.set(json, 0);
+          handle(0, json.length);
+        } catch (err: any) {
+          const msg = err.message || String(err);
+          console.error(`[plugin] wasm trap in ${filename}: ${msg.slice(0, 120)}`);
+        }
       });
     }, source);
     system.register(filename, "wasm-shared", source);
-    console.log(`[plugin] loaded wasm: ${filename} (shared memory)`);
+    console.log(`[plugin] loaded wasm: ${filename} (shared memory, max: ${PLUGIN_MEMORY_MAX_PAGES} pages)`);
     return;
   }
 
