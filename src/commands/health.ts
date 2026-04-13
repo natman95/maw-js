@@ -1,7 +1,7 @@
 import { execSync } from "child_process";
 import { loadConfig, cfgTimeout } from "../config";
-import { curlFetch } from "../curl-fetch";
-import { tmux } from "../tmux";
+import { curlFetch } from "../core/curl-fetch";
+import { tmux } from "../core/tmux";
 
 export async function cmdHealth() {
   const checks: { name: string; status: string; detail: string }[] = [];

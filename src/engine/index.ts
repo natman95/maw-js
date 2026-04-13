@@ -1,14 +1,14 @@
-import { tmux } from "../tmux";
-import { registerBuiltinHandlers } from "../handlers";
+import { tmux } from "../core/tmux";
+import { registerBuiltinHandlers } from "../core/handlers";
 import { pushCapture, pushPreviews, broadcastSessions, sendBusyAgents } from "./capture";
 import { StatusDetector } from "./status";
 import { broadcastTeams } from "./teams";
-import { getAggregatedSessions, getPeers } from "../peers";
+import { getAggregatedSessions, getPeers } from "../core/peers";
 import { loadConfig, buildCommand, cfgInterval, cfgLimit } from "../config";
 import type { FeedEvent } from "../lib/feed";
-import type { MawWS, Handler } from "../types";
-import type { Session } from "../ssh";
-import type { TransportRouter } from "../transport";
+import type { MawWS, Handler } from "../core/types";
+import type { Session } from "../core/ssh";
+import type { TransportRouter } from "../core/transport";
 
 type SessionInfo = { name: string; windows: { index: number; name: string; active: boolean }[] };
 
@@ -61,7 +61,7 @@ export class MawEngine {
   setTransportRouter(router: TransportRouter) {
     this.transportRouter = router;
     router.onMessage(async (msg) => {
-      const { findWindow, sendKeys, listSessions } = await import("../ssh");
+      const { findWindow, sendKeys, listSessions } = await import("../core/ssh");
       // Use cached sessions if available, otherwise fetch fresh
       const sessions = this.sessionCache.sessions.length > 0
         ? this.sessionCache.sessions

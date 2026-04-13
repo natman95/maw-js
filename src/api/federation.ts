@@ -1,12 +1,12 @@
 import { Elysia, t} from "elysia";
-import { getFederationStatus } from "../peers";
+import { getFederationStatus } from "../core/peers";
 import { loadConfig } from "../config";
-import { listSnapshots, loadSnapshot, latestSnapshot } from "../snapshot";
+import { listSnapshots, loadSnapshot, latestSnapshot } from "../core/snapshot";
 import { hostedAgents } from "../commands/federation-sync";
 import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { FLEET_DIR } from "../paths";
+import { FLEET_DIR } from "../core/paths";
 
 // Re-export so existing importers (and any future code) can still reach
 // hostedAgents via the API module. The canonical home is federation-sync.ts.

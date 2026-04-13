@@ -1,5 +1,5 @@
-import { tmux } from "../tmux";
-import { hostExec } from "../ssh";
+import { tmux } from "../core/tmux";
+import { hostExec } from "../core/ssh";
 import { mkdirSync, writeFileSync, readFileSync, readdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";

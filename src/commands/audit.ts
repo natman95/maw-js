@@ -1,4 +1,4 @@
-import { readAudit } from "../audit";
+import { readAudit } from "../core/audit";
 
 export async function cmdAudit(count = 20) {
   const lines = readAudit(count);

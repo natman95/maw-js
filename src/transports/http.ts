@@ -5,12 +5,12 @@
  * This is the last resort when MQTT is unavailable.
  */
 
-import { sendKeysToPeer, getAggregatedSessions } from "../peers";
+import { sendKeysToPeer, getAggregatedSessions } from "../core/peers";
 import { cfgTimeout } from "../config";
-import { listSessions } from "../ssh";
-import { findWindow } from "../find-window";
-import { curlFetch } from "../curl-fetch";
-import type { Transport, TransportTarget, TransportMessage, TransportPresence } from "../transport";
+import { listSessions } from "../core/ssh";
+import { findWindow } from "../core/find-window";
+import { curlFetch } from "../core/curl-fetch";
+import type { Transport, TransportTarget, TransportMessage, TransportPresence } from "../core/transport";
 import type { FeedEvent } from "../lib/feed";
 
 export interface HttpTransportConfig {

@@ -2,15 +2,11 @@
 process.env.MAW_CLI = "1";
 
 import { cmdPeek, cmdSend } from "./commands/comm";
-import { logAudit } from "./audit";
+import { logAudit } from "./core/audit";
 import { usage } from "./cli/usage";
 import { routeComm } from "./cli/route-comm";
-import { routeAgent } from "./cli/route-agent";
-import { routeFleet } from "./cli/route-fleet";
-import { routeWorkspace } from "./cli/route-workspace";
 import { routeTools } from "./cli/route-tools";
-import { routeTeam } from "./cli/route-team";
-import { scanCommands, matchCommand, executeCommand, listCommands } from "./cli/command-registry";
+import { scanCommands, matchCommand, executeCommand } from "./cli/command-registry";
 import { join } from "path";
 import { homedir } from "os";
 
@@ -64,6 +60,29 @@ if (cmd === "--version" || cmd === "-v" || cmd === "version") {
   let after = "";
   try { after = execSync(`maw --version`, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim(); } catch {}
 
+  // Refresh bundled plugin symlinks (point to new install)
+  try {
+    const pluginDir = join(homedir(), ".maw", "plugins");
+    const { existsSync: ex, readdirSync: rd, cpSync: cp, readFileSync: rf, lstatSync: ls, unlinkSync: ul, symlinkSync: sl } = require("fs");
+    const { mkdirSync: mk } = require("fs");
+    mk(pluginDir, { recursive: true });
+    const mawBin = execSync("which maw", { encoding: "utf-8" }).trim();
+    const mawSrc = require("path").dirname(require("fs").realpathSync(mawBin));
+    const bundled = join(mawSrc, "commands", "plugins");
+    if (ex(bundled)) {
+      let refreshed = 0;
+      for (const d of rd(bundled)) {
+        if (ex(join(bundled, d, "plugin.json")) || ex(join(bundled, d, "index.ts"))) {
+          const dest = join(pluginDir, d);
+          // Replace old symlink or missing entry
+          try { if (ls(dest).isSymbolicLink()) ul(dest); } catch {}
+          if (!ex(dest)) { sl(join(bundled, d), dest); refreshed++; }
+        }
+      }
+      if (refreshed > 0) console.log(`\n  🔗 ${refreshed} bundled plugins re-linked`);
+    }
+  } catch {}
+
   // Update plugins from pluginSources (read config file directly — module path may be stale after reinstall)
   try {
     const configPath = join(homedir(), ".config", "maw", "maw.config.json");
@@ -73,9 +92,6 @@ if (cmd === "--version" || cmd === "-v" || cmd === "version") {
     if (sources.length > 0) {
       console.log(`\n  🔌 updating ${sources.length} plugin source(s)...`);
       const pluginDir = join(homedir(), ".maw", "plugins");
-      const { existsSync: ex, readdirSync: rd, cpSync: cp, readFileSync: rf } = require("fs");
-      const { mkdirSync: mk } = require("fs");
-      mk(pluginDir, { recursive: true });
       for (const url of sources) {
         try {
           execSync(`ghq get -u "${url}"`, { stdio: "pipe" });
@@ -110,18 +126,18 @@ if (cmd === "--version" || cmd === "-v" || cmd === "version") {
   if (after) console.log(`  to:   ${after}\n`);
   else console.log("");
 } else {
-  // Auto-bootstrap: if ~/.maw/plugins/ is empty, copy bundled + install from pluginSources
+  // Auto-bootstrap: if ~/.maw/plugins/ is empty, symlink bundled + install from pluginSources
   const pluginDir = join(homedir(), ".maw", "plugins");
-  const { mkdirSync, existsSync, readdirSync, cpSync, writeFileSync, readFileSync } = require("fs");
+  const { mkdirSync, existsSync, readdirSync, cpSync, writeFileSync, readFileSync, symlinkSync, lstatSync, unlinkSync } = require("fs");
   const { execSync } = require("child_process");
   mkdirSync(pluginDir, { recursive: true });
   if (readdirSync(pluginDir).length === 0) {
-    // 1. Copy bundled plugins
+    // 1. Symlink bundled plugins (symlinks preserve relative imports)
     const bundled = join(import.meta.dir, "commands", "plugins");
     if (existsSync(bundled)) {
       for (const d of readdirSync(bundled)) {
         if (existsSync(join(bundled, d, "plugin.json")) || existsSync(join(bundled, d, "index.ts"))) {
-          cpSync(join(bundled, d), join(pluginDir, d), { recursive: true });
+          symlinkSync(join(bundled, d), join(pluginDir, d));
         }
       }
     }
@@ -166,12 +182,9 @@ if (cmd === "--version" || cmd === "-v" || cmd === "version") {
     usage();
   } else {
 
+  // Core routes: hey (transport) + plugin management + serve
   const handled =
     await routeComm(cmd, args) ||
-    await routeTeam(cmd, args) ||
-    await routeAgent(cmd, args) ||
-    await routeFleet(cmd, args) ||
-    await routeWorkspace(cmd, args) ||
     await routeTools(cmd, args);
 
   if (!handled) {

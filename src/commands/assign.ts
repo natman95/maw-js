@@ -1,4 +1,4 @@
-import { hostExec } from "../ssh";
+import { hostExec } from "../core/ssh";
 import { cmdWake, fetchIssuePrompt } from "./wake";
 
 function parseIssueUrl(url: string): { org: string; repo: string; issueNum: number } {

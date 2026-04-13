@@ -1,8 +1,8 @@
-import { hostExec } from "../ssh";
-import { tmux } from "../tmux";
+import { hostExec } from "../core/ssh";
+import { tmux } from "../core/tmux";
 import { buildCommand, buildCommandInDir, cfgTimeout, loadConfig, saveConfig } from "../config";
-import { restoreTabOrder } from "../tab-order";
-import { takeSnapshot } from "../snapshot";
+import { restoreTabOrder } from "../core/tab-order";
+import { takeSnapshot } from "../core/snapshot";
 import { execSync } from "child_process";
 
 /** Attach to tmux session — switch-client if inside tmux, attach if fresh shell */

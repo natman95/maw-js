@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { execSync } from "child_process";
-import { CONFIG_FILE } from "./paths";
+import { CONFIG_FILE } from "./core/paths";
 import { refreshContext } from "./lib/context";
 
 function detectGhqRoot(): string {

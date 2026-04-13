@@ -1,4 +1,4 @@
-import { tmux } from "../tmux";
+import { tmux } from "../core/tmux";
 import { loadConfig } from "../config";
 
 export interface AgentRow {

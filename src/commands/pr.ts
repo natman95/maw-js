@@ -1,4 +1,4 @@
-import { hostExec } from "../ssh";
+import { hostExec } from "../core/ssh";
 
 function branchToTitle(branch: string): string {
   // Strip prefix like "agents/" or "feature/"

@@ -36,7 +36,7 @@ mock.module("../src/config", () => ({
   cfgLimit: (_key: string) => 200,
 }));
 
-mock.module("../src/ssh", () => ({
+mock.module("../src/core/ssh", () => ({
   listSessions: async () => [],
   capture: async () => "",
   sendKeys: async () => {},
@@ -45,15 +45,15 @@ mock.module("../src/ssh", () => ({
   getPaneInfos: async () => ({}),
 }));
 
-mock.module("../src/routing", () => ({
+mock.module("../src/core/routing", () => ({
   resolveTarget: () => ({ type: "error", detail: "not found", hint: "" }),
 }));
 
-mock.module("../src/hooks", () => ({ runHook: async () => {} }));
-mock.module("../src/peers", () => ({ findPeerForTarget: async () => undefined }));
-mock.module("../src/worktrees", () => ({ scanWorktrees: async () => [] }));
-mock.module("../src/find-window", () => ({ findWindow: () => undefined }));
-mock.module("../src/curl-fetch", () => ({ curlFetch: async () => ({ ok: false, data: {} }) }));
+mock.module("../src/core/hooks", () => ({ runHook: async () => {} }));
+mock.module("../src/core/peers", () => ({ findPeerForTarget: async () => undefined }));
+mock.module("../src/core/worktrees", () => ({ scanWorktrees: async () => [] }));
+mock.module("../src/core/find-window", () => ({ findWindow: () => undefined }));
+mock.module("../src/core/curl-fetch", () => ({ curlFetch: async () => ({ ok: false, data: {} }) }));
 mock.module("../src/commands/wake", () => ({ resolveFleetSession: () => undefined }));
 
 import { cmdSend } from "../src/commands/comm";

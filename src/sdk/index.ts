@@ -24,12 +24,12 @@ export type { MawConfig } from "../config";
 
 // ─── Transport ───────────────────────────────────────────────────────────────
 
-export { tmux } from "../tmux";
-export { hostExec } from "../ssh";
-export { resolveTarget } from "../routing";
-export type { ResolveResult } from "../routing";
-export { findWindow } from "../find-window";
-export type { Session, Window } from "../find-window";
+export { tmux } from "../core/tmux";
+export { hostExec } from "../core/ssh";
+export { resolveTarget } from "../core/routing";
+export type { ResolveResult } from "../core/routing";
+export { findWindow } from "../core/find-window";
+export type { Session, Window } from "../core/find-window";
 
 // ─── Artifacts ───────────────────────────────────────────────────────────────
 

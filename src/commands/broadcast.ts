@@ -1,4 +1,4 @@
-import { tmux } from "../tmux";
+import { tmux } from "../core/tmux";
 
 /**
  * maw broadcast <message> — send to ALL Claude windows across ALL sessions

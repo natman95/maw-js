@@ -6,7 +6,7 @@
  * with re-exported getEnvVars from config.ts).
  */
 
-import { hostExec } from "../ssh";
+import { hostExec } from "../core/ssh";
 
 // --- URL/slug detection ---------------------------------------------------
 

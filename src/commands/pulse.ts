@@ -1,4 +1,4 @@
-import { hostExec } from "../ssh";
+import { hostExec } from "../core/ssh";
 import { cmdWake } from "./wake";
 
 const THAI_DAYS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];

@@ -1,10 +1,10 @@
 import { Elysia, t} from "elysia";
-import { listSessions, capture, sendKeys, selectWindow } from "../ssh";
-import { findWindow } from "../find-window";
-import { getAggregatedSessions, findPeerForTarget, sendKeysToPeer } from "../peers";
+import { listSessions, capture, sendKeys, selectWindow } from "../core/ssh";
+import { findWindow } from "../core/find-window";
+import { getAggregatedSessions, findPeerForTarget, sendKeysToPeer } from "../core/peers";
 import { loadConfig } from "../config";
-import { curlFetch } from "../curl-fetch";
-import { resolveTarget } from "../routing";
+import { curlFetch } from "../core/curl-fetch";
+import { resolveTarget } from "../core/routing";
 import { processMirror } from "../commands/overview";
 import { resolveFleetSession } from "../commands/wake";
 import { WakeBody, SleepBody, SendBody } from "../lib/schemas";

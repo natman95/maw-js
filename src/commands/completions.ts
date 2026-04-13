@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from "fs";
 import { join, dirname } from "path";
-import { FLEET_DIR } from "../paths";
+import { FLEET_DIR } from "../core/paths";
 
 // Auto-discover commands from src/commands/*.ts
 // No manual list — add a file, it shows up in completions

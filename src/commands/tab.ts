@@ -1,5 +1,5 @@
-import { hostExec } from "../ssh";
-import { tmux, tmuxCmd } from "../tmux";
+import { hostExec } from "../core/ssh";
+import { tmux, tmuxCmd } from "../core/tmux";
 import { cmdPeek, cmdSend } from "./comm";
 import { cmdTalkTo } from "./talk-to";
 

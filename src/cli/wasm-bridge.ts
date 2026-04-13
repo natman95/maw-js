@@ -18,7 +18,7 @@
  *   WASM should export: memory + maw_alloc(size) → ptr
  */
 
-import { maw } from "../sdk";
+import { maw } from "../core/sdk";
 
 // ---------------------------------------------------------------------------
 // Text codec singletons

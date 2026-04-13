@@ -1,8 +1,8 @@
-import { listSessions, hostExec } from "../ssh";
+import { listSessions, hostExec } from "../core/ssh";
 import { loadFleetEntries } from "./fleet-load";
 import { join } from "path";
 import { loadConfig } from "../config";
-import { FLEET_DIR } from "../paths";
+import { FLEET_DIR } from "../core/paths";
 import { readdirSync as readDir } from "fs";
 
 /**

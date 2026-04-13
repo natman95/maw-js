@@ -21,7 +21,7 @@
 
 import { loadConfig, cfgTimeout } from "../config";
 import type { MawConfig, PeerConfig } from "../config";
-import { curlFetch } from "../curl-fetch";
+import { curlFetch } from "../core/curl-fetch";
 
 // ---------- Pure identity helpers ----------
 

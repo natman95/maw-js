@@ -5,9 +5,9 @@
  * This is always the first transport tried for local targets.
  */
 
-import { sendKeys, listSessions } from "../ssh";
-import { findWindow } from "../find-window";
-import type { Transport, TransportTarget, TransportMessage, TransportPresence } from "../transport";
+import { sendKeys, listSessions } from "../core/ssh";
+import { findWindow } from "../core/find-window";
+import type { Transport, TransportTarget, TransportMessage, TransportPresence } from "../core/transport";
 import type { FeedEvent } from "../lib/feed";
 
 export class TmuxTransport implements Transport {

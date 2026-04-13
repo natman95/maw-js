@@ -1,9 +1,9 @@
-import { listSessions, hostExec, capture } from "../ssh";
+import { listSessions, hostExec, capture } from "../core/ssh";
 import { findWorktrees, detectSession, resolveFleetSession } from "./wake";
 import { readdirSync, readFileSync } from "fs";
 import { join } from "path";
-import { FLEET_DIR } from "../paths";
-import { scanAndCache, scanFull, scanRemote, readCache, isCacheStale, type OracleEntry } from "../oracle-registry";
+import { FLEET_DIR } from "../core/paths";
+import { scanAndCache, scanFull, scanRemote, readCache, isCacheStale, type OracleEntry } from "../core/oracle-registry";
 
 /** Like resolveOracle but returns null instead of process.exit */
 async function resolveOracleSafe(oracle: string): Promise<{ repoPath: string; repoName: string; parentDir: string } | { parentDir: ""; repoName: ""; repoPath: "" }> {
