@@ -168,6 +168,14 @@ export async function routeTools(cmd: string, args: string[]): Promise<boolean> 
     }
     return true;
   }
+  if (cmd === "artifacts" || cmd === "artifact") {
+    const { cmdArtifacts } = await import("../commands/artifacts");
+    const { parseFlags } = await import("./parse-args");
+    const sub = args[1] ?? "ls";
+    const flags = parseFlags(args, { "--json": Boolean }, 2);
+    await cmdArtifacts(sub, args.slice(2), flags);
+    return true;
+  }
   if (cmd === "agents" || cmd === "agent") {
     const { cmdAgents } = await import("../commands/agents");
     const { parseFlags } = await import("./parse-args");
