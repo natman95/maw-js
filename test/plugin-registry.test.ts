@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from "bun:test";
 import { registerCommand, matchCommand, listCommands, scanCommands, executeCommand } from "../src/cli/command-registry";
+import { buildImportObject, readString, writeString } from "../src/cli/wasm-bridge";
 import { mkdtempSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
@@ -267,6 +268,117 @@ describe("executeCommand", () => {
     expect((globalThis as any).__testExecArgs).toEqual(["hello", "world"]);
     delete (globalThis as any).__testExecArgs;
     rmSync(dir, { recursive: true });
+  });
+});
+
+// --- WASM bridge host functions ---
+
+describe("wasm-bridge host functions", () => {
+  /** Shared helper: create a fresh memory + simple bump allocator */
+  function makeMemAndAlloc(initialPages = 1) {
+    const mem = new WebAssembly.Memory({ initial: initialPages });
+    let nextPtr = 256; // leave first 256 bytes as guard space
+    const alloc = (size: number) => { const p = nextPtr; nextPtr += size; return p; };
+    return { mem, alloc };
+  }
+
+  test("buildImportObject env contains all required host functions", () => {
+    const { mem, alloc } = makeMemAndAlloc();
+    const bridge = buildImportObject(() => mem, () => alloc);
+    const expected = [
+      "maw_print", "maw_print_err", "maw_log",
+      "maw_identity", "maw_federation",
+      "maw_send", "maw_fetch", "maw_async_result", "maw_alloc",
+    ];
+    for (const fn of expected) {
+      expect(typeof (bridge.env as Record<string, unknown>)[fn]).toBe("function");
+    }
+  });
+
+  test("maw_alloc throws when allocation would exceed maxPages limit", () => {
+    const { mem, alloc } = makeMemAndAlloc(1);
+    // maxPages = 1 means we can never grow beyond the initial 1 page
+    const bridge = buildImportObject(() => mem, () => alloc, { memoryMaxPages: 1 });
+    // Allocating 65_537 bytes needs ceil(65537/65536) = 2 extra pages → exceeds limit
+    expect(() => bridge.env.maw_alloc(65_537)).toThrow("[wasm-safety]");
+  });
+
+  test("maw_alloc succeeds and returns current byte offset when within page limit", () => {
+    const { mem, alloc } = makeMemAndAlloc(1);
+    // maxPages = 2 — we have 1 page now, can grow 1 more
+    const bridge = buildImportObject(() => mem, () => alloc, { memoryMaxPages: 2 });
+    // currentPages=1, needed=1, 1+1=2 ≤ 2 — should succeed, returns ptr at start of old last page
+    const ptr = bridge.env.maw_alloc(65_536);
+    expect(typeof ptr).toBe("number");
+    expect(ptr).toBeGreaterThanOrEqual(0);
+  });
+
+  test("WebAssembly.instantiate rejects an invalid WASM binary gracefully", async () => {
+    // Bytes that do not start with the WASM magic (\0asm)
+    const invalid = new Uint8Array([0xff, 0xfe, 0x00, 0x00]);
+    await expect(WebAssembly.instantiate(invalid)).rejects.toThrow();
+  });
+
+  test("maw_async_result returns 0 for an id that has no result yet (simulates timeout pending)", () => {
+    const { mem, alloc } = makeMemAndAlloc();
+    const bridge = buildImportObject(() => mem, () => alloc);
+    // No fetch has been initiated — result for any id is 0
+    expect(bridge.env.maw_async_result(99_999)).toBe(0);
+  });
+
+  test("maw_fetch returns a positive integer id synchronously (fire-and-forget)", () => {
+    const { mem, alloc } = makeMemAndAlloc();
+    const bridge = buildImportObject(() => mem, () => alloc);
+    // Write a dummy URL into memory so maw_fetch can read it
+    const urlBytes = new TextEncoder().encode("http://localhost:0/nonexistent");
+    new Uint8Array(mem.buffer).set(urlBytes, 0);
+    const id = bridge.env.maw_fetch(0, urlBytes.length);
+    // Must return a positive integer immediately (async result pending)
+    expect(typeof id).toBe("number");
+    expect(id).toBeGreaterThan(0);
+    // Immediately after launch the result is not ready
+    expect(bridge.env.maw_async_result(id)).toBe(0);
+  });
+
+  test("maw_identity returns error JSON when not pre-cached", () => {
+    const { mem, alloc } = makeMemAndAlloc();
+    const bridge = buildImportObject(() => mem, () => alloc);
+    const ptr = bridge.env.maw_identity();
+    const view = new DataView(mem.buffer);
+    const len = view.getUint32(ptr, true);
+    const result = new TextDecoder().decode(new Uint8Array(mem.buffer, ptr + 4, len));
+    expect(result).toContain("error");
+  });
+
+  test("maw_identity returns cached JSON after _setCachedIdentity", () => {
+    const { mem, alloc } = makeMemAndAlloc();
+    const bridge = buildImportObject(() => mem, () => alloc);
+    const identity = '{"node":"test-node","version":"0.0.1","agents":[],"clockUtc":"2026-04-13T00:00:00Z","uptime":42}';
+    bridge._setCachedIdentity(identity);
+    const ptr = bridge.env.maw_identity();
+    const view = new DataView(mem.buffer);
+    const len = view.getUint32(ptr, true);
+    const result = new TextDecoder().decode(new Uint8Array(mem.buffer, ptr + 4, len));
+    expect(result).toBe(identity);
+  });
+
+  test("readString decodes UTF-8 bytes written at a known memory offset", () => {
+    const mem = new WebAssembly.Memory({ initial: 1 });
+    const bytes = new TextEncoder().encode("hello, maw!");
+    new Uint8Array(mem.buffer).set(bytes, 0);
+    expect(readString(mem, 0, bytes.length)).toBe("hello, maw!");
+  });
+
+  test("writeString stores u32-LE length prefix followed by UTF-8 payload", () => {
+    const mem = new WebAssembly.Memory({ initial: 1 });
+    let nextPtr = 64;
+    const alloc = (size: number) => { const p = nextPtr; nextPtr += size; return p; };
+    const ptr = writeString(mem, alloc, "wasm!");
+    const view = new DataView(mem.buffer);
+    const storedLen = view.getUint32(ptr, /* littleEndian */ true);
+    expect(storedLen).toBe(5); // "wasm!" = 5 bytes
+    const decoded = new TextDecoder().decode(new Uint8Array(mem.buffer, ptr + 4, storedLen));
+    expect(decoded).toBe("wasm!");
   });
 });
 
