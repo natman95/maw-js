@@ -27,6 +27,8 @@ const WASM_MEMORY_MAX_PAGES = 256; // 16MB
 const SCAN_DIRS = [
   join(homedir(), ".maw", "plugins"),
   join(homedir(), ".oracle", "commands"),
+  // Bundled plugins shipped with maw-js (src/commands/plugins/)
+  join(import.meta.dir, "..", "commands", "plugins"),
 ];
 
 /**
