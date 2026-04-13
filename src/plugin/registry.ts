@@ -78,7 +78,7 @@ export async function invokePlugin(
   // Universal -v / --version flag — shows plugin name, version, source, surfaces
   if (ctx.source === "cli") {
     const args = ctx.args as string[];
-    if (args[0] === "-v" || args[0] === "--version") {
+    if (args[0] === "-v" || args[0] === "--version" || args[0] === "-version") {
       const m = plugin.manifest;
       const surfaces = [
         m.cli ? `cli:${m.cli.command}` : null,
