@@ -253,21 +253,3 @@ export async function cmdSend(query: string, message: string, force = false) {
   }
   process.exit(1);
 }
-
-/** maw wire — federation send via local maw server's /api/send (routes to peers) */
-export async function cmdWire(query: string, message: string) {
-  const port = loadConfig().port;
-
-  const res = await curlFetch(`http://localhost:${port}/api/send`, {
-    method: "POST",
-    body: JSON.stringify({ target: query, text: message }),
-  });
-
-  if (!res.ok || !res.data?.ok) {
-    console.error(`\x1b[31merror\x1b[0m: ${res.data?.error || "wire send failed"}`);
-    process.exit(1);
-  }
-
-  const source = res.data.source === "local" ? "local" : `⚡ ${res.data.source}`;
-  console.log(`\x1b[36mwired\x1b[0m ${source} → ${res.data.target}: ${message}`);
-}

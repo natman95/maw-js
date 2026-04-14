@@ -174,7 +174,7 @@ ${lineageField}
 
 The convention has THREE complementary signature contexts. Use the right one for the audience:
 
-### 1. Internal federation messages (\`maw hey\`, \`maw wire\`, \`maw broadcast\`)
+### 1. Internal federation messages (\`maw hey\`, \`maw broadcast\`)
 
 Form: \`[<host>:${name}]\` — for example \`[mba:${name}]\` or \`[oracle-world:${name}]\`
 
