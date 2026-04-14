@@ -1,13 +1,13 @@
-import { listSessions, hostExec } from "../../../core/transport/ssh";
-import { tmux } from "../../../core/transport/tmux";
+import { listSessions, hostExec } from "../../../sdk";
+import { tmux } from "../../../sdk";
 import { loadConfig } from "../../../config";
 import { readdirSync, readFileSync, writeFileSync, appendFileSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { FLEET_DIR } from "../../../core/paths";
+import { FLEET_DIR } from "../../../sdk";
 import { cmdReunion } from "../reunion/impl";
 import { cmdSoulSync } from "../soul-sync/impl";
-import { takeSnapshot } from "../../../core/fleet/snapshot";
+import { takeSnapshot } from "../../../sdk";
 
 export interface DoneOpts {
   force?: boolean;

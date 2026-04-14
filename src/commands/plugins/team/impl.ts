@@ -1,8 +1,8 @@
 import { readdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { tmux } from "../../../core/transport/tmux";
-import type { TmuxPane } from "../../../core/transport/tmux";
+import { tmux } from "../../../sdk";
+import type { TmuxPane } from "../../../sdk";
 import { loadFleetEntries } from "../../shared/fleet-load";
 
 // Exported for testing — override with setTeamsDir/setTasksDir

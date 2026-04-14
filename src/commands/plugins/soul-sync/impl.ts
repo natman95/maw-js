@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, copyFileSync, mkdirSync, appendFileSync } from "fs";
 import { join, basename } from "path";
-import { hostExec } from "../../../core/transport/ssh";
+import { hostExec } from "../../../sdk";
 import { loadConfig } from "../../../config";
 import { loadFleet, type FleetSession } from "../../shared/fleet-load";
 

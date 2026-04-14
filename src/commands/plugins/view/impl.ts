@@ -1,5 +1,5 @@
-import { listSessions } from "../../../core/transport/ssh";
-import { Tmux, tmuxCmd, resolveSocket } from "../../../core/transport/tmux";
+import { listSessions } from "../../../sdk";
+import { Tmux, tmuxCmd, resolveSocket } from "../../../sdk";
 import { loadConfig } from "../../../config";
 import { execSync } from "child_process";
 

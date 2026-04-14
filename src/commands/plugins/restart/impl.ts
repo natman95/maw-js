@@ -10,8 +10,8 @@
  *   4. Wake fleet (maw wake all)
  */
 
-import { listSessions } from "../../../core/transport/ssh";
-import { Tmux } from "../../../core/transport/tmux";
+import { listSessions } from "../../../sdk";
+import { Tmux } from "../../../sdk";
 import { cmdSleep, cmdWakeAll } from "../../shared/fleet";
 import { execSync } from "child_process";
 

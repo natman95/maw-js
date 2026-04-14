@@ -1,10 +1,10 @@
-import { hostExec } from "../../../core/transport/ssh";
+import { hostExec } from "../../../sdk";
 import { loadConfig } from "../../../config";
 import { loadFleetEntries } from "../../shared/fleet-load";
 import { cmdSoulSync } from "../soul-sync/impl";
 import { cmdWake } from "../../shared/wake";
 import { parseWakeTarget, ensureCloned } from "../../shared/wake-target";
-import { FLEET_DIR } from "../../../core/paths";
+import { FLEET_DIR } from "../../../sdk";
 import { join } from "path";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
 

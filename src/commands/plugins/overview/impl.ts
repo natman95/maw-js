@@ -1,7 +1,7 @@
-import { listSessions, hostExec } from "../../../core/transport/ssh";
-import { tmux } from "../../../core/transport/tmux";
+import { listSessions, hostExec } from "../../../sdk";
+import { tmux } from "../../../sdk";
 import { loadConfig } from "../../../config";
-import type { Session } from "../../../core/transport/ssh";
+import type { Session } from "../../../sdk";
 
 export interface OverviewTarget {
   session: string;

@@ -1,7 +1,7 @@
 import { join } from "path";
 import { existsSync, mkdirSync, rmSync } from "fs";
-import { hostExec } from "../../../core/transport/ssh";
-import { FLEET_DIR } from "../../../core/paths";
+import { hostExec } from "../../../sdk";
+import { FLEET_DIR } from "../../../sdk";
 import { loadConfig, saveConfig } from "../../../config";
 import { loadFleet } from "../../shared/fleet-load";
 

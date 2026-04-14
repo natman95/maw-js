@@ -1,8 +1,8 @@
 import { join } from "path";
 import { readdirSync, readFileSync, unlinkSync } from "fs";
-import { hostExec } from "../../../core/transport/ssh";
+import { hostExec } from "../../../sdk";
 import { loadConfig } from "../../../config";
-import { FLEET_DIR } from "../../../core/paths";
+import { FLEET_DIR } from "../../../sdk";
 
 /**
  * maw fleet consolidate [--dry-run] [--remove]
