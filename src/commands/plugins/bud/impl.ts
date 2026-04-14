@@ -17,6 +17,7 @@ export interface BudOpts {
   root?: boolean;
   dryRun?: boolean;
   note?: string;
+  split?: boolean;
 }
 
 /**
@@ -308,6 +309,23 @@ Run \`/awaken\` for the full identity setup ceremony.
   } catch (e: any) {
     console.log(`  \x1b[33m⚠\x1b[0m wake failed: ${e.message || e}`);
     console.log(`  \x1b[90m  try: maw wake ${name}\x1b[0m`);
+  }
+
+  // 8.25. Optional --split: show the child in a right-side pane so parent watches it awaken
+  if (opts.split && process.env.TMUX) {
+    try {
+      // Find the child's session:window
+      const { listSessions } = await import("../../../sdk");
+      const sessions = await listSessions();
+      const childSess = sessions.find(s => s.name.endsWith(`-${name}`) || s.name === name);
+      const target = childSess ? `${childSess.name}:${childSess.windows[0]?.index ?? 0}` : name;
+      await hostExec(`tmux split-window -h -l 50% "tmux attach-session -t ${target}"`);
+      console.log(`  \x1b[32m✓\x1b[0m split — watching ${name} in right pane`);
+    } catch (e: any) {
+      console.log(`  \x1b[33m⚠\x1b[0m split failed: ${e.message || e}`);
+    }
+  } else if (opts.split && !process.env.TMUX) {
+    console.log(`  \x1b[33m⚠\x1b[0m --split requires tmux session (TMUX env var not set)`);
   }
 
   // 8.5. Copy local project ψ/ if --repo was used and it exists
