@@ -237,7 +237,7 @@ export async function cmdOracleScan(opts: { force?: boolean; json?: boolean; loc
     console.log(`\n  \x1b[32m✓\x1b[0m Scanned ${cache.oracles.length} oracles locally (${elapsed}s)\n`);
     for (const o of cache.oracles) {
       const org = o.org ? `\x1b[90m${o.org}/\x1b[0m` : "";
-      console.log(`  ${org}\x1b[36m${o.name}\x1b[0m  \x1b[90m${o.path}\x1b[0m`);
+      console.log(`  ${org}\x1b[36m${o.name}\x1b[0m  \x1b[90m${o.local_path}\x1b[0m`);
     }
     console.log(`\n  Cache → \x1b[90m~/.config/maw/oracles.json\x1b[0m\n`);
     return;
