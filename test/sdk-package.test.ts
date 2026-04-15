@@ -20,7 +20,7 @@ describe("@maw/sdk workspace package", () => {
       require("fs").readFileSync(join(SDK_PKG_DIR, "package.json"), "utf8"),
     );
     expect(pkg.name).toBe("@maw/sdk");
-    expect(pkg.version).toBe("1.0.0");
+    expect(pkg.version).toBe("1.0.0-alpha.1");
     expect(pkg.type).toBe("module");
     expect(pkg.main).toBe("./index.ts");
     expect(pkg.types).toBe("./index.d.ts");
