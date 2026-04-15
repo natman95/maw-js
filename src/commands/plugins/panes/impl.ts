@@ -4,6 +4,8 @@ import { resolveSessionTarget } from "../../../core/matcher/resolve-target";
 export interface PanesOpts {
   /** Include a PID column (for /proc inspection / ghost detection). */
   pid?: boolean;
+  /** Enumerate every pane across every session (tmux list-panes -a). */
+  all?: boolean;
 }
 
 interface PaneRow {
@@ -28,7 +30,10 @@ export async function cmdPanes(target?: string, opts: PanesOpts = {}) {
   const tmux = tmuxCmd();
 
   let filter: string | null = null; // tmux -t target for list-panes; null = current
-  if (target) {
+  if (opts.all) {
+    if (target) console.log(`  \x1b[90m⚠ --all ignores target argument\x1b[0m`);
+    // skip target resolution entirely — --all enumerates everything
+  } else if (target) {
     if (target.includes(":")) {
       // Resolve session portion only; window stays as-is
       const [rawSession, rest] = target.split(":", 2);
@@ -75,7 +80,7 @@ export async function cmdPanes(target?: string, opts: PanesOpts = {}) {
   // #{pane_pid} only appended when --pid requested, to keep default output stable.
   const baseFmt = "#{session_name}:#{window_index}.#{pane_index}|||#{pane_width}x#{pane_height}|||#{pane_current_command}|||#{pane_title}";
   const fmt = opts.pid ? `${baseFmt}|||#{pane_pid}` : baseFmt;
-  const targetFlag = filter ? `-s -t '${filter}'` : "";
+  const targetFlag = opts.all ? "-a" : (filter ? `-s -t '${filter}'` : "");
   let raw: string;
   try {
     raw = await hostExec(`${tmux} list-panes ${targetFlag} -F '${fmt}'`);

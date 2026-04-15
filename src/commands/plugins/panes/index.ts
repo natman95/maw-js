@@ -17,27 +17,30 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
     let target: string | undefined;
 
     let pid = false;
+    let all = false;
 
     if (ctx.source === "cli") {
       const args = ctx.args as string[];
-      const flags = parseFlags(args, { "--pid": Boolean }, 0);
+      const flags = parseFlags(args, { "--pid": Boolean, "--all": Boolean, "-a": "--all" }, 0);
 
       const first = flags._[0];
       if (first === "--help" || first === "-h") {
-        return { ok: false, error: "usage: maw panes [target] [--pid]" };
+        return { ok: false, error: "usage: maw panes [target] [--pid] [--all|-a]" };
       }
       if (first && first.startsWith("-")) {
-        return { ok: false, error: `"${first}" looks like a flag, not a target.\n  usage: maw panes [target] [--pid]` };
+        return { ok: false, error: `"${first}" looks like a flag, not a target.\n  usage: maw panes [target] [--pid] [--all|-a]` };
       }
       target = first;
       pid = !!flags["--pid"];
+      all = !!flags["--all"];
     } else {
       const body = ctx.args as Record<string, unknown>;
       target = body.target as string | undefined;
       pid = !!body.pid;
+      all = !!body.all;
     }
 
-    await cmdPanes(target, { pid });
+    await cmdPanes(target, { pid, all });
     return { ok: true, output: logs.join("\n") || undefined };
   } catch (e: any) {
     return { ok: false, error: logs.join("\n") || e.message, output: logs.join("\n") || undefined };

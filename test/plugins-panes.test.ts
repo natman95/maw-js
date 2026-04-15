@@ -4,8 +4,12 @@ import type { InvokeContext } from "../src/plugin/types";
 
 const root = join(import.meta.dir, "../src");
 
+interface CallRecord { target?: string; opts: { pid?: boolean; all?: boolean } }
+const calls: CallRecord[] = [];
+
 mock.module(join(root, "commands/plugins/panes/impl"), () => ({
-  cmdPanes: async (target?: string) => {
+  cmdPanes: async (target?: string, opts: { pid?: boolean; all?: boolean } = {}) => {
+    calls.push({ target, opts });
     if (target === "ambi") {
       console.error("✗ 'ambi' is ambiguous");
       throw new Error("exit 1");
@@ -14,8 +18,15 @@ mock.module(join(root, "commands/plugins/panes/impl"), () => ({
       console.error("✗ session 'nope-xyz' not found");
       throw new Error("exit 1");
     }
-    console.log(`TARGET  SIZE  COMMAND  TITLE`);
-    console.log(`${target ?? "current"}:0.0  80x24  zsh  ready`);
+    if (opts.all && target) console.log("⚠ --all ignores target argument");
+    const header = opts.pid ? "TARGET  SIZE  PID  COMMAND  TITLE" : "TARGET  SIZE  COMMAND  TITLE";
+    console.log(header);
+    if (opts.all) {
+      console.log(`alpha:0.0  80x24  ${opts.pid ? "111  " : ""}zsh  ready`);
+      console.log(`beta:1.0   80x24  ${opts.pid ? "222  " : ""}claude  busy`);
+    } else {
+      console.log(`${target ?? "current"}:0.0  80x24  ${opts.pid ? "111  " : ""}zsh  ready`);
+    }
   },
 }));
 
@@ -70,5 +81,55 @@ describe("panes plugin", () => {
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
     expect(result.output).toContain("mawjs-view:0.0");
+  });
+
+  it("CLI — --all passes all=true to cmdPanes", async () => {
+    calls.length = 0;
+    const ctx: InvokeContext = { source: "cli", args: ["--all"] };
+    const result = await handler(ctx);
+    expect(result.ok).toBe(true);
+    expect(calls[0]!.opts.all).toBe(true);
+    expect(calls[0]!.target).toBeUndefined();
+    expect(result.output).toContain("alpha:0.0");
+    expect(result.output).toContain("beta:1.0");
+  });
+
+  it("CLI — -a alias behaves identically to --all", async () => {
+    calls.length = 0;
+    const ctx: InvokeContext = { source: "cli", args: ["-a"] };
+    const result = await handler(ctx);
+    expect(result.ok).toBe(true);
+    expect(calls[0]!.opts.all).toBe(true);
+    expect(result.output).toContain("alpha:0.0");
+  });
+
+  it("CLI — --all composes with --pid", async () => {
+    calls.length = 0;
+    const ctx: InvokeContext = { source: "cli", args: ["--all", "--pid"] };
+    const result = await handler(ctx);
+    expect(result.ok).toBe(true);
+    expect(calls[0]!.opts.all).toBe(true);
+    expect(calls[0]!.opts.pid).toBe(true);
+    expect(result.output).toContain("PID");
+  });
+
+  it("CLI — --all + target warns and still shows all panes", async () => {
+    calls.length = 0;
+    const ctx: InvokeContext = { source: "cli", args: ["mawjs", "--all"] };
+    const result = await handler(ctx);
+    expect(result.ok).toBe(true);
+    expect(calls[0]!.opts.all).toBe(true);
+    expect(calls[0]!.target).toBe("mawjs");
+    expect(result.output).toContain("--all ignores target");
+    expect(result.output).toContain("alpha:0.0");
+  });
+
+  it("API — all=true routes to --all mode", async () => {
+    calls.length = 0;
+    const ctx: InvokeContext = { source: "api", args: { all: true } };
+    const result = await handler(ctx);
+    expect(result.ok).toBe(true);
+    expect(calls[0]!.opts.all).toBe(true);
+    expect(result.output).toContain("alpha:0.0");
   });
 });
