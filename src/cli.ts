@@ -7,10 +7,19 @@ import { usage } from "./cli/usage";
 import { routeComm } from "./cli/route-comm";
 import { routeTools } from "./cli/route-tools";
 import { scanCommands, matchCommand, executeCommand } from "./cli/command-registry";
+import { setVerbosityFlags } from "./cli/verbosity";
 import { join } from "path";
 import { homedir } from "os";
 
-const args = process.argv.slice(2);
+// Strip verbosity flags up-front so they don't collide with cmd detection or
+// leak into plugin argv. Task #3 will flip call sites to honor these.
+const VERBOSITY_FLAGS = new Set(["--quiet", "-q", "--silent", "-s"]);
+const rawArgs = process.argv.slice(2);
+const verbosity: { quiet?: boolean; silent?: boolean } = {};
+if (rawArgs.some(a => a === "--quiet" || a === "-q")) verbosity.quiet = true;
+if (rawArgs.some(a => a === "--silent" || a === "-s")) verbosity.silent = true;
+setVerbosityFlags(verbosity);
+const args = rawArgs.filter(a => !VERBOSITY_FLAGS.has(a));
 const cmd = args[0]?.toLowerCase();
 
 logAudit(cmd || "", args);
