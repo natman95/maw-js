@@ -5,6 +5,9 @@ mock.module("./impl", () => ({
   cmdBud: async (name: string, _opts: any) => {
     console.log(`budding ${name}`);
   },
+  cmdBudTiny: async (name: string, _opts: any) => {
+    console.log(`tiny-budding ${name}`);
+  },
 }));
 
 describe("bud plugin", () => {

@@ -1,5 +1,5 @@
 import type { InvokeContext, InvokeResult } from "../../../plugin/types";
-import { cmdBud } from "./impl";
+import { cmdBud, cmdBudTiny } from "./impl";
 import { parseFlags } from "../../../cli/parse-args";
 
 export const command = {
@@ -27,44 +27,59 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
         "--dry-run": Boolean,
         "--split": Boolean,
         "--blank": Boolean,
+        "--tiny": Boolean,
+        "--parent": String,
       }, 0);
 
       const name = flags._[0];
       if (!name || name === "--help" || name === "-h") {
-        return { ok: false, error: "usage: maw bud <name> [--from <oracle>] [--root] [--blank] [--org <org>] [--repo org/repo] [--issue N] [--note <text>] [--fast] [--split] [--dry-run]" };
+        return { ok: false, error: "usage: maw bud <name> [--from <oracle>] [--root] [--blank] [--org <org>] [--repo org/repo] [--issue N] [--note <text>] [--fast] [--split] [--dry-run]\n       maw bud <name> --tiny --parent <oracle>" };
       }
       if (name.startsWith("-")) {
         return { ok: false, error: `"${name}" looks like a flag, not an oracle name.\n  usage: maw bud <name> ${args.join(" ")}` };
       }
 
-      await cmdBud(name, {
-        from: flags["--from"],
-        repo: flags["--repo"],
-        org: flags["--org"],
-        issue: flags["--issue"],
-        note: flags["--note"],
-        fast: flags["--fast"],
-        root: flags["--root"],
-        dryRun: flags["--dry-run"],
-        split: flags["--split"],
-        blank: flags["--blank"],
-      });
+      if (flags["--tiny"]) {
+        if (!flags["--parent"]) {
+          return { ok: false, error: "--tiny requires --parent <oracle>" };
+        }
+        await cmdBudTiny(name, { parent: flags["--parent"], org: flags["--org"] });
+      } else {
+        await cmdBud(name, {
+          from: flags["--from"],
+          repo: flags["--repo"],
+          org: flags["--org"],
+          issue: flags["--issue"],
+          note: flags["--note"],
+          fast: flags["--fast"],
+          root: flags["--root"],
+          dryRun: flags["--dry-run"],
+          split: flags["--split"],
+          blank: flags["--blank"],
+        });
+      }
     } else if (ctx.source === "api") {
       const body = ctx.args as Record<string, unknown>;
       const name = body.name as string;
       if (!name) return { ok: false, error: "name required" };
-      await cmdBud(name, {
-        from: body.from as string | undefined,
-        repo: body.repo as string | undefined,
-        org: body.org as string | undefined,
-        issue: body.issue as number | undefined,
-        note: body.note as string | undefined,
-        fast: body.fast as boolean | undefined,
-        root: body.root as boolean | undefined,
-        dryRun: body.dryRun as boolean | undefined,
-        split: body.split as boolean | undefined,
-        blank: body.blank as boolean | undefined,
-      });
+      if (body.tiny) {
+        const parent = body.parent as string | undefined;
+        if (!parent) return { ok: false, error: "tiny bud requires parent" };
+        await cmdBudTiny(name, { parent, org: body.org as string | undefined });
+      } else {
+        await cmdBud(name, {
+          from: body.from as string | undefined,
+          repo: body.repo as string | undefined,
+          org: body.org as string | undefined,
+          issue: body.issue as number | undefined,
+          note: body.note as string | undefined,
+          fast: body.fast as boolean | undefined,
+          root: body.root as boolean | undefined,
+          dryRun: body.dryRun as boolean | undefined,
+          split: body.split as boolean | undefined,
+          blank: body.blank as boolean | undefined,
+        });
+      }
     }
 
     return { ok: true, output: logs.join("\n") || undefined };

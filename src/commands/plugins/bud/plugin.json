@@ -6,7 +6,7 @@
   "description": "Create a new oracle (bud from parent)",
   "cli": {
     "command": "bud",
-    "help": "maw bud <name> [--from <oracle>] [--root] [--blank] [--org <org>] [--repo org/repo] [--issue N] [--note <text>] [--fast] [--split] [--dry-run]",
+    "help": "maw bud <name> [--from <oracle>] [--root] [--blank] [--org <org>] [--repo org/repo] [--issue N] [--note <text>] [--fast] [--split] [--dry-run]\n       maw bud <name> --tiny --parent <oracle>  (nested leaf oracle inside parent's vault)",
     "flags": {
       "--from": "string",
       "--org": "string",
@@ -17,7 +17,9 @@
       "--root": "boolean",
       "--blank": "boolean",
       "--split": "boolean",
-      "--dry-run": "boolean"
+      "--dry-run": "boolean",
+      "--tiny": "boolean",
+      "--parent": "string"
     }
   },
   "api": {

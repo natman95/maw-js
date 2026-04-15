@@ -23,6 +23,16 @@ export interface BudOpts {
   blank?: boolean;
 }
 
+export interface TinyBudOpts {
+  parent: string;
+  /** Optional override for parent oracle root dir. Tests pass a tmpdir here
+   *  instead of resolving via ghqRoot/org. Not exposed on the CLI. */
+  parentRoot?: string;
+  /** Optional org override (for parentRoot resolution when parentRoot is not
+   *  passed). Defaults to config.githubOrg → "Soul-Brews-Studio". */
+  org?: string;
+}
+
 /**
  * maw bud <name> [--from <parent>] [--org <org>] [--repo org/repo] [--issue N] [--fast] [--dry-run]
  *
@@ -356,4 +366,58 @@ Run \`/awaken\` for the full identity setup ceremony.
     console.log(`  \x1b[90m  run /awaken in the new oracle for full identity setup\x1b[0m`);
   }
   console.log();
+}
+
+/**
+ * maw bud <name> --tiny --parent <oracle>
+ *
+ * PR α of #209 — skeleton only. Creates a nested tiny oracle inside the
+ * parent's vault at `<parent-root>/ψ/buds/<name>/`. No federation, no cron,
+ * no signaling (those are PR β and γ).
+ *
+ * Templates live on disk under this plugin's `templates/tiny/` and get
+ * rendered with `{{name}}`, `{{parent}}`, `{{budded_at}}` substitution.
+ */
+export async function cmdBudTiny(name: string, opts: TinyBudOpts): Promise<void> {
+  if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(name)) {
+    console.error(`  \x1b[31m✗\x1b[0m invalid oracle name: "${name}"`);
+    console.error(`  \x1b[90m  names must start with a letter and contain only letters, numbers, hyphens\x1b[0m`);
+    process.exit(1);
+  }
+  if (!opts.parent) {
+    console.error(`  \x1b[31m✗\x1b[0m --tiny requires --parent <oracle>`);
+    process.exit(1);
+  }
+
+  const config = loadConfig();
+  const org = opts.org || config.githubOrg || "Soul-Brews-Studio";
+  const parentRoot = opts.parentRoot || join(config.ghqRoot, org, `${opts.parent}-oracle`);
+
+  if (!existsSync(parentRoot)) {
+    console.error(`  \x1b[31m✗\x1b[0m parent oracle root not found: ${parentRoot}`);
+    console.error(`  \x1b[90m  expected: ${parentRoot} (use --parent <oracle> or override via tests)\x1b[0m`);
+    process.exit(1);
+  }
+
+  const budDir = join(parentRoot, "ψ", "buds", name);
+  if (existsSync(budDir)) {
+    console.error(`  \x1b[31m✗\x1b[0m tiny bud already exists: ${budDir}`);
+    console.error(`  \x1b[90m  refusing to overwrite — remove the dir or pick a new name\x1b[0m`);
+    process.exit(1);
+  }
+
+  mkdirSync(join(budDir, "memory", "logs"), { recursive: true });
+
+  const buddedAt = new Date().toISOString();
+  const vars: Record<string, string> = { name, parent: opts.parent, budded_at: buddedAt };
+  const render = (tpl: string) => Object.entries(vars).reduce(
+    (acc, [k, v]) => acc.replaceAll(`{{${k}}}`, v), tpl,
+  );
+  const tplDir = join(import.meta.dir, "templates", "tiny");
+
+  writeFileSync(join(budDir, "identity.md"), render(readFileSync(join(tplDir, "identity.md"), "utf-8")));
+  writeFileSync(join(budDir, "CLAUDE.md"), render(readFileSync(join(tplDir, "CLAUDE.md"), "utf-8")));
+  writeFileSync(join(budDir, "memory", "logs", ".gitkeep"), "");
+
+  console.log(`  \x1b[32m✓\x1b[0m tiny bud ${name} created at ${budDir}`);
 }
