@@ -1,9 +1,10 @@
-import { readdirSync, readFileSync, writeFileSync, existsSync, rmSync } from "fs";
+import { readdirSync, readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, copyFileSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
 import { tmux } from "../../../sdk";
 import type { TmuxPane } from "../../../sdk";
 import { loadFleetEntries } from "../../shared/fleet-load";
+import { assertValidOracleName } from "../../../core/fleet/validate";
 
 // Exported for testing — override with setTeamsDir/setTasksDir
 let TEAMS_DIR = join(homedir(), ".claude/teams");
@@ -64,9 +65,44 @@ export function writeShutdownRequest(teamName: string, memberName: string, reaso
   writeFileSync(inboxPath, JSON.stringify(messages, null, 2));
 }
 
+/** Resolve ψ/ directory from cwd — the oracle vault root. */
+function resolvePsi(): string {
+  const psi = join(process.cwd(), "ψ");
+  if (existsSync(psi)) return psi;
+  // fallback: try readlink in case it's a symlink target
+  try {
+    const real = readFileSync(psi, "utf-8"); // will throw if not exists
+    return real;
+  } catch {
+    return psi; // return default — callers mkdir as needed
+  }
+}
+
+/**
+ * Write a generic message to a teammate's inbox file.
+ * Same protocol as writeShutdownRequest but with type: "message".
+ */
+export function writeMessage(teamName: string, memberName: string, from: string, text: string): void {
+  const inboxPath = join(TEAMS_DIR, teamName, "inboxes", `${memberName}.json`);
+  let messages: any[] = [];
+  if (existsSync(inboxPath)) {
+    try { messages = JSON.parse(readFileSync(inboxPath, "utf-8")); } catch { messages = []; }
+  }
+  messages.push({
+    from,
+    text: JSON.stringify({ type: "message", content: text }),
+    summary: text.slice(0, 80),
+    timestamp: new Date().toISOString(),
+    read: false,
+  });
+  const dir = join(TEAMS_DIR, teamName, "inboxes");
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(inboxPath, JSON.stringify(messages, null, 2));
+}
+
 // ─── A1: maw team shutdown <name> ───
 
-export async function cmdTeamShutdown(name: string, opts: { force?: boolean } = {}) {
+export async function cmdTeamShutdown(name: string, opts: { force?: boolean; merge?: boolean } = {}) {
   const team = loadTeam(name);
   if (!team) {
     console.error(`\x1b[31m✗\x1b[0m team not found: ${name}`);
@@ -128,8 +164,40 @@ export async function cmdTeamShutdown(name: string, opts: { force?: boolean } = 
     }
   }
 
+  // FUSION: merge team knowledge into individual oracle mailboxes
+  if (opts.merge) {
+    const PSI = resolvePsi();
+    const teamInboxDir = join(TEAMS_DIR, name, "inboxes");
+    for (const m of teammates) {
+      const dest = join(PSI, "memory", "mailbox", m.name);
+      mkdirSync(dest, { recursive: true });
+      // Copy inbox messages
+      const src = join(teamInboxDir, `${m.name}.json`);
+      if (existsSync(src)) {
+        copyFileSync(src, join(dest, `team-${name}-inbox.json`));
+      }
+      // Copy any findings from team dir
+      const memberDir = join(TEAMS_DIR, name, m.name);
+      if (existsSync(memberDir)) {
+        try {
+          for (const f of readdirSync(memberDir).filter(f => f.endsWith("_findings.md"))) {
+            copyFileSync(join(memberDir, f), join(dest, f));
+          }
+        } catch { /* best effort */ }
+      }
+      console.log(`  \x1b[36m↪\x1b[0m merged ${m.name} → ψ/memory/mailbox/${m.name}/`);
+    }
+    // Archive manifest instead of deleting
+    const manifestSrc = join(TEAMS_DIR, name, "config.json");
+    if (existsSync(manifestSrc)) {
+      const archiveDest = join(PSI, "memory", "mailbox", "teams", name);
+      mkdirSync(archiveDest, { recursive: true });
+      copyFileSync(manifestSrc, join(archiveDest, "manifest.json"));
+    }
+  }
+
   cleanupTeamDir(name);
-  console.log(`\x1b[32m✓\x1b[0m team '${name}' shut down`);
+  console.log(`\x1b[32m✓\x1b[0m team '${name}' shut down${opts.merge ? " (knowledge merged)" : ""}`);
 }
 
 function cleanupTeamDir(name: string) {
@@ -280,4 +348,202 @@ function findZombiePanes(allPanes: TmuxPane[]): ZombiePane[] {
       info: `${p.target}  "${(p.title || "").slice(0, 50)}"`,
       teamName: "unknown",
     }));
+}
+
+// ─── B1: maw team create <name> ───
+
+export function cmdTeamCreate(name: string, opts: { description?: string } = {}) {
+  assertValidOracleName(name);
+
+  const PSI = resolvePsi();
+  const teamDir = join(PSI, "memory", "mailbox", "teams", name);
+
+  if (existsSync(join(teamDir, "manifest.json"))) {
+    console.error(`\x1b[31m✗\x1b[0m team '${name}' already exists at ${teamDir}`);
+    process.exit(1);
+  }
+
+  mkdirSync(teamDir, { recursive: true });
+
+  const manifest = {
+    name,
+    createdAt: Date.now(),
+    members: [] as string[],
+    description: opts.description || "",
+  };
+  writeFileSync(join(teamDir, "manifest.json"), JSON.stringify(manifest, null, 2));
+
+  console.log(`\x1b[32m✓\x1b[0m team '${name}' created`);
+  console.log(`  \x1b[90m${teamDir}/manifest.json\x1b[0m`);
+}
+
+// ─── B2: maw team spawn <team> <role> ───
+
+export function cmdTeamSpawn(
+  teamName: string,
+  role: string,
+  opts: { model?: string; prompt?: string } = {},
+) {
+  const PSI = resolvePsi();
+  const teamDir = join(PSI, "memory", "mailbox", "teams", teamName);
+  const manifestPath = join(teamDir, "manifest.json");
+
+  if (!existsSync(manifestPath)) {
+    console.error(`\x1b[31m✗\x1b[0m team '${teamName}' not found — run: maw team create ${teamName}`);
+    process.exit(1);
+  }
+
+  // Check for past life
+  const agentMailbox = join(PSI, "memory", "mailbox", role);
+  let pastLife = false;
+  let standingOrders = "";
+  let latestFindings = "";
+
+  if (existsSync(agentMailbox)) {
+    pastLife = true;
+    const soPath = join(agentMailbox, "standing-orders.md");
+    if (existsSync(soPath)) {
+      standingOrders = readFileSync(soPath, "utf-8");
+    }
+    // Find latest *_findings.md
+    try {
+      const findings = readdirSync(agentMailbox)
+        .filter(f => f.endsWith("_findings.md"))
+        .sort()
+        .pop();
+      if (findings) {
+        const lines = readFileSync(join(agentMailbox, findings), "utf-8").split("\n");
+        latestFindings = lines.slice(-30).join("\n");
+      }
+    } catch { /* no findings */ }
+  }
+
+  // Build spawn prompt
+  const model = opts.model || "sonnet";
+  const parts: string[] = [];
+  parts.push(`You are '${role}' on team '${teamName}'.`);
+  if (opts.prompt) parts.push(opts.prompt);
+  if (standingOrders) parts.push(`## Standing Orders (from past life)\n${standingOrders}`);
+  if (latestFindings) parts.push(`## Last Known Findings\n${latestFindings}`);
+
+  const spawnPrompt = parts.join("\n\n");
+
+  // Write prompt file for the user to use
+  const promptPath = join(teamDir, `${role}-spawn-prompt.md`);
+  writeFileSync(promptPath, spawnPrompt);
+
+  // Update manifest with new member
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+  if (!manifest.members.includes(role)) {
+    manifest.members.push(role);
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+  }
+
+  console.log(`\x1b[32m✓\x1b[0m spawn prompt written for '${role}'`);
+  console.log(`  \x1b[90mpast life: ${pastLife ? "yes" : "no"}\x1b[0m`);
+  console.log(`  \x1b[90mmodel: ${model}\x1b[0m`);
+  console.log(`  \x1b[90mprompt: ${promptPath}\x1b[0m`);
+  console.log();
+  console.log(`  \x1b[36mRun:\x1b[0m claude --model ${model} --prompt-file "${promptPath}"`);
+}
+
+// ─── B3: maw team send <team> <agent> <message> ───
+
+export function cmdTeamSend(teamName: string, agent: string, message: string) {
+  if (!message) {
+    console.error(`\x1b[31m✗\x1b[0m usage: maw team send <team> <agent> <message>`);
+    process.exit(1);
+  }
+
+  // Try CC team inbox first (live team), fallback to vault mailbox
+  const team = loadTeam(teamName);
+  if (team) {
+    writeMessage(teamName, agent, "maw-team-send", message);
+    console.log(`\x1b[32m✓\x1b[0m message sent to ${agent} in live team '${teamName}'`);
+    return;
+  }
+
+  // Fallback: write to ψ mailbox for async delivery
+  const PSI = resolvePsi();
+  const mailboxDir = join(PSI, "memory", "mailbox", agent);
+  mkdirSync(mailboxDir, { recursive: true });
+  const msgFile = join(mailboxDir, `msg-${Date.now()}.json`);
+  writeFileSync(msgFile, JSON.stringify({
+    from: "maw-team-send",
+    team: teamName,
+    text: message,
+    timestamp: new Date().toISOString(),
+  }, null, 2));
+  console.log(`\x1b[32m✓\x1b[0m message written to ψ/memory/mailbox/${agent}/ (team not live)`);
+}
+
+// ─── B4: maw team resume <name> ───
+
+export function cmdTeamResume(name: string, opts: { model?: string } = {}) {
+  const PSI = resolvePsi();
+  const manifestPath = join(PSI, "memory", "mailbox", "teams", name, "manifest.json");
+
+  if (!existsSync(manifestPath)) {
+    console.error(`\x1b[31m✗\x1b[0m no archived team '${name}' found`);
+    console.error(`  \x1b[90mlooked in: ${manifestPath}\x1b[0m`);
+    process.exit(1);
+  }
+
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+  const members: string[] = manifest.members || [];
+
+  if (!members.length) {
+    console.log(`\x1b[90mTeam '${name}' has no members to resume.\x1b[0m`);
+    return;
+  }
+
+  console.log(`\x1b[36m⏳\x1b[0m resuming team '${name}' — ${members.length} agent(s)...\n`);
+
+  for (const member of members) {
+    cmdTeamSpawn(name, member, { model: opts.model });
+    console.log();
+  }
+
+  console.log(`\x1b[32m✓\x1b[0m team '${name}' resumed — ${members.length} agent(s) reincarnated`);
+}
+
+// ─── B5: maw team lives <agent> ───
+
+export function cmdTeamLives(agent: string) {
+  const PSI = resolvePsi();
+  const mailboxDir = join(PSI, "memory", "mailbox", agent);
+
+  if (!existsSync(mailboxDir)) {
+    console.log(`\x1b[90mNo past lives found for '${agent}'\x1b[0m`);
+    console.log(`  \x1b[90mlooked in: ${mailboxDir}\x1b[0m`);
+    return;
+  }
+
+  const files = readdirSync(mailboxDir).sort();
+
+  console.log(`\n  \x1b[36;1m${agent} — past lives\x1b[0m\n`);
+
+  // Standing orders
+  const hasOrders = files.includes("standing-orders.md");
+  console.log(`  standing orders: ${hasOrders ? "\x1b[32myes\x1b[0m" : "\x1b[90mno\x1b[0m"}`);
+
+  // Findings
+  const findings = files.filter(f => f.endsWith("_findings.md"));
+  if (findings.length) {
+    console.log(`  findings: \x1b[32m${findings.length}\x1b[0m`);
+    for (const f of findings) {
+      const lines = readFileSync(join(mailboxDir, f), "utf-8").split("\n").length;
+      console.log(`    \x1b[90m${f} (${lines} lines)\x1b[0m`);
+    }
+  } else {
+    console.log(`  findings: \x1b[90mnone\x1b[0m`);
+  }
+
+  // Other files (messages, team archives)
+  const other = files.filter(f => f !== "standing-orders.md" && !f.endsWith("_findings.md"));
+  if (other.length) {
+    console.log(`  other: \x1b[90m${other.join(", ")}\x1b[0m`);
+  }
+
+  console.log();
 }

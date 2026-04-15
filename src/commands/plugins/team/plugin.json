@@ -1,14 +1,14 @@
 {
   "name": "team",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "entry": "./index.ts",
   "sdk": "^1.0.0",
-  "description": "Manage agent teams — shutdown and list.",
+  "description": "Agent reincarnation engine — create, spawn, send, shutdown, resume, lives.",
   "author": "Soul-Brews-Studio",
   "cli": {
     "command": "team",
-    "aliases": [],
-    "help": "maw team <shutdown|list> [args] — Manage agent teams"
+    "aliases": ["t"],
+    "help": "maw team <create|spawn|send|shutdown|resume|lives|list|status>"
   },
   "weight": 50
 }
