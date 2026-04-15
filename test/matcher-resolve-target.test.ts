@@ -92,6 +92,13 @@ describe("resolveByName — no match", () => {
     expect(r.kind).toBe("none");
   });
 
+  test("pure none has no hints field when nothing even substring-matches", () => {
+    const items = [sess("alpha"), sess("beta-core")];
+    const r = resolveByName("xyz", items);
+    expect(r.kind).toBe("none");
+    if (r.kind === "none") expect(r.hints).toBeUndefined();
+  });
+
   test("empty target → none (does not match everything)", () => {
     const items = [sess("a"), sess("b-c")];
     const r = resolveByName("", items);
@@ -114,6 +121,76 @@ describe("resolveByName — no match", () => {
     const items = [sess("mawjs-view")];
     const r = resolveByName("iew", items);
     expect(r.kind).toBe("none");
+  });
+});
+
+describe("resolveByName — word-segment middle match (NEW)", () => {
+  test("middle-segment match: target 'cli' matches 'skills-cli-view' via -cli-", () => {
+    const items = [sess("skills-cli-view"), sess("unrelated")];
+    const r = resolveByName("cli", items);
+    expect(r.kind).toBe("fuzzy");
+    if (r.kind === "fuzzy") expect(r.match.name).toBe("skills-cli-view");
+  });
+
+  test("middle-segment with multiple hits → ambiguous", () => {
+    const items = [
+      sess("skills-cli-view"),
+      sess("maw-cli-tool"),
+      sess("other"),
+    ];
+    const r = resolveByName("cli", items);
+    expect(r.kind).toBe("ambiguous");
+    if (r.kind === "ambiguous") {
+      const names = r.candidates.map(c => c.name).sort();
+      expect(names).toEqual(["maw-cli-tool", "skills-cli-view"]);
+    }
+  });
+});
+
+describe("resolveByName — substring hints on none (NEW)", () => {
+  test("substring fallback populates hints but kind stays 'none'", () => {
+    // target "maw" matches nothing by word-segment (all three end in -view,
+    // none start with maw-, none have -maw-). But all contain "maw" as a
+    // substring — surface them as hints for a "did you mean?" render.
+    const items = [sess("mawjs-view"), sess("mawjs-view-view"), sess("mawui-view")];
+    const r = resolveByName("maw", items);
+    expect(r.kind).toBe("none");
+    if (r.kind === "none") {
+      expect(r.hints).toBeDefined();
+      const names = r.hints!.map(h => h.name).sort();
+      expect(names).toEqual(["mawjs-view", "mawjs-view-view", "mawui-view"]);
+    }
+  });
+
+  test("substring fallback with single hit is STILL none (never fuzzy)", () => {
+    // The contract: substring matches never auto-pick. A single substring
+    // match still returns `none` with one hint — the caller must refuse.
+    const items = [sess("mawjs-view")];
+    const r = resolveByName("awjs", items); // substring only, no word-segment boundary
+    expect(r.kind).toBe("none");
+    if (r.kind === "none") {
+      expect(r.hints).toHaveLength(1);
+      expect(r.hints![0]!.name).toBe("mawjs-view");
+    }
+  });
+
+  test("word-segment match wins over substring: hints NOT populated on ambiguous", () => {
+    // target "mawjs" hits two word-segment matches (both start with mawjs-).
+    // Result must be ambiguous — no substring hints, no fallback to "none".
+    const items = [sess("mawjs-view"), sess("mawjs-core"), sess("other")];
+    const r = resolveByName("mawjs", items);
+    expect(r.kind).toBe("ambiguous");
+    // ambiguous has no `hints` field by shape — asserting kind is enough,
+    // but be explicit: word-segment wins and substring-fallback is skipped.
+    if (r.kind === "ambiguous") expect(r.candidates).toHaveLength(2);
+  });
+
+  test("word-segment match wins over substring: single fuzzy, hints not populated", () => {
+    // target "mawjs" has one word-segment hit AND would also substring-match
+    // the same item. Result must be fuzzy — substring hints are skipped entirely.
+    const items = [sess("mawjs-view"), sess("other")];
+    const r = resolveByName("mawjs", items);
+    expect(r.kind).toBe("fuzzy");
   });
 });
 

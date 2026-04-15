@@ -64,6 +64,12 @@ export async function cmdSplit(target: string, opts: SplitOpts = {}) {
     }
     if (r.kind === "none") {
       console.error(`  \x1b[31m✗\x1b[0m session '${target}' not found in fleet`);
+      if (r.hints?.length) {
+        console.error(`  \x1b[90mdid you mean:\x1b[0m`);
+        for (const h of r.hints) {
+          console.error(`  \x1b[90m    • ${h.name}\x1b[0m`);
+        }
+      }
       console.error(`  \x1b[90m  try: maw ls\x1b[0m`);
       process.exit(1);
     }

@@ -10,28 +10,36 @@
  *   (e.g., target="mawjs" didn't match "mawjs-view").
  *
  * This helper makes resolution explicit: exact wins, otherwise collect all
- * suffix/prefix fuzzy matches and surface ambiguity to the caller. Silent
+ * word-segment fuzzy matches and surface ambiguity to the caller. Silent
  * wrong-answer is worse than a loud failure.
  */
 
 export type ResolveResult<T extends { name: string }> =
-  | { kind: "none" }
+  | { kind: "none"; hints?: T[] }
   | { kind: "exact"; match: T }
   | { kind: "fuzzy"; match: T }
   | { kind: "ambiguous"; candidates: T[] };
 
 /**
  * Resolve a bare user-typed name against a list of named items.
- * Priority: exact (case-insensitive) → suffix or prefix fuzzy → ambiguity.
  *
- * - If an item's name exactly equals the target (case-insensitive), return it
- *   as "exact". Exact wins even if other items also fuzzy-match.
- * - Otherwise collect items where name ends with `-${target}` OR starts with
- *   `${target}-` (both case-insensitive). If exactly one → "fuzzy". If two or
- *   more → "ambiguous" (return all candidates). If zero → "none".
+ * Three-tier cascade:
  *
- * The target is trimmed before matching. An empty target returns "none" —
- * we don't want the empty string to match everything.
+ * 1. **exact** (case-insensitive): name === target → { kind: "exact" }.
+ * 2. **word-segment**: dash-bounded anywhere in the name — prefix
+ *    (`target-*`), suffix (`*-target`), or middle (`*-target-*`). 1 match →
+ *    "fuzzy" (auto-pick). 2+ matches → "ambiguous" (caller disambiguates).
+ * 3. **substring fallback** (only if tier 2 was empty): `name.includes(target)`
+ *    anywhere. Matches are returned as `hints` under `kind: "none"` — they
+ *    never auto-pick and never become ambiguous. Callers can render
+ *    "did you mean?" but the contract still says "not found".
+ *
+ * Invariant: the match ladder is exact → word-segment → none. Substring
+ * matches are auxiliary hints, never a real match. This keeps resolution
+ * predictable: a bare name either resolves cleanly or the caller refuses.
+ *
+ * The target is trimmed before matching. An empty target returns "none"
+ * with no hints — we don't want the empty string to match everything.
  */
 export function resolveByName<T extends { name: string }>(
   target: string,
@@ -40,19 +48,28 @@ export function resolveByName<T extends { name: string }>(
   const lc = target.trim().toLowerCase();
   if (lc === "") return { kind: "none" };
 
-  // Step 1 — exact match wins, even if other items would fuzzy-match
+  // Tier 1 — exact wins, even if other items would word-segment match
   const exact = items.find(it => it.name.toLowerCase() === lc);
   if (exact) return { kind: "exact", match: exact };
 
-  // Step 2+3 — fuzzy match (suffix OR prefix), case-insensitive
-  const fuzzy = items.filter(it => {
+  // Tier 2 — word-segment: dash-bounded prefix, suffix, or middle
+  const segment = items.filter(it => {
     const n = it.name.toLowerCase();
-    return n.endsWith(`-${lc}`) || n.startsWith(`${lc}-`);
+    return (
+      n.startsWith(`${lc}-`) ||
+      n.endsWith(`-${lc}`) ||
+      n.includes(`-${lc}-`)
+    );
   });
+  if (segment.length === 1) return { kind: "fuzzy", match: segment[0]! };
+  if (segment.length >= 2) return { kind: "ambiguous", candidates: segment };
 
-  if (fuzzy.length === 0) return { kind: "none" };
-  if (fuzzy.length === 1) return { kind: "fuzzy", match: fuzzy[0]! };
-  return { kind: "ambiguous", candidates: fuzzy };
+  // Tier 3 — substring fallback. Never auto-picks, never ambiguous; only
+  // populates `hints` so callers can render "did you mean?" next to the
+  // not-found message. Stays under `kind: "none"` by design.
+  const hints = items.filter(it => it.name.toLowerCase().includes(lc));
+  if (hints.length > 0) return { kind: "none", hints };
+  return { kind: "none" };
 }
 
 // Thin convenience wrappers so call sites read cleanly at the use site.

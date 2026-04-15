@@ -28,7 +28,17 @@ export async function cmdView(agent: string, windowHint?: string, clean = false)
     const byWindow = sessions.find(s => s.windows.some(w => w.name.toLowerCase().includes(agentLower)));
     if (byWindow) sessionName = byWindow.name;
   }
-  if (!sessionName) { console.error(`session not found for: ${agent}`); process.exit(1); }
+  if (!sessionName) {
+    console.error(`  \x1b[31m✗\x1b[0m session not found for: ${agent}`);
+    if (resolved.kind === "none" && resolved.hints?.length) {
+      console.error(`  \x1b[90mdid you mean:\x1b[0m`);
+      for (const h of resolved.hints) {
+        console.error(`  \x1b[90m    • ${h.name}\x1b[0m`);
+      }
+    }
+    console.error(`  \x1b[90m  try: maw ls\x1b[0m`);
+    process.exit(1);
+  }
 
   // Generate view name from RESOLVED session (not raw input) — prevents duplicates
   // e.g. "maw a worm" and "maw a wormhole" both resolve to "102-white-wormhole"
