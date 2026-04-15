@@ -58,6 +58,8 @@ if (cmd === "--version" || cmd === "-v" || cmd === "version") {
     "",
     "  Flags:",
     "    --help, -h    show this message and exit (no side effects)",
+    "",
+    "  ⚠ Manual `bun add -g` may loop — use `maw update <ref>` instead.",
   ].join("\n");
 
   // Layer 1: short-circuit --help/-h BEFORE any side effects (#356)
@@ -113,6 +115,7 @@ if (cmd === "--version" || cmd === "-v" || cmd === "version") {
   const sameNote = beforeVer === ref ? " \x1b[90m(re-sync)\x1b[0m" : "";
   console.log(`\n  🍺 maw \x1b[36m${beforeVer}\x1b[0m ${arrow} \x1b[36m${ref}\x1b[0m${sameNote}\n`);
   // Remove first to avoid bun dependency loop (#214)
+  // Required: purges stale global refs that cause dep loops (#347)
   try { execSync(`bun remove -g maw`, { stdio: "pipe" }); } catch {}
   execSync(`bun add -g github:${repository}#${ref}`, { stdio: "inherit" });
   // Link SDK so plugins can `import { maw } from "@maw/sdk"` (workspace package at packages/sdk/)
@@ -120,16 +123,23 @@ if (cmd === "--version" || cmd === "-v" || cmd === "version") {
   try {
     const mawDir = join(execSync(`ghq list --full-path | grep 'Soul-Brews-Studio/maw-js$'`, { encoding: "utf-8" }).trim());
     if (mawDir) {
-      execSync(`cd ${mawDir} && bun link`, { stdio: "pipe" });
-      const oracleDir = join(homedir(), ".oracle");
-      const { existsSync: exists, writeFileSync: writeFile } = require("fs");
-      const { mkdirSync } = require("fs");
-      mkdirSync(oracleDir, { recursive: true });
-      if (!exists(join(oracleDir, "package.json"))) {
-        writeFile(join(oracleDir, "package.json"), '{"name":"oracle-plugins","private":true}\n');
+      // #346: Gate link on version match — stale ghq clone would override the fresh global install
+      const cloneVersion: string = require(join(mawDir, "package.json")).version;
+      const refNormalized = ref.replace(/^v/, "");
+      if (ref !== "main" && !cloneVersion.includes(refNormalized)) {
+        console.log(`  ⚠ SDK link skipped — local clone is ${cloneVersion}, installed ${ref}`);
+      } else {
+        execSync(`cd ${mawDir} && bun link`, { stdio: "pipe" });
+        const oracleDir = join(homedir(), ".oracle");
+        const { existsSync: exists, writeFileSync: writeFile } = require("fs");
+        const { mkdirSync } = require("fs");
+        mkdirSync(oracleDir, { recursive: true });
+        if (!exists(join(oracleDir, "package.json"))) {
+          writeFile(join(oracleDir, "package.json"), '{"name":"oracle-plugins","private":true}\n');
+        }
+        execSync(`cd ${oracleDir} && bun link maw`, { stdio: "pipe" });
+        console.log(`  🔗 SDK linked (@maw/sdk)`);
       }
-      execSync(`cd ${oracleDir} && bun link maw`, { stdio: "pipe" });
-      console.log(`  🔗 SDK linked (@maw/sdk)`);
     }
   } catch { /* ghq not available or link failed — non-fatal */ }
   let after = "";
