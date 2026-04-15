@@ -3,6 +3,7 @@ import { join } from "path";
 import { execSync } from "child_process";
 import { CONFIG_FILE } from "./core/paths";
 import { refreshContext } from "./lib/context";
+import { verbose, info } from "./cli/verbosity";
 
 function detectGhqRoot(): string {
   try {
@@ -364,6 +365,13 @@ export function loadConfig(): MawConfig {
   } catch {
     cached = { ...DEFAULTS };
   }
+  // One-shot startup summary — fires unless --quiet/--silent (verbose-by-default).
+  verbose(() => {
+    const nT = cached!.triggers?.length ?? 0;
+    const nP = cached!.pluginSources?.length ?? 0;
+    const nPeers = (cached!.peers?.length ?? 0) + (cached!.namedPeers?.length ?? 0);
+    info(`loaded config: ${nT} trigger${nT === 1 ? "" : "s"}, ${nP} plugin${nP === 1 ? "" : "s"}, ${nPeers} peer${nPeers === 1 ? "" : "s"}`);
+  });
   return cached;
 }
 

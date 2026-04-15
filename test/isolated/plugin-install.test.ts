@@ -45,22 +45,30 @@ afterEach(() => {
   }
 });
 
-/** Run fn with process.exit + console captured. */
+/** Run fn with process.exit + console + process.stderr.write captured.
+ *  (Task #2 routes warn/info/error through process.stderr.write; keep the
+ *  console.* mocks for tests that call console directly.) */
 async function capture(fn: () => Promise<unknown>): Promise<{
   exitCode: number | undefined; stdout: string; stderr: string;
 }> {
   const o = { exit: process.exit, log: console.log, err: console.error, warn: console.warn };
+  const origStderrWrite = process.stderr.write.bind(process.stderr);
   const outs: string[] = [], errs: string[] = [];
   let exitCode: number | undefined;
   console.log = (...a: any[]) => outs.push(a.map(String).join(" "));
   console.error = (...a: any[]) => errs.push(a.map(String).join(" "));
   console.warn = (...a: any[]) => errs.push(a.map(String).join(" "));
+  (process.stderr as any).write = (chunk: any) => {
+    errs.push(typeof chunk === "string" ? chunk : String(chunk));
+    return true;
+  };
   (process as any).exit = (c?: number) => { exitCode = c ?? 0; throw new Error("__exit__:" + exitCode); };
   try { await fn(); }
   catch (e: any) { if (!String(e?.message ?? "").startsWith("__exit__")) throw e; }
   finally {
     (process as any).exit = o.exit; console.log = o.log;
     console.error = o.err; console.warn = o.warn;
+    (process.stderr as any).write = origStderrWrite;
   }
   return { exitCode, stdout: outs.join("\n"), stderr: errs.join("\n") };
 }

@@ -31,6 +31,7 @@ import {
   readString,
   textEncoder,
 } from "../cli/wasm-bridge";
+import { verbose, warn, info } from "../cli/verbosity";
 import type { LoadedPlugin, InvokeContext, InvokeResult } from "./types";
 
 const PLUGIN_INVOKE_TIMEOUT_MS = 5_000;
@@ -176,8 +177,8 @@ function warnLegacyOnce(count: number): void {
   if (_warnedLegacy) return;
   _warnedLegacy = true;
   if (count > 0) {
-    console.warn(
-      `\x1b[90m[maw] ${count} legacy plugin${count === 1 ? "" : "s"} loaded without artifact hash — build them to enforce integrity.\x1b[0m`,
+    warn(
+      `${count} legacy plugin${count === 1 ? "" : "s"} loaded without artifact hash — build them to enforce integrity.`,
     );
   }
 }
@@ -257,16 +258,32 @@ export function discoverPackages(): LoadedPlugin[] {
           );
           continue;
         }
-      } else if (!m.artifact && !devMode) {
-        // Legacy plugin (no artifact field). Allow — but count for the one-shot warning.
-        // Dev-mode symlinks are reloaded from source each CLI invocation, so hash
-        // verification would be a no-op; excluding them keeps `maw ls` quiet locally.
+      } else if (!m.artifact) {
+        // Legacy plugin (no artifact field). Allow — but count for the one-shot
+        // warning. #343b flips #341b: symlinks now count too. Dev-mode symlinks
+        // are legitimately "legacy-shaped" at runtime; omitting them under-reported
+        // the real legacy footprint on mixed dev machines. --quiet suppresses via
+        // warn(); --verbose exposes the per-plugin mode line below.
         legacyCount++;
       }
 
       if (disabled.includes(m.name)) {
         loaded.disabled = true;
       }
+
+      // Per-plugin verbose load line — fires unless --quiet/--silent (verbosity
+      // defaults to loud per #343). mode ∈ {symlink, sha256:abc1234…, unbuilt, legacy}
+      verbose(() => {
+        const mode = devMode
+          ? "symlink"
+          : m.artifact?.sha256
+            ? `sha256:${m.artifact!.sha256!.replace(/^sha256:/, "").slice(0, 7)}…`
+            : m.artifact
+              ? "unbuilt"
+              : "legacy";
+        info(`loaded plugin ${m.name}@${m.version} (sdk ${m.sdk}, ${mode})`);
+      });
+
       plugins.push(loaded);
     }
   }

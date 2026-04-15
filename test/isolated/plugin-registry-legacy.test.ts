@@ -1,8 +1,15 @@
 /**
- * Legacy-warning quieting (#341b) — the "N legacy plugins loaded without
- * artifact hash" warning must exclude dev-mode symlinks. Symlinked installs
- * are reloaded from source every CLI invocation, so hash verification would
- * be a no-op; counting them just spams `maw ls` on dev machines.
+ * Legacy-warning behavior (#343b — flips #341b).
+ *
+ * The "N legacy plugins loaded without artifact hash" warning now counts
+ * ALL legacy plugins, including dev-mode symlinks. The previous exclusion
+ * (introduced in #341b) under-reported the real legacy footprint on mixed
+ * dev machines and made it too easy to forget unbuilt symlinked installs.
+ *
+ * Visibility is controlled by the unified verbosity module
+ * (src/cli/verbosity.ts, task #2): warn() emits to stderr with a "⚠ "
+ * prefix unless isQuiet() is true (--quiet, --silent, MAW_QUIET=1,
+ * MAW_SILENT=1).
  */
 
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
@@ -13,9 +20,12 @@ import {
 import { join } from "path";
 import { tmpdir } from "os";
 import { discoverPackages, __resetDiscoverStateForTests } from "../../src/plugin/registry";
+import { setVerbosityFlags } from "../../src/cli/verbosity";
 
 const created: string[] = [];
 let origPluginsDir: string | undefined;
+let origQuiet: string | undefined;
+let origSilent: string | undefined;
 
 function tmpDir(prefix = "maw-legacy-test-"): string {
   const d = mkdtempSync(join(tmpdir(), prefix));
@@ -26,6 +36,11 @@ function pluginsDir(): string { return process.env.MAW_PLUGINS_DIR!; }
 
 beforeEach(() => {
   origPluginsDir = process.env.MAW_PLUGINS_DIR;
+  origQuiet = process.env.MAW_QUIET;
+  origSilent = process.env.MAW_SILENT;
+  delete process.env.MAW_QUIET;    // ensure loud baseline per test
+  delete process.env.MAW_SILENT;
+  setVerbosityFlags({});            // clear any leaked --quiet/--silent state
   process.env.MAW_PLUGINS_DIR = join(tmpDir("maw-home-"), "plugins");
   mkdirSync(pluginsDir(), { recursive: true });
   __resetDiscoverStateForTests();
@@ -34,6 +49,11 @@ beforeEach(() => {
 afterEach(() => {
   if (origPluginsDir !== undefined) process.env.MAW_PLUGINS_DIR = origPluginsDir;
   else delete process.env.MAW_PLUGINS_DIR;
+  if (origQuiet !== undefined) process.env.MAW_QUIET = origQuiet;
+  else delete process.env.MAW_QUIET;
+  if (origSilent !== undefined) process.env.MAW_SILENT = origSilent;
+  else delete process.env.MAW_SILENT;
+  setVerbosityFlags({});
   for (const d of created.splice(0)) {
     if (existsSync(d)) rmSync(d, { recursive: true, force: true });
   }
@@ -64,39 +84,67 @@ function plantLegacySymlink(name: string): void {
   symlinkSync(sourceDir, join(pluginsDir(), name), "dir");
 }
 
-/** Capture console.warn output while running fn. */
-async function captureWarn(fn: () => void | Promise<void>): Promise<string> {
-  const orig = console.warn;
-  const lines: string[] = [];
-  console.warn = (...a: any[]) => lines.push(a.map(String).join(" "));
+/**
+ * Capture stderr output while running fn. Task #2's verbosity module writes
+ * via process.stderr.write — the prior console.warn capture no longer sees it.
+ */
+async function captureStderr(fn: () => void | Promise<void>): Promise<string> {
+  const orig = process.stderr.write.bind(process.stderr);
+  let captured = "";
+  (process.stderr as any).write = (chunk: any) => {
+    captured += typeof chunk === "string" ? chunk : String(chunk);
+    return true;
+  };
   try { await fn(); }
-  finally { console.warn = orig; }
-  return lines.join("\n");
+  finally { (process.stderr as any).write = orig; }
+  return captured;
 }
 
-describe("discoverPackages — legacy warning quieting (#341b)", () => {
-  test("all symlinks → no legacy warning emitted", async () => {
+describe("discoverPackages — legacy warning (default loud, #343b)", () => {
+  test("all symlinks → warning IS emitted and counts them", async () => {
     plantLegacySymlink("dev-a");
     plantLegacySymlink("dev-b");
     plantLegacySymlink("dev-c");
-    const warn = await captureWarn(() => {
+    const err = await captureStderr(() => {
       const plugins = discoverPackages();
       expect(plugins.map(p => p.manifest.name).sort()).toEqual(["dev-a", "dev-b", "dev-c"]);
     });
-    expect(warn).not.toContain("legacy plugin");
+    expect(err).toContain("3 legacy plugins loaded without artifact hash");
   });
 
-  test("mix → warning counts only non-symlink legacy plugins", async () => {
+  test("mix → warning counts ALL legacy plugins (symlinks + real installs)", async () => {
     plantLegacySymlink("dev-a");
     plantLegacySymlink("dev-b");
     plantLegacyDir("real-legacy-1");
     plantLegacyDir("real-legacy-2");
-    const warn = await captureWarn(() => {
+    const err = await captureStderr(() => {
       const plugins = discoverPackages();
       expect(plugins.map(p => p.manifest.name).sort())
         .toEqual(["dev-a", "dev-b", "real-legacy-1", "real-legacy-2"]);
     });
-    // Expect "2 legacy plugins" (not 4) — symlinks excluded.
-    expect(warn).toContain("2 legacy plugins loaded without artifact hash");
+    // #343b: full count (4), not 2 as in #341b.
+    expect(err).toContain("4 legacy plugins loaded without artifact hash");
+  });
+
+  test("MAW_QUIET=1 → legacy warning is suppressed", async () => {
+    plantLegacyDir("real-legacy-1");
+    plantLegacyDir("real-legacy-2");
+    plantLegacySymlink("dev-a");
+    process.env.MAW_QUIET = "1";
+    const err = await captureStderr(() => {
+      const plugins = discoverPackages();
+      expect(plugins.length).toBe(3);
+    });
+    expect(err).not.toContain("legacy plugin");
+  });
+
+  test("setVerbosityFlags({ quiet: true }) → legacy warning is suppressed", async () => {
+    plantLegacyDir("real-legacy-1");
+    setVerbosityFlags({ quiet: true });
+    const err = await captureStderr(() => {
+      const plugins = discoverPackages();
+      expect(plugins.length).toBe(1);
+    });
+    expect(err).not.toContain("legacy plugin");
   });
 });
