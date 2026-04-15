@@ -1,9 +1,19 @@
 {
   "name": "@maw/sdk",
-  "version": "1.0.0",
+  "version": "1.0.0-alpha.1",
   "description": "maw-js plugin SDK — stable typed API for plugin authors.",
   "license": "BUSL-1.1",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Soul-Brews-Studio/maw-js.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://github.com/Soul-Brews-Studio/maw-js/tree/main/packages/sdk#readme",
+  "bugs": "https://github.com/Soul-Brews-Studio/maw-js/issues",
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./index.ts",
   "types": "./index.d.ts",
   "exports": {
@@ -21,6 +31,7 @@
     "index.d.ts",
     "plugin.ts",
     "plugin.d.ts",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ]
 }
