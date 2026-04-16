@@ -95,6 +95,17 @@ export async function routeTools(cmd: string, args: string[]): Promise<boolean> 
     return true;
   }
   if (cmd === "serve") {
+    // Reject unknown flags BEFORE starting the server — alpha.72 gate already
+    // caught --help (hasHelpFlag). Anything else starting with "-" is a typo.
+    // Footgun without this: `maw serve --unknown-flag` silently started a
+    // duplicate server (integration-tester iter 13 recon).
+    const unknownFlag = args.slice(1).find(a => a.startsWith("-"));
+    if (unknownFlag) {
+      const { UserError } = await import("../core/util/user-error");
+      console.error(`\x1b[31m✗\x1b[0m unknown flag '${unknownFlag}' for 'maw serve'`);
+      console.error(`  usage: maw serve [port]  (run 'maw serve --help' for more)`);
+      throw new UserError(`unknown flag '${unknownFlag}'`);
+    }
     const portArg = args.find(a => a !== "serve" && /^\d+$/.test(a));
     const { startServer } = await import("../core/server");
     startServer(portArg ? +portArg : 3456);
