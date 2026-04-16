@@ -10,7 +10,10 @@ import { ghqFindSync } from "../core/ghq";
 
 export async function runUpdate(args: string[]): Promise<void> {
   const { repository } = require("../../package.json");
-  let ref = args[1] || "main";
+  // args[0] is "update"; first non-flag positional is the ref.
+  // Prevents `maw update --yes` from treating "--yes" as a ref (alpha.72 fix).
+  const positionals = args.slice(1).filter(a => !a.startsWith("-"));
+  let ref = positionals[0] || "main";
 
   const UPDATE_HELP_TEXT = [
     "usage: maw update [ref]",
@@ -36,10 +39,13 @@ export async function runUpdate(args: string[]): Promise<void> {
     process.exit(0);
   }
 
-  // Layer 2: reject refs that look like flags — defense-in-depth (#356)
-  // Catches `maw update alpha --help` where --help somehow lands in args[1]
-  if (ref.startsWith("--")) {
-    console.error(`\x1b[31merror\x1b[0m: invalid ref "${ref}" — looks like a flag. Run \`maw update --help\` for usage.`);
+  // Layer 2: reject unknown flag-looking args — defense-in-depth (#356).
+  // Catches typos like `--yess` for `--yes`. Known flags are allowed; positional
+  // filter above already extracted the ref, so a bad flag here is user error.
+  const KNOWN_FLAGS = new Set(["--yes", "-y", "--help", "-h"]);
+  const unknownFlag = args.slice(1).find(a => a.startsWith("-") && !KNOWN_FLAGS.has(a));
+  if (unknownFlag) {
+    console.error(`\x1b[31merror\x1b[0m: invalid ref "${unknownFlag}" — looks like a flag. Run \`maw update --help\` for usage.`);
     process.exit(1);
   }
 
@@ -86,6 +92,14 @@ export async function runUpdate(args: string[]): Promise<void> {
   // Confirmation gate — show from→to, ask before destructive install.
   // Skip with --yes/-y for scripted usage (e.g. fleet update).
   if (!args.includes("--yes") && !args.includes("-y")) {
+    // Non-interactive environments (Claude Code sandbox, CI, piped) have no
+    // /dev/tty → openSync would throw ENXIO. Bail with an actionable hint
+    // instead (alpha.72 fix — reported by user trying `maw update` in a
+    // non-TTY sandbox).
+    if (!process.stdin.isTTY) {
+      console.error("  \x1b[31m✗\x1b[0m non-interactive environment — re-run with --yes (or -y) to skip confirmation");
+      process.exit(1);
+    }
     process.stdout.write("  proceed? [y/N] ");
     const buf = Buffer.alloc(8);
     const fd = openSync("/dev/tty", "r");

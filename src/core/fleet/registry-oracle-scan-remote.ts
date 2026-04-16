@@ -45,7 +45,11 @@ export async function scanRemote(orgs?: string[], verbose = false): Promise<Orac
         if (seen.has(key)) continue;
         seen.add(key);
 
-        if (verbose) process.stdout.write(`  \x1b[90m  checking ${repoName}...\x1b[0m`);
+        // Per-repo progress — always visible. Without this, ψ/ detection on
+        // a large org (e.g. laris-co with 34 oracles × ~1.5s each gh api
+        // call) looks frozen for ~50s (user report 2026-04-16, alpha.72).
+        // --verbose is no longer needed for per-repo visibility.
+        process.stdout.write(`  \x1b[90m  checking ${repoName}...\x1b[0m`);
 
         // Check for ψ/ directory via API (light — just HEAD check)
         let hasPsi = false;
@@ -54,7 +58,7 @@ export async function scanRemote(orgs?: string[], verbose = false): Promise<Orac
           hasPsi = true;
         } catch { /* no ψ/ */ }
 
-        if (verbose) console.log(hasPsi ? " \x1b[32mψ/\x1b[0m" : " \x1b[90m—\x1b[0m");
+        console.log(hasPsi ? " \x1b[32mψ/\x1b[0m" : " \x1b[90m—\x1b[0m");
 
         entries.push({
           org,
