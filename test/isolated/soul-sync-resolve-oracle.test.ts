@@ -23,18 +23,10 @@ const mockExec = async (cmd: string, _host?: string) => {
 mock.module("../../src/config", () =>
   mockConfigModule(() => ({ host: "local" })),
 );
-mock.module("../../src/core/transport/ssh", () => ({
+import { mockSshModule } from "../helpers/mock-ssh";
+mock.module("../../src/core/transport/ssh", () => mockSshModule({
   hostExec: mockExec,
   ssh: mockExec,
-  findWindow: () => null,
-  listSessions: async () => [],
-  capture: async () => "",
-  sendKeys: async () => {},
-  selectWindow: async () => {},
-  switchClient: async () => {},
-  getPaneCommand: async () => "",
-  getPaneCommands: async () => ({}),
-  getPaneInfos: async () => ({}),
 }));
 
 const { resolveOraclePath } = await import("../../src/commands/plugins/soul-sync/impl");

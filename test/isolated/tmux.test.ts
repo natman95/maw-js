@@ -14,14 +14,10 @@ const mockExec = async (cmd: string, _host?: string) => {
   commands.push(cmd);
   return sshResult;
 };
-mock.module("../../src/core/transport/ssh", () => ({
+import { mockSshModule } from "../helpers/mock-ssh";
+mock.module("../../src/core/transport/ssh", () => mockSshModule({
   hostExec: mockExec,
   ssh: mockExec,
-  // Stub: real findWindow/listSessions are tested in 00-ssh.test.ts (loads
-  // first alphabetically). listSessions stub is needed so other test files
-  // that transitively import ../src/ssh don't crash on global mock pollution.
-  findWindow: () => null,
-  listSessions: async () => [],
 }));
 
 // Ensure no socket env var leaks into tests
@@ -263,7 +259,7 @@ describe("Tmux", () => {
       // Regression: tmux.run() previously wrapped every command with
       // `2>/dev/null`, making wake failures surface as bare "exit 1".
       const throwExec = async (_cmd: string) => { throw new Error("can't find session: neo"); };
-      mock.module("../../src/core/transport/ssh", () => ({
+      mock.module("../../src/core/transport/ssh", () => mockSshModule({
         hostExec: throwExec,
         ssh: throwExec,
       }));
@@ -274,7 +270,7 @@ describe("Tmux", () => {
     test("built command does not include 2>/dev/null", async () => {
       let captured = "";
       const capExec = async (cmd: string) => { captured = cmd; return ""; };
-      mock.module("../../src/core/transport/ssh", () => ({
+      mock.module("../../src/core/transport/ssh", () => mockSshModule({
         hostExec: capExec,
         ssh: capExec,
       }));
@@ -290,7 +286,7 @@ describe("Tmux", () => {
       // Override mock to throw
       const orig = commands;
       const throwExec2 = async () => { throw new Error("session not found"); };
-      mock.module("../../src/core/transport/ssh", () => ({
+      mock.module("../../src/core/transport/ssh", () => mockSshModule({
         hostExec: throwExec2,
         ssh: throwExec2,
       }));
@@ -309,7 +305,7 @@ describe("Tmux", () => {
         capturedHost = host;
         return "";
       };
-      mock.module("../../src/core/transport/ssh", () => ({
+      mock.module("../../src/core/transport/ssh", () => mockSshModule({
         hostExec: hostMock,
         ssh: hostMock,
       }));

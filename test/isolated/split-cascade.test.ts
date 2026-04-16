@@ -1,5 +1,6 @@
 import { describe, test, expect, mock, beforeEach, afterEach } from "bun:test";
 import { mockConfigModule } from "../helpers/mock-config";
+import { mockSshModule } from "../helpers/mock-ssh";
 
 // Regression for #365: `maw bud --split` silently no-ops on 2nd+ bud from
 // same parent. Root cause: cmdSplit emitted `tmux split-window` without -t,
@@ -15,22 +16,14 @@ const mockExec = async (cmd: string, _host?: string) => {
 mock.module("../../src/config", () =>
   mockConfigModule(() => ({ host: "local" })),
 );
-mock.module("../../src/core/transport/ssh", () => ({
+mock.module("../../src/core/transport/ssh", () => mockSshModule({
   hostExec: mockExec,
   ssh: mockExec,
-  findWindow: () => null,
   listSessions: async () => [
     { name: "05-volt", windows: [{ index: 0, name: "main" }] },
     { name: "106-tennis-court-v2", windows: [{ index: 0, name: "main" }] },
     { name: "107-volt-pv", windows: [{ index: 0, name: "main" }] },
   ],
-  capture: async () => "",
-  sendKeys: async () => {},
-  selectWindow: async () => {},
-  switchClient: async () => {},
-  getPaneCommand: async () => "",
-  getPaneCommands: async () => ({}),
-  getPaneInfos: async () => ({}),
 }));
 
 const { cmdSplit } = await import("../../src/commands/plugins/split/impl");

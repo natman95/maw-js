@@ -16,6 +16,7 @@
     "dev": "pm2 start ecosystem.config.cjs",
     "test": "bun test test/ --path-ignore-patterns '**/maw-js/**' --path-ignore-patterns '**/test/isolated/**' --path-ignore-patterns '**/zz-mock-tmux-smoke*'",
     "test:isolated": "bun test test/isolated/ --path-ignore-patterns '**/maw-js/**'",
+    "test:isolated:random": "bun test test/isolated/ --path-ignore-patterns '**/maw-js/**' --randomize",
     "test:mock-smoke": "bun test test/zz-mock-tmux-smoke.test.ts",
     "test:plugin": "bun test src/commands/plugins/",
     "test:all": "bun run test && bun run test:isolated && bun run test:mock-smoke && bun run test:plugin",
