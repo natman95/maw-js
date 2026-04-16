@@ -47,8 +47,7 @@ export async function cmdPluginInstall(args: string[]): Promise<void> {
   const src = flags._[0];
 
   if (!src || src === "--help" || src === "-h") {
-    console.error("usage: maw plugin install <dir | .tgz | URL> [--link]");
-    process.exit(1);
+    throw new Error("usage: maw plugin install <dir | .tgz | URL> [--link]");
   }
 
   ensureInstallRoot();

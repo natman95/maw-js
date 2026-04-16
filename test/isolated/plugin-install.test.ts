@@ -64,7 +64,19 @@ async function capture(fn: () => Promise<unknown>): Promise<{
   };
   (process as any).exit = (c?: number) => { exitCode = c ?? 0; throw new Error("__exit__:" + exitCode); };
   try { await fn(); }
-  catch (e: any) { if (!String(e?.message ?? "").startsWith("__exit__")) throw e; }
+  catch (e: any) {
+    // Real Error from a handler (post-alpha.57 throw-instead-of-exit pattern):
+    // treat as exit 1 and surface the message in stderr so existing assertions hold.
+    const msg = String(e?.message ?? "");
+    if (!msg.startsWith("__exit__")) {
+      if (e instanceof Error && exitCode === undefined) {
+        exitCode = 1;
+        errs.push(msg);
+      } else {
+        throw e;
+      }
+    }
+  }
   finally {
     (process as any).exit = o.exit; console.log = o.log;
     console.error = o.err; console.warn = o.warn;

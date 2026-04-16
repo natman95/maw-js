@@ -22,11 +22,7 @@ export interface CaptureOpts {
  */
 export async function cmdCapture(target: string, opts: CaptureOpts = {}) {
   if (!target) {
-    console.error("usage: maw capture <target> [--pane N] [--lines N] [--full]");
-    console.error("  e.g. maw capture mawjs");
-    console.error("       maw capture neo:0 --pane 1 --lines 100");
-    console.error("       maw capture mawjs --full");
-    process.exit(1);
+    throw new Error("usage: maw capture <target> [--pane N] [--lines N] [--full]\n  e.g. maw capture mawjs\n       maw capture neo:0 --pane 1 --lines 100\n       maw capture mawjs --full");
   }
 
   let resolved: string;
@@ -37,15 +33,14 @@ export async function cmdCapture(target: string, opts: CaptureOpts = {}) {
     if (r.kind === "ambiguous") {
       console.error(`  \x1b[31m✗\x1b[0m '${rawSession}' is ambiguous — matches ${r.candidates.length} sessions:`);
       for (const s of r.candidates) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
-      process.exit(1);
+      throw new Error(`'${rawSession}' is ambiguous — matches ${r.candidates.length} sessions`);
     }
     if (r.kind === "none") {
-      console.error(`  \x1b[31m✗\x1b[0m session '${rawSession}' not found`);
       if (r.hints && r.hints.length > 0) {
         console.error(`  \x1b[90m  did you mean:\x1b[0m`);
         for (const s of r.hints) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
       }
-      process.exit(1);
+      throw new Error(`session '${rawSession}' not found`);
     }
     resolved = `${r.match.name}:${rest}`;
   } else {
@@ -54,17 +49,16 @@ export async function cmdCapture(target: string, opts: CaptureOpts = {}) {
     if (r.kind === "ambiguous") {
       console.error(`  \x1b[31m✗\x1b[0m '${target}' is ambiguous — matches ${r.candidates.length} sessions:`);
       for (const s of r.candidates) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
-      process.exit(1);
+      throw new Error(`'${target}' is ambiguous — matches ${r.candidates.length} sessions`);
     }
     if (r.kind === "none") {
-      console.error(`  \x1b[31m✗\x1b[0m session '${target}' not found`);
       if (r.hints && r.hints.length > 0) {
         console.error(`  \x1b[90m  did you mean:\x1b[0m`);
         for (const s of r.hints) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
       } else {
         console.error(`  \x1b[90m  try: maw ls\x1b[0m`);
       }
-      process.exit(1);
+      throw new Error(`session '${target}' not found`);
     }
     resolved = `${r.match.name}:${r.match.windows[0]?.index ?? 0}`;
   }
@@ -84,7 +78,6 @@ export async function cmdCapture(target: string, opts: CaptureOpts = {}) {
     }
     if (raw) console.log(raw);
   } catch (e: any) {
-    console.error(`  \x1b[31m✗\x1b[0m capture failed: ${e.message || e}`);
-    process.exit(1);
+    throw new Error(`capture failed: ${e.message || e}`);
   }
 }

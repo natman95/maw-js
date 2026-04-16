@@ -15,10 +15,7 @@ export interface ZoomOpts {
  */
 export async function cmdZoom(target: string, opts: ZoomOpts = {}) {
   if (!target) {
-    console.error("usage: maw zoom <target> [--pane N]");
-    console.error("  e.g. maw zoom mawjs");
-    console.error("       maw zoom neo:0 --pane 1");
-    process.exit(1);
+    throw new Error("usage: maw zoom <target> [--pane N]\n  e.g. maw zoom mawjs\n       maw zoom neo:0 --pane 1");
   }
 
   let resolved: string;
@@ -29,15 +26,14 @@ export async function cmdZoom(target: string, opts: ZoomOpts = {}) {
     if (r.kind === "ambiguous") {
       console.error(`  \x1b[31m✗\x1b[0m '${rawSession}' is ambiguous — matches ${r.candidates.length} sessions:`);
       for (const s of r.candidates) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
-      process.exit(1);
+      throw new Error(`'${rawSession}' is ambiguous — matches ${r.candidates.length} sessions`);
     }
     if (r.kind === "none") {
-      console.error(`  \x1b[31m✗\x1b[0m session '${rawSession}' not found`);
       if (r.hints && r.hints.length > 0) {
         console.error(`  \x1b[90m  did you mean:\x1b[0m`);
         for (const s of r.hints) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
       }
-      process.exit(1);
+      throw new Error(`session '${rawSession}' not found`);
     }
     resolved = `${r.match.name}:${rest}`;
   } else {
@@ -46,17 +42,16 @@ export async function cmdZoom(target: string, opts: ZoomOpts = {}) {
     if (r.kind === "ambiguous") {
       console.error(`  \x1b[31m✗\x1b[0m '${target}' is ambiguous — matches ${r.candidates.length} sessions:`);
       for (const s of r.candidates) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
-      process.exit(1);
+      throw new Error(`'${target}' is ambiguous — matches ${r.candidates.length} sessions`);
     }
     if (r.kind === "none") {
-      console.error(`  \x1b[31m✗\x1b[0m session '${target}' not found`);
       if (r.hints && r.hints.length > 0) {
         console.error(`  \x1b[90m  did you mean:\x1b[0m`);
         for (const s of r.hints) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
       } else {
         console.error(`  \x1b[90m  try: maw ls\x1b[0m`);
       }
-      process.exit(1);
+      throw new Error(`session '${target}' not found`);
     }
     resolved = `${r.match.name}:${r.match.windows[0]?.index ?? 0}`;
   }
@@ -69,7 +64,6 @@ export async function cmdZoom(target: string, opts: ZoomOpts = {}) {
     await hostExec(`${tmux} resize-pane -Z -t '${full}'`);
     console.log(`  \x1b[32m✓\x1b[0m toggled zoom on ${full}`);
   } catch (e: any) {
-    console.error(`  \x1b[31m✗\x1b[0m zoom failed: ${e.message || e}`);
-    process.exit(1);
+    throw new Error(`zoom failed: ${e.message || e}`);
   }
 }

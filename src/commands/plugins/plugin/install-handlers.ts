@@ -14,21 +14,18 @@ import { readManifest, printInstallSuccess } from "./install-manifest-helpers";
 
 export async function installFromDir(srcDir: string): Promise<void> {
   if (!existsSync(srcDir)) {
-    console.error(`\x1b[31m✗\x1b[0m source not found: ${srcDir}`);
-    process.exit(1);
+    throw new Error(`source not found: ${srcDir}`);
   }
   if (!statSync(srcDir).isDirectory()) {
-    console.error(`\x1b[31m✗\x1b[0m not a directory: ${srcDir}`);
-    process.exit(1);
+    throw new Error(`not a directory: ${srcDir}`);
   }
   const manifest = readManifest(srcDir);
-  if (!manifest) process.exit(1);
+  if (!manifest) throw new Error("failed to read plugin manifest");
 
   // Semver gate — before symlinking, so a broken plugin never lands.
   const runtime = runtimeSdkVersion();
   if (!satisfies(runtime, manifest!.sdk)) {
-    console.error(formatSdkMismatchError(manifest!.name, manifest!.sdk, runtime));
-    process.exit(1);
+    throw new Error(formatSdkMismatchError(manifest!.name, manifest!.sdk, runtime));
   }
 
   const dest = join(installRoot(), manifest!.name);
@@ -43,8 +40,7 @@ export async function installFromTarball(
   opts: { source: string },
 ): Promise<void> {
   if (!existsSync(tarballPath)) {
-    console.error(`\x1b[31m✗\x1b[0m tarball not found: ${tarballPath}`);
-    process.exit(1);
+    throw new Error(`tarball not found: ${tarballPath}`);
   }
 
   // Extract into a staging dir so we can read the manifest + verify hash
@@ -53,28 +49,25 @@ export async function installFromTarball(
   const extractResult = extractTarball(tarballPath, staging);
   if (!extractResult.ok) {
     rmSync(staging, { recursive: true, force: true });
-    console.error(`\x1b[31m✗\x1b[0m ${extractResult.error}`);
-    process.exit(1);
+    throw new Error(extractResult.error);
   }
 
   const manifest = readManifest(staging);
   if (!manifest) {
     rmSync(staging, { recursive: true, force: true });
-    process.exit(1);
+    throw new Error("failed to read plugin manifest");
   }
 
   const runtime = runtimeSdkVersion();
   if (!satisfies(runtime, manifest!.sdk)) {
     rmSync(staging, { recursive: true, force: true });
-    console.error(formatSdkMismatchError(manifest!.name, manifest!.sdk, runtime));
-    process.exit(1);
+    throw new Error(formatSdkMismatchError(manifest!.name, manifest!.sdk, runtime));
   }
 
   const hashResult = verifyArtifactHash(staging, manifest!);
   if (!hashResult.ok) {
     rmSync(staging, { recursive: true, force: true });
-    console.error(`\x1b[31m✗\x1b[0m ${hashResult.error}`);
-    process.exit(1);
+    throw new Error(hashResult.error);
   }
 
   // All gates passed — move staging into the install root.
@@ -102,8 +95,7 @@ export async function installFromTarball(
 export async function installFromUrl(url: string): Promise<void> {
   const dl = await downloadTarball(url);
   if (!dl.ok) {
-    console.error(`\x1b[31m✗\x1b[0m ${dl.error}`);
-    process.exit(1);
+    throw new Error(dl.error);
   }
   try {
     await installFromTarball(dl.path, { source: url });

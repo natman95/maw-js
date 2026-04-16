@@ -10,9 +10,7 @@ export function cmdTeamResume(name: string, opts: { model?: string } = {}) {
   const manifestPath = join(PSI, "memory", "mailbox", "teams", name, "manifest.json");
 
   if (!existsSync(manifestPath)) {
-    console.error(`\x1b[31m✗\x1b[0m no archived team '${name}' found`);
-    console.error(`  \x1b[90mlooked in: ${manifestPath}\x1b[0m`);
-    process.exit(1);
+    throw new Error(`no archived team '${name}' found — looked in: ${manifestPath}`);
   }
 
   const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));

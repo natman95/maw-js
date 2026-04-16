@@ -7,8 +7,7 @@ import { hostExec } from "../../../sdk";
  */
 export async function cmdWhoami() {
   if (!process.env.TMUX) {
-    console.error("maw whoami requires an active tmux session");
-    process.exit(1);
+    throw new Error("maw whoami requires an active tmux session");
   }
   const raw = await hostExec(`tmux display-message -p '#S'`);
   console.log(raw.trim());

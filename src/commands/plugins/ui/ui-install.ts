@@ -49,9 +49,8 @@ export async function cmdUiInstall(version?: string): Promise<void> {
     const dl = spawnSync("gh", buildGhReleaseArgs(REPO, version, tmpDir), { encoding: "utf-8" });
 
     if (dl.status !== 0) {
-      console.error(`✗ gh release download failed:\n${dl.stderr}`);
       console.error(`  → ensure: gh auth status, and a release with maw-ui-dist.tar.gz asset exists`);
-      process.exit(1);
+      throw new Error(`gh release download failed:\n${dl.stderr}`);
     }
 
     const tarPath = join(tmpDir, "maw-ui-dist.tar.gz");
@@ -64,14 +63,12 @@ export async function cmdUiInstall(version?: string): Promise<void> {
       encoding: "utf-8",
     });
     if (ext.status !== 0) {
-      console.error(`✗ tar extraction failed:\n${ext.stderr}`);
-      process.exit(1);
+      throw new Error(`tar extraction failed:\n${ext.stderr}`);
     }
 
     const files = readdirSync(DIST_DIR);
     if (files.length === 0) {
-      console.error(`✗ no files extracted to ${DIST_DIR}`);
-      process.exit(1);
+      throw new Error(`no files extracted to ${DIST_DIR}`);
     }
 
     console.log(`✓ maw-ui ${displayRef} installed → ${DIST_DIR} (${files.length} top-level entries)`);

@@ -45,7 +45,15 @@ async function initIn(cwd: string, args: string[]): Promise<void> {
   }
 }
 
-/** Run fn with process.exit + console.error captured. Returns {exitCode, errors}. */
+/**
+ * Run fn with process.exit + console.error captured. Returns {exitCode, errors}.
+ *
+ * After alpha.57 (process.exit silent-fail audit), most plugin handlers throw
+ * `new Error()` instead of calling `process.exit(1)`. The handler's try/catch
+ * up the call stack converts the throw into an exit. To keep these tests
+ * stable across both styles, this helper treats a thrown Error as exitCode=1
+ * and captures its message as part of `errors`.
+ */
 async function captureExit(fn: () => Promise<unknown>): Promise<{ exitCode: number | undefined; errors: string }> {
   const origExit = process.exit;
   const origError = console.error;
@@ -58,8 +66,14 @@ async function captureExit(fn: () => Promise<unknown>): Promise<{ exitCode: numb
   };
   try {
     await fn();
-  } catch {
-    // expected when process.exit fires
+  } catch (e: any) {
+    // process.exit fired: exitCode already set (and the Error message starts with "exit:").
+    // Real Error thrown by a handler (post-alpha.57 pattern): treat as exit 1
+    // and surface the message in `errors` so existing /invalid name/ etc. assertions hold.
+    if (exitCode === undefined && e instanceof Error && !e.message.startsWith("exit:")) {
+      exitCode = 1;
+      errs.push(e.message);
+    }
   } finally {
     (process as any).exit = origExit;
     console.error = origError;

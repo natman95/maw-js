@@ -37,22 +37,20 @@ export async function cmdSplit(target: string, opts: SplitOpts = {}) {
   // Safe for "session:window" form: nothing to strip unless the user adds a literal slash.
   target = normalizeTarget(target);
   if (!process.env.TMUX) {
-    console.error("  \x1b[31m✗\x1b[0m maw split requires an active tmux session");
-    process.exit(1);
+    throw new Error("maw split requires an active tmux session");
   }
 
   if (!target) {
     console.error("usage: maw split <target> [--pct N] [--vertical] [--no-attach]");
     console.error("  e.g. maw split yeast");
     console.error("       maw split mawjs-view --pct 30 --vertical");
-    process.exit(1);
+    throw new Error("usage: maw split <target> [--pct N] [--vertical] [--no-attach]");
   }
 
   // Validate pct early so bad input never reaches tmux
   const pct = opts.pct ?? 50;
   if (!Number.isFinite(pct) || pct < 1 || pct > 99) {
-    console.error(`  \x1b[31m✗\x1b[0m --pct must be 1-99 (got ${pct})`);
-    process.exit(1);
+    throw new Error(`--pct must be 1-99 (got ${pct})`);
   }
 
   // Resolve target to session:window if bare name given. Resolution rules
@@ -69,7 +67,7 @@ export async function cmdSplit(target: string, opts: SplitOpts = {}) {
         console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
       }
       console.error(`  \x1b[90m  use the full name: maw split <exact-session>\x1b[0m`);
-      process.exit(1);
+      throw new Error(`'${target}' is ambiguous`);
     }
     if (r.kind === "none") {
       console.error(`  \x1b[31m✗\x1b[0m session '${target}' not found in fleet`);
@@ -80,7 +78,7 @@ export async function cmdSplit(target: string, opts: SplitOpts = {}) {
         }
       }
       console.error(`  \x1b[90m  try: maw ls\x1b[0m`);
-      process.exit(1);
+      throw new Error(`session '${target}' not found in fleet`);
     }
 
     resolved = `${r.match.name}:${r.match.windows[0]?.index ?? 0}`;
@@ -122,7 +120,6 @@ export async function cmdSplit(target: string, opts: SplitOpts = {}) {
     const action = opts.noAttach ? "empty pane" : resolved;
     console.log(`  \x1b[32m✓\x1b[0m split ${side} — ${action} (${pct}%)`);
   } catch (e: any) {
-    console.error(`  \x1b[31m✗\x1b[0m split failed: ${e.message || e}`);
-    process.exit(1);
+    throw new Error(`split failed: ${e.message || e}`);
   }
 }

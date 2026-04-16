@@ -27,8 +27,7 @@ export async function cmdAssign(issueUrl: string, opts: { oracle?: string }): Pr
     oracle = await detectCurrentOracle() ?? undefined;
   }
   if (!oracle) {
-    console.error("could not detect oracle — pass --oracle <name>");
-    process.exit(1);
+    throw new Error("could not detect oracle — pass --oracle <name>");
   }
 
   console.log(`\x1b[36m⚡\x1b[0m fetching issue #${issueNum} from ${slug}...`);

@@ -19,9 +19,8 @@ export async function cmdPing(node?: string) {
       const legacy = legacyPeers.find((u: string) => u.includes(node));
       if (legacy) targets.push({ name: node, url: legacy });
       else {
-        console.error(`\x1b[31merror\x1b[0m: unknown node "${node}"`);
         console.error(`\x1b[33mknown\x1b[0m: ${peers.map((p: any) => p.name).join(", ") || "(none)"}`);
-        process.exit(1);
+        throw new Error(`unknown node "${node}"`);
       }
     }
   } else {

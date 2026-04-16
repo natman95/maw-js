@@ -11,8 +11,7 @@ async function currentSession(): Promise<string> {
   try {
     return (await tmux.run("display-message", "-p", "#S")).trim();
   } catch {
-    console.error("\x1b[31merror\x1b[0m: not inside a tmux session");
-    process.exit(1);
+    throw new Error("not inside a tmux session");
   }
 }
 
@@ -54,9 +53,8 @@ export async function cmdTab(tabArgs: string[]) {
   const tabs = await listTabs(session);
   const tab = tabs.find(t => t.index === tabNum);
   if (!tab) {
-    console.error(`\x1b[31merror\x1b[0m: tab ${tabNum} not found in session \x1b[36m${session}\x1b[0m`);
     console.error(`available: ${tabs.map(t => t.index).join(", ")}`);
-    process.exit(1);
+    throw new Error(`tab ${tabNum} not found in session ${session}`);
   }
 
   const hasTalk = tabArgs.includes("--talk");

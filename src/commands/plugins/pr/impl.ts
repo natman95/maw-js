@@ -16,8 +16,7 @@ function extractIssueNum(branch: string): number | null {
 
 export async function cmdPr(window?: string): Promise<void> {
   if (!process.env.TMUX) {
-    console.error("not in a tmux session — run inside tmux");
-    process.exit(1);
+    throw new Error("not in a tmux session — run inside tmux");
   }
 
   // Get cwd of target window (or current pane)
@@ -30,8 +29,7 @@ export async function cmdPr(window?: string): Promise<void> {
   }
 
   if (!cwd) {
-    console.error("could not detect working directory");
-    process.exit(1);
+    throw new Error("could not detect working directory");
   }
 
   // Get current branch
@@ -39,12 +37,10 @@ export async function cmdPr(window?: string): Promise<void> {
   try {
     branch = (await hostExec(`git -C '${cwd}' branch --show-current`)).trim();
   } catch {
-    console.error(`not a git repo: ${cwd}`);
-    process.exit(1);
+    throw new Error(`not a git repo: ${cwd}`);
   }
   if (!branch) {
-    console.error("detached HEAD — cannot create PR");
-    process.exit(1);
+    throw new Error("detached HEAD — cannot create PR");
   }
 
   const title = branchToTitle(branch);
@@ -61,7 +57,6 @@ export async function cmdPr(window?: string): Promise<void> {
     const result = await hostExec(`cd '${cwd}' && gh pr create --title '${titleEscaped}' ${bodyFlag}`);
     console.log(`\x1b[32m✅\x1b[0m ${result}`);
   } catch (e: any) {
-    console.error(`\x1b[31m✗\x1b[0m ${e.message}`);
-    process.exit(1);
+    throw new Error(e.message);
   }
 }

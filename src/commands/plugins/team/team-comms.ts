@@ -6,8 +6,7 @@ import { loadTeam, writeMessage, resolvePsi } from "./team-helpers";
 
 export function cmdTeamSend(teamName: string, agent: string, message: string) {
   if (!message) {
-    console.error(`\x1b[31m✗\x1b[0m usage: maw team send <team> <agent> <message>`);
-    process.exit(1);
+    throw new Error("usage: maw team send <team> <agent> <message>");
   }
 
   // Try CC team inbox first (live team), fallback to vault mailbox

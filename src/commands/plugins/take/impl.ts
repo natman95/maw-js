@@ -17,7 +17,7 @@ export async function cmdTake(source: string, targetSession?: string) {
   if (!srcWindow) {
     console.error("usage: maw take <session>:<window> [target-session]");
     console.error("  e.g. maw take neo:neo-skills pulse");
-    process.exit(1);
+    throw new Error("usage: maw take <session>:<window> [target-session]");
   }
 
   // Resolve target session
@@ -31,8 +31,7 @@ export async function cmdTake(source: string, targetSession?: string) {
       await hostExec(`tmux new-session -d -s '${target}'`);
     } catch (e: any) {
       if (!e.message?.includes("duplicate")) {
-        console.error(`  \x1b[31m✗\x1b[0m could not create session '${target}': ${e.message}`);
-        process.exit(1);
+        throw new Error(`could not create session '${target}': ${e.message}`);
       }
     }
   }
@@ -46,16 +45,14 @@ export async function cmdTake(source: string, targetSession?: string) {
   const sessions = await listSessions();
   const srcSess = sessions.find(s => s.name.toLowerCase() === srcSession.toLowerCase());
   if (!srcSess) {
-    console.error(`  \x1b[31m✗\x1b[0m session '${srcSession}' not found`);
-    process.exit(1);
+    throw new Error(`session '${srcSession}' not found`);
   }
 
   const srcWin = srcSess.windows.find(w =>
     w.name.toLowerCase() === srcWindow.toLowerCase() || String(w.index) === srcWindow
   );
   if (!srcWin) {
-    console.error(`  \x1b[31m✗\x1b[0m window '${srcWindow}' not found in session '${srcSession}'`);
-    process.exit(1);
+    throw new Error(`window '${srcWindow}' not found in session '${srcSession}'`);
   }
 
   // Get the window's cwd before moving
@@ -76,7 +73,6 @@ export async function cmdTake(source: string, targetSession?: string) {
       console.log(`  \x1b[90m  cwd: ${paneCwd}\x1b[0m`);
     }
   } catch (e: any) {
-    console.error(`  \x1b[31m✗\x1b[0m move failed: ${e.message || e}`);
-    process.exit(1);
+    throw new Error(`move failed: ${e.message || e}`);
   }
 }

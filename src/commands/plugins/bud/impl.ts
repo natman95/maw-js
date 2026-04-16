@@ -47,16 +47,15 @@ export async function cmdBud(name: string, opts: BudOpts = {}) {
   name = normalizeTarget(name);
   // Oracle names: alphanumeric + hyphens only, must start with a letter
   if (!/^[a-zA-Z][a-zA-Z0-9-]*$/.test(name)) {
-    console.error(`  \x1b[31m✗\x1b[0m invalid oracle name: "${name}"`);
-    console.error(`  \x1b[90m  names must start with a letter and contain only letters, numbers, hyphens\x1b[0m`);
-    process.exit(1);
+    throw new Error(
+      `invalid oracle name: "${name}" — names must start with a letter and contain only letters, numbers, hyphens`,
+    );
   }
   // #358 — reject -view suffix (reserved for ephemeral grouped sessions).
   try {
     assertValidOracleName(name);
   } catch (e: any) {
-    console.error(`  \x1b[31m✗\x1b[0m ${e.message}`);
-    process.exit(1);
+    throw new Error(e.message);
   }
 
   // Runtime guard: stem must NOT end with -oracle (the plugin auto-appends it).
@@ -89,8 +88,7 @@ export async function cmdBud(name: string, opts: BudOpts = {}) {
       const repoName = cwd.split("/").pop() || "";
       parentName = repoName.replace(/\.wt-.*$/, "").replace(/-oracle$/, "");
     } catch {
-      console.error("  \x1b[31m✗\x1b[0m could not detect parent oracle. Use --from <oracle> or --root");
-      process.exit(1);
+      throw new Error("could not detect parent oracle. Use --from <oracle> or --root");
     }
   }
 

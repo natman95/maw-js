@@ -25,7 +25,7 @@ export async function cmdKill(target: string, opts: KillOpts = {}) {
     console.error("  e.g. maw kill mawjs");
     console.error("       maw kill mawjs:0");
     console.error("       maw kill mawjs --pane 1");
-    process.exit(1);
+    throw new Error("usage: maw kill <target>[:window] [--pane N]");
   }
 
   const [rawSession, rawWindow] = target.includes(":")
@@ -42,7 +42,7 @@ export async function cmdKill(target: string, opts: KillOpts = {}) {
       console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
     }
     console.error(`  \x1b[90m  use the full name: maw kill <exact-session>\x1b[0m`);
-    process.exit(1);
+    throw new Error(`'${rawSession}' is ambiguous`);
   }
   if (r.kind === "none") {
     console.error(`  \x1b[31m✗\x1b[0m session '${rawSession}' not found`);
@@ -52,7 +52,7 @@ export async function cmdKill(target: string, opts: KillOpts = {}) {
     } else {
       console.error(`  \x1b[90m  try: maw ls\x1b[0m`);
     }
-    process.exit(1);
+    throw new Error(`session '${rawSession}' not found`);
   }
 
   const session = r.match.name;
@@ -67,8 +67,7 @@ export async function cmdKill(target: string, opts: KillOpts = {}) {
       await hostExec(`${tmux} kill-pane -t '${pane}'`);
       console.log(`  \x1b[32m✓\x1b[0m killed pane ${pane}`);
     } catch (e: any) {
-      console.error(`  \x1b[31m✗\x1b[0m kill-pane failed: ${e.message || e}`);
-      process.exit(1);
+      throw new Error(`kill-pane failed: ${e.message || e}`);
     }
     return;
   }
@@ -79,8 +78,7 @@ export async function cmdKill(target: string, opts: KillOpts = {}) {
       await hostExec(`${tmux} kill-window -t '${win}'`);
       console.log(`  \x1b[32m✓\x1b[0m killed window ${win}`);
     } catch (e: any) {
-      console.error(`  \x1b[31m✗\x1b[0m kill-window failed: ${e.message || e}`);
-      process.exit(1);
+      throw new Error(`kill-window failed: ${e.message || e}`);
     }
     return;
   }
@@ -89,7 +87,6 @@ export async function cmdKill(target: string, opts: KillOpts = {}) {
     await hostExec(`${tmux} kill-session -t '${session}'`);
     console.log(`  \x1b[32m✓\x1b[0m killed session ${session}`);
   } catch (e: any) {
-    console.error(`  \x1b[31m✗\x1b[0m kill-session failed: ${e.message || e}`);
-    process.exit(1);
+    throw new Error(`kill-session failed: ${e.message || e}`);
   }
 }

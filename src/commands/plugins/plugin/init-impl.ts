@@ -27,24 +27,20 @@ export async function cmdPluginInit(args: string[]): Promise<void> {
   const name = flags._[0];
 
   if (!name || name.startsWith("-")) {
-    console.error("usage: maw plugin init <name> --ts");
-    process.exit(1);
+    throw new Error("usage: maw plugin init <name> --ts");
   }
   if (!NAME_RE.test(name)) {
-    console.error(
-      `\x1b[31m✗\x1b[0m invalid name "${name}" — use lowercase letters, digits, hyphens (must start with a letter)`,
+    throw new Error(
+      `invalid name "${name}" — use lowercase letters, digits, hyphens (must start with a letter)`,
     );
-    process.exit(1);
   }
   if (!flags["--ts"]) {
-    console.error("usage: maw plugin init <name> --ts  (only --ts is supported in Phase A)");
-    process.exit(1);
+    throw new Error("usage: maw plugin init <name> --ts  (only --ts is supported in Phase A)");
   }
 
   const dest = join(process.cwd(), name);
   if (existsSync(dest)) {
-    console.error(`\x1b[31m✗\x1b[0m ${dest} already exists`);
-    process.exit(1);
+    throw new Error(`${dest} already exists`);
   }
 
   mkdirSync(join(dest, "src"), { recursive: true });

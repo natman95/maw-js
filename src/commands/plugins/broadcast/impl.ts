@@ -6,8 +6,7 @@ import { tmux } from "../../../sdk";
  */
 export async function cmdBroadcast(message: string) {
   if (!message) {
-    console.error("usage: maw broadcast <message>");
-    process.exit(1);
+    throw new Error("usage: maw broadcast <message>");
   }
 
   // Detect sender from current tmux window

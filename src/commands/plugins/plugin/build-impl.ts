@@ -95,29 +95,23 @@ export async function cmdPluginBuild(args: string[]): Promise<void> {
 async function runBuild(dir: string): Promise<BuildSummary> {
   const manifestPath = join(dir, "plugin.json");
   if (!existsSync(manifestPath)) {
-    console.error(`\x1b[31m✗\x1b[0m no plugin.json in ${dir}`);
-    process.exit(1);
+    throw new Error(`no plugin.json in ${dir}`);
   }
 
   let manifest: any;
   try {
     manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   } catch (e: any) {
-    console.error(`\x1b[31m✗\x1b[0m invalid plugin.json: ${e.message}`);
-    process.exit(1);
+    throw new Error(`invalid plugin.json: ${e.message}`);
   }
 
   // --- Target gate (Phase A: js only; wasm → Phase C message) ---
   const target = manifest.target ?? "js";
   if (target === "wasm") {
-    console.error(
-      `\x1b[31m✗\x1b[0m target "wasm" not yet supported (Phase C). Use target "js" for now.`,
-    );
-    process.exit(1);
+    throw new Error(`target "wasm" not yet supported (Phase C). Use target "js" for now.`);
   }
   if (target !== "js") {
-    console.error(`\x1b[31m✗\x1b[0m unknown target ${JSON.stringify(target)} (expected "js")`);
-    process.exit(1);
+    throw new Error(`unknown target ${JSON.stringify(target)} (expected "js")`);
   }
 
   const name = manifest.name;
@@ -125,8 +119,7 @@ async function runBuild(dir: string): Promise<BuildSummary> {
   const entry = manifest.entry || "./src/index.ts";
   const srcPath = join(dir, entry);
   if (!existsSync(srcPath)) {
-    console.error(`\x1b[31m✗\x1b[0m entry not found: ${srcPath}`);
-    process.exit(1);
+    throw new Error(`entry not found: ${srcPath}`);
   }
 
   const distDir = join(dir, "dist");
@@ -142,8 +135,7 @@ async function runBuild(dir: string): Promise<BuildSummary> {
   );
   const elapsedMs = Date.now() - t0;
   if (build.status !== 0) {
-    console.error(`\x1b[31m✗\x1b[0m bundle failed:\n${build.stderr || build.stdout || "(no output)"}`);
-    process.exit(1);
+    throw new Error(`bundle failed:\n${build.stderr || build.stdout || "(no output)"}`);
   }
 
   const bundleBytes = readFileSync(outFile);
@@ -183,8 +175,7 @@ async function runBuild(dir: string): Promise<BuildSummary> {
     { encoding: "utf8" },
   );
   if (tar.status !== 0) {
-    console.error(`\x1b[31m✗\x1b[0m tarball packing failed: ${tar.stderr || tar.stdout}`);
-    process.exit(1);
+    throw new Error(`tarball packing failed: ${tar.stderr || tar.stdout}`);
   }
 
   // --- Summary ---

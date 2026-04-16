@@ -16,9 +16,8 @@ export async function cmdRename(target: string, newName: string) {
     : windows.find(w => w.name === target);
 
   if (!win) {
-    console.error(`\x1b[31merror\x1b[0m: tab \x1b[33m${target}\x1b[0m not found in \x1b[36m${session}\x1b[0m`);
     console.error(`tabs: ${windows.map(w => `${w.index}:${w.name}`).join(", ")}`);
-    process.exit(1);
+    throw new Error(`tab ${target} not found in ${session}`);
   }
 
   // Auto-prefix: extract oracle name from session (e.g. "03-neo" → "neo")

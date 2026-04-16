@@ -143,8 +143,7 @@ export async function cmdTalkTo(target: string, message: string, force = false) 
       console.log(`\x1b[32m✓\x1b[0m thread #${threadResult.thread_id} updated`);
       console.log(`\x1b[33mwarn\x1b[0m: window "${target}" not found — message saved to thread only`);
     } else {
-      console.error(`\x1b[31merror\x1b[0m: window "${target}" not found`);
-      process.exit(1);
+      throw new Error(`window "${target}" not found`);
     }
     return;
   }
@@ -158,8 +157,7 @@ export async function cmdTalkTo(target: string, message: string, force = false) 
         console.log(`\x1b[32m✓\x1b[0m thread #${threadResult.thread_id} updated`);
         console.log(`\x1b[33mwarn\x1b[0m: no active Claude in ${tmuxTarget} — message saved to thread only`);
       } else {
-        console.error(`\x1b[31merror\x1b[0m: no active Claude session in ${tmuxTarget} (use --force)`);
-        process.exit(1);
+        throw new Error(`no active Claude session in ${tmuxTarget} (use --force)`);
       }
       return;
     }

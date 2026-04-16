@@ -42,15 +42,14 @@ export async function cmdPanes(target?: string, opts: PanesOpts = {}) {
       if (r.kind === "ambiguous") {
         console.error(`  \x1b[31m✗\x1b[0m '${rawSession}' is ambiguous — matches ${r.candidates.length} sessions:`);
         for (const s of r.candidates) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
-        process.exit(1);
+        throw new Error(`'${rawSession}' is ambiguous — matches ${r.candidates.length} sessions`);
       }
       if (r.kind === "none") {
-        console.error(`  \x1b[31m✗\x1b[0m session '${rawSession}' not found`);
         if (r.hints && r.hints.length > 0) {
           console.error(`  \x1b[90m  did you mean:\x1b[0m`);
           for (const s of r.hints) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
         }
-        process.exit(1);
+        throw new Error(`session '${rawSession}' not found`);
       }
       filter = `${r.match.name}:${rest}`;
     } else {
@@ -59,17 +58,16 @@ export async function cmdPanes(target?: string, opts: PanesOpts = {}) {
       if (r.kind === "ambiguous") {
         console.error(`  \x1b[31m✗\x1b[0m '${target}' is ambiguous — matches ${r.candidates.length} sessions:`);
         for (const s of r.candidates) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
-        process.exit(1);
+        throw new Error(`'${target}' is ambiguous — matches ${r.candidates.length} sessions`);
       }
       if (r.kind === "none") {
-        console.error(`  \x1b[31m✗\x1b[0m session '${target}' not found`);
         if (r.hints && r.hints.length > 0) {
           console.error(`  \x1b[90m  did you mean:\x1b[0m`);
           for (const s of r.hints) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
         } else {
           console.error(`  \x1b[90m  try: maw ls\x1b[0m`);
         }
-        process.exit(1);
+        throw new Error(`session '${target}' not found`);
       }
       // Session-wide: use list-panes -s
       filter = r.match.name;
@@ -85,8 +83,7 @@ export async function cmdPanes(target?: string, opts: PanesOpts = {}) {
   try {
     raw = await hostExec(`${tmux} list-panes ${targetFlag} -F '${fmt}'`);
   } catch (e: any) {
-    console.error(`  \x1b[31m✗\x1b[0m list-panes failed: ${e.message || e}`);
-    process.exit(1);
+    throw new Error(`list-panes failed: ${e.message || e}`);
   }
 
   const rows: PaneRow[] = raw.split("\n").filter(Boolean).map(line => {

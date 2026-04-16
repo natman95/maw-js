@@ -9,8 +9,7 @@ async function resolveRepo(repo: string): Promise<{ repoPath: string; repoName: 
   const searchTerm = repo.includes("/") ? repo.split("/").pop()! : repo;
   const ghqOut = await hostExec(`ghq list --full-path | grep -i '/${searchTerm}$' | head -1`);
   if (!ghqOut?.trim()) {
-    console.error(`repo not found: ${repo}`);
-    process.exit(1);
+    throw new Error(`repo not found: ${repo}`);
   }
   const repoPath = ghqOut.trim();
   const repoName = repoPath.split("/").pop()!;
@@ -39,7 +38,7 @@ export async function cmdWorkon(repo: string, task?: string): Promise<void> {
           console.error(`\x1b[90m    • ${c.name}\x1b[0m`);
         }
         console.error(`\x1b[90m  use the full name: maw workon ${repo} <exact-worktree>\x1b[0m`);
-        process.exit(1);
+        throw new Error(`'${task}' is ambiguous — matches ${resolved.candidates.length} worktrees`);
       case "none":
         match = null;
         break;
@@ -65,13 +64,11 @@ export async function cmdWorkon(repo: string, task?: string): Promise<void> {
 
   // Detect current tmux session
   if (!process.env.TMUX) {
-    console.error("not in a tmux session — run inside tmux");
-    process.exit(1);
+    throw new Error("not in a tmux session — run inside tmux");
   }
   const session = (await hostExec("tmux display-message -p '#{session_name}'").catch(() => "")).trim();
   if (!session) {
-    console.error("could not detect current tmux session");
-    process.exit(1);
+    throw new Error("could not detect current tmux session");
   }
 
   // Create window + start claude

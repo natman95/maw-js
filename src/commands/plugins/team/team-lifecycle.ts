@@ -10,9 +10,7 @@ const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
 export async function cmdTeamShutdown(name: string, opts: { force?: boolean; merge?: boolean } = {}) {
   const team = loadTeam(name);
   if (!team) {
-    console.error(`\x1b[31m✗\x1b[0m team not found: ${name}`);
-    console.error(`  check ~/.claude/teams/ for available teams`);
-    process.exit(1);
+    throw new Error(`team not found: ${name} — check ~/.claude/teams/ for available teams`);
   }
 
   const teammates = team.members.filter(m => m.agentType !== "team-lead");
@@ -112,8 +110,7 @@ export function cmdTeamCreate(name: string, opts: { description?: string } = {})
   const teamDir = join(PSI, "memory", "mailbox", "teams", name);
 
   if (existsSync(join(teamDir, "manifest.json"))) {
-    console.error(`\x1b[31m✗\x1b[0m team '${name}' already exists at ${teamDir}`);
-    process.exit(1);
+    throw new Error(`team '${name}' already exists at ${teamDir}`);
   }
 
   mkdirSync(teamDir, { recursive: true });
@@ -141,8 +138,7 @@ export function cmdTeamSpawn(
   const manifestPath = join(teamDir, "manifest.json");
 
   if (!existsSync(manifestPath)) {
-    console.error(`\x1b[31m✗\x1b[0m team '${teamName}' not found — run: maw team create ${teamName}`);
-    process.exit(1);
+    throw new Error(`team '${teamName}' not found — run: maw team create ${teamName}`);
   }
 
   // Check for past life

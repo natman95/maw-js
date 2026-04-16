@@ -19,8 +19,7 @@ export async function cmdSleepOne(oracle: string, window?: string) {
   // Resolve session
   const session = await detectSession(oracle);
   if (!session) {
-    console.error(`\x1b[31merror\x1b[0m: no running session found for '${oracle}'`);
-    process.exit(1);
+    throw new Error(`no running session found for '${oracle}'`);
   }
 
   // Determine window name
@@ -34,8 +33,7 @@ export async function cmdSleepOne(oracle: string, window?: string) {
   try {
     windows = await tmux.listWindows(session);
   } catch {
-    console.error(`\x1b[31merror\x1b[0m: could not list windows for session '${session}'`);
-    process.exit(1);
+    throw new Error(`could not list windows for session '${session}'`);
   }
 
   // Normalize trailing dashes — tmux window names like "fireman-1w-test-"
@@ -51,9 +49,8 @@ export async function cmdSleepOne(oracle: string, window?: string) {
       new RegExp(`^${oracle}-\\d+-${nameSuffix}-?$`).test(w.name)
     );
     if (!fuzzy) {
-      console.error(`\x1b[31merror\x1b[0m: window '${windowName}' not found in session '${session}'`);
       console.error(`\x1b[90mavailable:\x1b[0m ${windows.map(w => w.name).join(", ")}`);
-      process.exit(1);
+      throw new Error(`window '${windowName}' not found in session '${session}'`);
     }
     // Use the fuzzy-matched name
     return await doSleep(session, fuzzy.name, oracle);

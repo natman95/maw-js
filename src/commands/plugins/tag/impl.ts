@@ -33,7 +33,7 @@ export async function cmdTag(target: string, opts: TagOpts = {}) {
   if (!target) {
     console.error("usage: maw tag <target> [--pane N] [--title <text>] [--meta key=val]");
     console.error("       maw tag <target>                   (read mode — show current tags)");
-    process.exit(1);
+    throw new Error("usage: maw tag <target> [--pane N] [--title <text>] [--meta key=val]");
   }
 
   // Read mode: no write flags → show current tags on the target pane.
@@ -50,7 +50,7 @@ export async function cmdTag(target: string, opts: TagOpts = {}) {
     if (r.kind === "ambiguous") {
       console.error(`  \x1b[31m✗\x1b[0m '${rawSession}' is ambiguous — matches ${r.candidates.length} sessions:`);
       for (const s of r.candidates) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
-      process.exit(1);
+      throw new Error(`'${rawSession}' is ambiguous`);
     }
     if (r.kind === "none") {
       console.error(`  \x1b[31m✗\x1b[0m session '${rawSession}' not found`);
@@ -58,7 +58,7 @@ export async function cmdTag(target: string, opts: TagOpts = {}) {
         console.error(`  \x1b[90m  did you mean:\x1b[0m`);
         for (const s of r.hints) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
       }
-      process.exit(1);
+      throw new Error(`session '${rawSession}' not found`);
     }
     resolvedTarget = `${r.match.name}:${winPart ?? "0"}`;
   } else {
@@ -67,7 +67,7 @@ export async function cmdTag(target: string, opts: TagOpts = {}) {
     if (r.kind === "ambiguous") {
       console.error(`  \x1b[31m✗\x1b[0m '${target}' is ambiguous — matches ${r.candidates.length} sessions:`);
       for (const s of r.candidates) console.error(`  \x1b[90m    • ${s.name}\x1b[0m`);
-      process.exit(1);
+      throw new Error(`'${target}' is ambiguous`);
     }
     if (r.kind === "none") {
       console.error(`  \x1b[31m✗\x1b[0m session '${target}' not found`);
@@ -77,7 +77,7 @@ export async function cmdTag(target: string, opts: TagOpts = {}) {
       } else {
         console.error(`  \x1b[90m  try: maw ls\x1b[0m`);
       }
-      process.exit(1);
+      throw new Error(`session '${target}' not found`);
     }
     resolvedTarget = `${r.match.name}:${r.match.windows[0]?.index ?? 0}`;
   }
@@ -109,8 +109,7 @@ export async function cmdTag(target: string, opts: TagOpts = {}) {
       }
       return;
     } catch (e: any) {
-      console.error(`  \x1b[31m✗\x1b[0m read failed: ${e.message || e}`);
-      process.exit(1);
+      throw new Error(`read failed: ${e.message || e}`);
     }
   }
 
@@ -121,8 +120,7 @@ export async function cmdTag(target: string, opts: TagOpts = {}) {
       await hostExec(`${tmux} select-pane -t '${fullTarget}' -T '${escapedTitle}'`);
       console.log(`  \x1b[32m✓\x1b[0m title: ${fullTarget} = '${opts.title}'`);
     } catch (e: any) {
-      console.error(`  \x1b[31m✗\x1b[0m select-pane -T failed: ${e.message || e}`);
-      process.exit(1);
+      throw new Error(`select-pane -T failed: ${e.message || e}`);
     }
   }
 
@@ -130,8 +128,7 @@ export async function cmdTag(target: string, opts: TagOpts = {}) {
   for (const kv of opts.meta ?? []) {
     const eqIdx = kv.indexOf("=");
     if (eqIdx <= 0) {
-      console.error(`  \x1b[31m✗\x1b[0m --meta must be key=val (got: ${kv})`);
-      process.exit(1);
+      throw new Error(`--meta must be key=val (got: ${kv})`);
     }
     const key = kv.slice(0, eqIdx).trim();
     const val = kv.slice(eqIdx + 1);
@@ -141,8 +138,7 @@ export async function cmdTag(target: string, opts: TagOpts = {}) {
       await hostExec(`${tmux} set-option -p -t '${fullTarget}' '${optKey}' '${escapedVal}'`);
       console.log(`  \x1b[32m✓\x1b[0m meta: ${fullTarget} ${optKey} = '${val}'`);
     } catch (e: any) {
-      console.error(`  \x1b[31m✗\x1b[0m set-option failed: ${e.message || e}`);
-      process.exit(1);
+      throw new Error(`set-option failed: ${e.message || e}`);
     }
   }
 }
