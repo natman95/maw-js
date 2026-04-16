@@ -10,7 +10,6 @@ import { cfgTimeout } from "../config";
 import { listSessions } from "../core/transport/ssh";
 import { findWindow } from "../core/runtime/find-window";
 import { curlFetch } from "../core/transport/curl-fetch";
-import { trySilentAsync } from "../core/util/try-silent";
 import type { Transport, TransportTarget, TransportMessage, TransportPresence } from "../core/transport/transport";
 import type { FeedEvent } from "../lib/feed";
 
@@ -68,16 +67,25 @@ export class HttpTransport implements Transport {
   }
 
   async publishFeed(event: FeedEvent): Promise<void> {
-    // Post feed event to all peers via curlFetch (bypasses macOS Local Network Privacy)
-    await Promise.allSettled(
-      this.config.peers.map((url) =>
-        trySilentAsync(() => curlFetch(`${url}/api/feed`, {
-          method: "POST",
-          body: JSON.stringify(event),
-          timeout: cfgTimeout("http"),
-        })),
-      ),
+    // Post feed event to all peers via curlFetch (bypasses macOS Local Network Privacy).
+    // Per-peer failures are best-effort but must be visible: allSettled collects
+    // rejections so we can warn per failed peer (#385 site 4 — previously double-buried
+    // by an inner trySilentAsync inside allSettled, which made cluster-wide drops silent).
+    const peers = this.config.peers;
+    const results = await Promise.allSettled(
+      peers.map((url) => curlFetch(`${url}/api/feed`, {
+        method: "POST",
+        body: JSON.stringify(event),
+        timeout: cfgTimeout("http"),
+      })),
     );
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (r.status === "rejected") {
+        const reason = r.reason instanceof Error ? r.reason.message : String(r.reason);
+        console.warn(`\x1b[33m⚠\x1b[0m feed publish failed for ${peers[i]}: ${reason}`);
+      }
+    }
   }
 
   onMessage(handler: (msg: TransportMessage) => void) {

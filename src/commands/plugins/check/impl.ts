@@ -1,4 +1,5 @@
 import { spawnSync } from "child_process";
+import { tlink } from "../../../core/util/terminal";
 
 export interface ToolStatus {
   name: string;
@@ -20,11 +21,6 @@ export const TOOLS: Omit<ToolStatus, "present" | "version">[] = [
   { name: "uv",   required: false, category: "optional", installUrl: "https://docs.astral.sh/uv/getting-started/installation/" },
   { name: "uvx",  required: false, category: "optional", installUrl: "https://docs.astral.sh/uv/", notes: "provided by uv" },
 ];
-
-/** OSC 8 hyperlink — clickable in iTerm/WezTerm/modern terminals. */
-function tlink(url: string, text?: string): string {
-  return `\x1b]8;;${url}\x07${text ?? url}\x1b]8;;\x07`;
-}
 
 /**
  * Check whether a tool binary is present and extract its version string.

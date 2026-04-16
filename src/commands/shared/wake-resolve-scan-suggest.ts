@@ -2,6 +2,7 @@ import { spawnSync } from "child_process";
 import { openSync, readSync, closeSync } from "fs";
 import { hostExec } from "../../sdk";
 import { loadConfig } from "../../config";
+import { tlink } from "../../core/util/terminal";
 
 export interface OrgEntry {
   name: string;
@@ -44,11 +45,6 @@ export function buildOrgList(ghqOutput: string, cfg: any): OrgEntry[] {
     }
   }
   return result.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-}
-
-/** OSC 8 hyperlink — clickable in iTerm/WezTerm/modern terminals. */
-function tlink(url: string, text?: string): string {
-  return `\x1b]8;;${url}\x07${text ?? url}\x1b]8;;\x07`;
 }
 
 /** Default synchronous exec — throws on non-zero exit. */
