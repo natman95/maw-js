@@ -66,7 +66,15 @@ async function nativeFetch(url: string, opts: typeof curlFetch extends (u: strin
     const text = await res.text();
     const data = text ? JSON.parse(text) : null;
     return { ok: res.ok, status: res.status, data };
-  } catch {
+  } catch (err) {
+    // Surface the failure (#385 site 1). Previously this catch swallowed
+    // every error — abort, JSON parse, network, DNS — and callers saw a
+    // bare {ok:false, status:0} with no diagnosis. We keep the return
+    // shape (22 callers depend on it) and warn loud before returning.
+    // Note: signing failures return early at the catch above, so this
+    // path never fires for signing errors — no duplicate output.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`\x1b[33m⚠\x1b[0m nativeFetch failed: ${opts?.method ?? "GET"} ${url} — ${msg}`);
     return { ok: false, status: 0, data: null };
   }
 }

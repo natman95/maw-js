@@ -44,6 +44,34 @@ describe("curlFetch", () => {
     expect(res.ok).toBe(false);
   });
 
+  test("warns on nativeFetch failure with method + URL (#385 site 1)", async () => {
+    // Previous behavior: catch swallowed ALL errors (abort/JSON/network/DNS)
+    // and returned a bare {ok:false, status:0, data:null} — callers had no
+    // diagnosis. Fix: warn loud with method + URL + error message before
+    // returning the same shape (22 callers depend on it).
+    const logs: string[] = [];
+    const origWarn = console.warn;
+    console.warn = (...args: unknown[]) => { logs.push(args.map(String).join(" ")); };
+    try {
+      const res = await curlFetch("http://192.0.2.1:9999/api/test", {
+        method: "POST",
+        body: JSON.stringify({ t: 1 }),
+        timeout: 1000,
+      });
+      // Return shape preserved
+      expect(res.ok).toBe(false);
+      expect(res.status).toBe(0);
+      expect(res.data).toBe(null);
+      // Diagnosis surfaced: method + URL + "failed" must be greppable
+      const joined = logs.join("\n");
+      expect(joined).toMatch(/nativeFetch failed/);
+      expect(joined).toMatch(/POST/);
+      expect(joined).toMatch(/192\.0\.2\.1/);
+    } finally {
+      console.warn = origWarn;
+    }
+  });
+
   test("fails closed when signing throws — does NOT send unsigned request (#385 site 5)", async () => {
     // Previous behavior: catch swallowed the signing error, request went out
     // UNSIGNED, peer rejected with bare 401, caller saw ok:false with no clue.

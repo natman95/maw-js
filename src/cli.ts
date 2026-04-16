@@ -110,20 +110,34 @@ async function main(): Promise<void> {
         }
         const isKnownCommand = knownCommands.some(n => n.toLowerCase() === cmd);
         if (!isKnownCommand) {
-          // Not a known command — is it a real oracle? (strict: exact name or "NN-name")
-          const { listSessions } = await import("./sdk");
-          const sessions = await listSessions().catch(() => [] as Awaited<ReturnType<typeof listSessions>>);
-          const target = args[0].toLowerCase();
-          const isOracle = sessions.some(s => {
-            const name = s.name.toLowerCase();
-            return name === target || name.replace(/^\d+-/, "") === target;
-          });
+          // #394 — fuzzy FIRST, tmux listSessions second. The old order paid
+          // ~40ms on every unknown arg even when it was clearly a typo of a
+          // known command. New flow:
+          //   1. fuzzy-match against knownCommands (distance ≤ 2)
+          //   2. if close candidates → "did you mean" + exit, skip tmux
+          //   3. else if arg has oracle-name shape → tmux listSessions
+          //   4. else → generic "run maw --help"
+          const { fuzzyMatch } = await import("./core/util/fuzzy");
+          const closeCandidates = fuzzyMatch(args[0], knownCommands, 3, 2);
+          let isOracle = false;
+          if (closeCandidates.length === 0) {
+            // No close typo-match. Only spend the tmux query if the arg
+            // shape is plausibly an oracle session name.
+            const ORACLE_NAME_SHAPE = /^[a-z0-9][a-z0-9:_-]*$/i;
+            if (ORACLE_NAME_SHAPE.test(args[0])) {
+              const { listSessions } = await import("./sdk");
+              const sessions = await listSessions().catch(() => [] as Awaited<ReturnType<typeof listSessions>>);
+              const target = args[0].toLowerCase();
+              isOracle = sessions.some(s => {
+                const name = s.name.toLowerCase();
+                return name === target || name.replace(/^\d+-/, "") === target;
+              });
+            }
+          }
           if (!isOracle) {
-            const { fuzzyMatch } = await import("./core/util/fuzzy");
-            const candidates = fuzzyMatch(args[0], knownCommands);
             console.error(`\x1b[31m✗\x1b[0m unknown command: ${args[0]}`);
-            if (candidates.length > 0) {
-              console.error(`  did you mean: ${candidates.join(", ")}?`);
+            if (closeCandidates.length > 0) {
+              console.error(`  did you mean: ${closeCandidates.join(", ")}?`);
             } else {
               console.error(`  run 'maw --help' to see available commands`);
             }
