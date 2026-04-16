@@ -1,16 +1,22 @@
 import { scanAndCache, scanFull, scanRemote, readCache } from "../../../sdk";
 import { cmdOracleList, type OracleListOpts } from "./impl-list";
+import { isQuiet } from "../../../cli/verbosity";
 
-export async function cmdOracleScan(opts: { force?: boolean; json?: boolean; local?: boolean; remote?: boolean; all?: boolean; verbose?: boolean } = {}) {
+export async function cmdOracleScan(opts: { force?: boolean; json?: boolean; local?: boolean; remote?: boolean; all?: boolean; verbose?: boolean; quiet?: boolean } = {}) {
   const start = Date.now();
 
   // Default to local (fast). Use --all or --remote for GitHub API scan.
   const mode = opts.all ? "both" : opts.remote ? "remote" : "local";
 
+  // Verbose by default (alpha.74, feedback_verbose_by_default). --quiet /
+  // MAW_QUIET=1 opts out to the terse summary; --verbose forces loud even
+  // under MAW_QUIET.
+  const loud = opts.verbose === true ? true : !(opts.quiet || isQuiet());
+
   if (mode === "remote") {
     // Remote only — GitHub API. Loud on failure.
     console.log(`\n  \x1b[36m📡\x1b[0m Scanning GitHub orgs for *-oracle repos...\n`);
-    const entries = await scanRemote(undefined, opts.verbose);
+    const entries = await scanRemote(undefined, loud);
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
     if (opts.json) { console.log(JSON.stringify(entries, null, 2)); return; }
     console.log(`  \x1b[32m✓\x1b[0m Found ${entries.length} oracles remotely (${elapsed}s)\n`);
@@ -23,15 +29,14 @@ export async function cmdOracleScan(opts: { force?: boolean; json?: boolean; loc
   }
 
   if (mode === "local") {
-    // Local scan — write-only: count + delta vs previous cache. No list dump.
-    // Callers wanting the full list should `maw oracle ls` (or --json here).
-    // `--verbose` shows per-org + per-oracle detection breakdown.
+    // Local scan. Verbose-by-default: show per-org + per-oracle detection.
+    // `--quiet` suppresses the detail and returns to the terse summary line.
     const prev = readCache();
     const prevKeys = new Set((prev?.oracles || []).map(o => `${o.org}/${o.repo}`));
 
-    if (opts.verbose) console.log();  // blank line before verbose output
+    if (loud) console.log();  // blank line before verbose output
 
-    const cache = scanAndCache("local", opts.verbose);
+    const cache = scanAndCache("local", loud);
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
 
     if (opts.json) { console.log(JSON.stringify(cache, null, 2)); return; }
@@ -49,8 +54,8 @@ export async function cmdOracleScan(opts: { force?: boolean; json?: boolean; loc
       delta = `+${addedKeys.length} -${removedKeys.length} since last`;
     }
 
-    // In verbose mode, enumerate delta + cache file location.
-    if (opts.verbose) {
+    // Enumerate delta + cache file location when loud.
+    if (loud) {
       if (addedKeys.length > 0) {
         console.log(`  \x1b[32m+\x1b[0m added: ${addedKeys.join(", ")}`);
       }
@@ -67,7 +72,7 @@ export async function cmdOracleScan(opts: { force?: boolean; json?: boolean; loc
 
   // Both — full picture
   console.log(`\n  \x1b[36m📡\x1b[0m Full scan: local + GitHub remote...\n`);
-  const cache = await scanFull(undefined, opts.verbose);
+  const cache = await scanFull(undefined, loud);
   const elapsed = ((Date.now() - start) / 1000).toFixed(1);
 
   if (opts.json) { console.log(JSON.stringify(cache, null, 2)); return; }

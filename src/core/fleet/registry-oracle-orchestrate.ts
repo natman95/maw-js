@@ -10,8 +10,8 @@ import { writeCache } from "./registry-oracle-cache";
 import { scanLocal } from "./registry-oracle-scan-local";
 import { scanRemote } from "./registry-oracle-scan-remote";
 
-/** Scan local, write cache, return entries */
-export function scanAndCache(mode: "local" | "remote" | "both" = "local", verbose = false): RegistryCache {
+/** Scan local, write cache, return entries. Verbose-by-default (alpha.74). */
+export function scanAndCache(mode: "local" | "remote" | "both" = "local", verbose = true): RegistryCache {
   const config = loadConfig();
   const localEntries = mode !== "remote" ? scanLocal(verbose) : [];
 
@@ -25,8 +25,8 @@ export function scanAndCache(mode: "local" | "remote" | "both" = "local", verbos
   return cache;
 }
 
-/** Full scan: local + remote merged */
-export async function scanFull(orgs?: string[], verbose = false): Promise<RegistryCache> {
+/** Full scan: local + remote merged. Verbose-by-default (alpha.74). */
+export async function scanFull(orgs?: string[], verbose = true): Promise<RegistryCache> {
   const config = loadConfig();
   if (verbose) console.log(`  \x1b[90m⏳ scanning local...\x1b[0m`);
   const localEntries = scanLocal(verbose);

@@ -53,6 +53,8 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
           "--all": Boolean,
           "--verbose": Boolean,
           "-v": "--verbose",
+          "--quiet": Boolean,
+          "-q": "--quiet",
         }, 1);
         await cmdOracleScan({
           json: flags["--json"],
@@ -61,6 +63,7 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
           remote: flags["--remote"],
           all: flags["--all"],
           verbose: flags["--verbose"],
+          quiet: flags["--quiet"],
         });
       } else if (subcmd === "fleet") {
         // Deprecated alias — warn then delegate to ls.

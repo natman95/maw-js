@@ -61,7 +61,12 @@ export function deriveName(repo: string): string {
 
 // ---------- Local scan ----------
 
-export function scanLocal(verbose = false): OracleEntry[] {
+/**
+ * Scan local ghq for oracles. Verbose-by-default per user direction
+ * (alpha.74, 2026-04-16) — pass verbose=false for the terse summary.
+ * See `feedback_verbose_by_default`.
+ */
+export function scanLocal(verbose = true): OracleEntry[] {
   const config = loadConfig();
   const ghqRoot = config.ghqRoot;
   const now = new Date().toISOString();

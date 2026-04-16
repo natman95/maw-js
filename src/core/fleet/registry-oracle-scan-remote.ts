@@ -28,7 +28,7 @@ async function checkPsi(fullName: string): Promise<boolean> {
   return code === 0;
 }
 
-export async function scanRemote(orgs?: string[], verbose = false): Promise<OracleEntry[]> {
+export async function scanRemote(orgs?: string[], verbose = true): Promise<OracleEntry[]> {
   const config = loadConfig();
   const defaultOrgs = config.githubOrgs || ["Soul-Brews-Studio", "laris-co"];
   const targetOrgs = orgs || defaultOrgs;
