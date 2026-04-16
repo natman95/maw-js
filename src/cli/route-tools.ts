@@ -28,7 +28,7 @@ export async function routeTools(cmd: string, args: string[]): Promise<boolean> 
     // "maw plugin ls/info/remove" → forward to plugins (plural) legacy handler.
     // `install` is NOT in this list anymore — it's handled above by the new
     // install-impl.ts via the plugin dispatcher.
-    if (sub && ["ls", "list", "info", "remove", "uninstall", "rm", "lean", "nuke", "enable", "disable"].includes(sub)) {
+    if (sub && ["ls", "list", "info", "remove", "uninstall", "rm", "lean", "standard", "full", "nuke", "enable", "disable"].includes(sub)) {
       const { cmdPlugins } = await import("../commands/shared/plugins");
       const { parseFlags } = await import("./parse-args");
       const flags = parseFlags(args, { "--json": Boolean, "--force": Boolean, "--all": Boolean }, 2);

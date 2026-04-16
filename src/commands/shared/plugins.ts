@@ -75,7 +75,11 @@ export async function cmdPlugins(
       return doDisable(name);
     }
     case "lean":
-      return doLean(discover);
+      return doProfile("core", discover);
+    case "standard":
+      return doProfile("standard", discover);
+    case "full":
+      return doProfile("full", discover);
     case "nuke":
       return doNuke();
     default:
@@ -285,30 +289,36 @@ function doRemove(name: string, discover: () => LoadedPlugin[]): void {
   );
 }
 
-function doLean(discover: () => LoadedPlugin[]): void {
+function doProfile(profile: "core" | "standard" | "full", discover: () => LoadedPlugin[]): void {
   const { loadConfig, saveConfig } = require("../../config");
   const plugins = discover();
-  const toDisable: string[] = [];
 
+  if (profile === "full") {
+    saveConfig({ disabledPlugins: [] });
+    console.log(`\n\x1b[32m✓\x1b[0m full — all ${plugins.length} plugins enabled`);
+    return;
+  }
+
+  // core: keep weight < 10. standard: keep weight < 50 (core + standard tiers).
+  const threshold = profile === "core" ? 10 : 50;
+  const toDisable: string[] = [];
   for (const p of plugins) {
-    const w = p.manifest.weight ?? 50;
-    if (w >= 10) toDisable.push(p.manifest.name); // keep only weight 00 (core)
+    if ((p.manifest.weight ?? 50) >= threshold) toDisable.push(p.manifest.name);
   }
 
   if (toDisable.length === 0) {
-    console.log("already lean — only core plugins active");
+    console.log(`already ${profile} — nothing to disable`);
     return;
   }
 
   const config = loadConfig();
-  const disabled = new Set(config.disabledPlugins ?? []);
-  for (const n of toDisable) disabled.add(n);
-  saveConfig({ disabledPlugins: [...disabled] });
+  // Reset disabled list (don't accumulate from previous profile)
+  saveConfig({ disabledPlugins: toDisable });
 
   for (const n of toDisable) console.log(`  \x1b[33m✗\x1b[0m ${n}`);
   const remaining = plugins.length - toDisable.length;
-  console.log(`\n\x1b[32m✓\x1b[0m lean — disabled ${toDisable.length}, kept ${remaining} core plugins`);
-  console.log(`\x1b[90m  Restore: maw plugin enable <name>\x1b[0m`);
+  console.log(`\n\x1b[32m✓\x1b[0m ${profile} — ${remaining} active, ${toDisable.length} disabled`);
+  console.log(`\x1b[90m  Profiles: maw plugin lean | standard | full\x1b[0m`);
 }
 
 function doNuke(): void {
