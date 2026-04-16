@@ -34,7 +34,15 @@ export async function curlFetch(url: string, opts?: {
       const signed = signHeaders(token, opts?.method || "GET", urlObj.pathname);
       Object.assign(headers, signed);
     }
-  } catch {}
+  } catch (err) {
+    // Fail closed: if a token is configured but signing throws (config load
+    // failure, malformed URL, etc.), do NOT fall through to an unsigned
+    // request — peers would reject with a bare 401 and the user would see
+    // no diagnosis. Surface the signing failure and abort the call.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[curl-fetch] signing failed for ${url}: ${msg}`);
+    return { ok: false, status: 0, data: null };
+  }
 
   // Prefer native fetch (Linux, remote hosts)
   // Fall back to curl on macOS (Local Network Privacy blocks fetch for LAN/WG)

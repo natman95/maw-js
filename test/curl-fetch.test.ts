@@ -9,8 +9,12 @@ mock.module("../src/core/paths", () => ({
 }));
 
 let mockToken: string | undefined = "test-token-16chars!";
+let mockConfigThrows = false;
 import { mockConfigModule } from "./helpers/mock-config";
-mock.module("../src/config", () => mockConfigModule(() => ({ federationToken: mockToken, node: "test" })));
+mock.module("../src/config", () => mockConfigModule(() => {
+  if (mockConfigThrows) throw new Error("simulated config load failure");
+  return { federationToken: mockToken, node: "test" };
+}));
 
 const { curlFetch } = await import("../src/core/transport/curl-fetch");
 
@@ -38,6 +42,30 @@ describe("curlFetch", () => {
   test("returns ok:false for unreachable host", async () => {
     const res = await curlFetch("http://192.0.2.1:9999/api/test", { timeout: 1000 });
     expect(res.ok).toBe(false);
+  });
+
+  test("fails closed when signing throws — does NOT send unsigned request (#385 site 5)", async () => {
+    // Previous behavior: catch swallowed the signing error, request went out
+    // UNSIGNED, peer rejected with bare 401, caller saw ok:false with no clue.
+    // Fix: surface the failure and abort the call without falling through.
+    mockConfigThrows = true;
+    const logs: string[] = [];
+    const origErr = console.error;
+    console.error = (...args: unknown[]) => { logs.push(args.map(String).join(" ")); };
+    try {
+      const res = await curlFetch("http://192.0.2.1:9999/api/send", {
+        method: "POST",
+        body: JSON.stringify({ t: 1 }),
+        timeout: 1000,
+      });
+      expect(res.ok).toBe(false);
+      expect(res.status).toBe(0);
+      // User-facing diagnosis: the word "signing" must appear so it's greppable
+      expect(logs.some((l) => /signing/i.test(l))).toBe(true);
+    } finally {
+      mockConfigThrows = false;
+      console.error = origErr;
+    }
   });
 
   liveTest("sends HMAC headers when token configured", async () => {
