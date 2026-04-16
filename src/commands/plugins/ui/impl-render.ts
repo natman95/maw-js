@@ -1,0 +1,129 @@
+/**
+ * `maw ui` — output rendering, argument parsing, and CLI dispatcher.
+ */
+
+import {
+  LENS_PORT,
+  MAW_PORT,
+  type UiOptions,
+  isUiDistInstalled,
+  findMawUiSrcDir,
+  buildDevCommand,
+  buildLensUrl,
+  resolvePeerHostPort,
+  justHost,
+  buildTunnelCommand,
+} from "./impl-helpers";
+
+/**
+ * Render the full output that `maw ui` prints, given the parsed options.
+ * Returns a single string with newlines so tests can assert on it without
+ * having to capture stdout. The CLI just prints this verbatim.
+ */
+export function renderUiOutput(opts: UiOptions): string {
+  // Detect Shape A: if dist is installed, use maw-js port (3456) instead of vite (5173)
+  const distInstalled = isUiDistInstalled();
+  const lensPort = distInstalled ? MAW_PORT : LENS_PORT;
+
+  // --dev mode: print the vite dev server command
+  if (opts.dev) {
+    const srcDir = findMawUiSrcDir();
+    if (!srcDir) {
+      return [
+        `# maw-ui source not found. Searched:`,
+        `#   - ghq list (no match for /maw-ui)`,
+        `#   - sibling directory of maw-js`,
+        `#   - $MAW_UI_SRC env var`,
+        `#`,
+        `# Clone it: ghq get https://github.com/Soul-Brews-Studio/maw-ui`,
+        `# Or set: export MAW_UI_SRC=/path/to/maw-ui`,
+      ].join("\n");
+    }
+    const devCmd = buildDevCommand(srcDir);
+    const url = buildLensUrl({ threeD: opts.threeD, port: LENS_PORT });
+    return [
+      `# Start vite dev server (HMR on :${LENS_PORT}, proxy /api → maw serve on :${MAW_PORT}):`,
+      devCmd,
+      ``,
+      `# Then open:`,
+      url,
+      ``,
+      `# Requires maw serve running on :${MAW_PORT} for API/WS proxy.`,
+      `# Edit files in ${srcDir} — vite hot-reloads instantly.`,
+      `# Ctrl+C stops the dev server. Static :${MAW_PORT} keeps serving if installed.`,
+    ].join("\n");
+  }
+
+  // --tunnel mode
+  if (opts.tunnel) {
+    if (!opts.peer) {
+      return [
+        "# usage: maw ui --tunnel <peer>",
+        "# example: maw ui --tunnel oracle-world",
+      ].join("\n");
+    }
+    const hostPort = resolvePeerHostPort(opts.peer);
+    if (!hostPort) {
+      return [
+        `# unknown peer: ${opts.peer}`,
+        `# expected a named peer (config.namedPeers) or literal host:port`,
+      ].join("\n");
+    }
+    const host = justHost(hostPort);
+    const user = process.env.USER || "neo";
+    const sshCmd = buildTunnelCommand({ user, host });
+    const url = buildLensUrl({ threeD: opts.threeD, port: lensPort });
+    return [
+      `# Run this on your local machine to forward both lens (${lensPort}) and maw-js (${MAW_PORT}):`,
+      sshCmd,
+      ``,
+      `# Then open in your browser:`,
+      url,
+      ``,
+      `# Stop the tunnel with Ctrl+C in the SSH terminal.`,
+      ...(distInstalled ? [``, `# (Shape A — maw-ui dist served from maw-js on port ${MAW_PORT})`] : []),
+    ].join("\n");
+  }
+
+  // Bare or <peer> mode — just print the URL
+  if (opts.peer) {
+    const hostPort = resolvePeerHostPort(opts.peer);
+    if (!hostPort) {
+      return [
+        `# unknown peer: ${opts.peer}`,
+        `# expected a named peer (config.namedPeers) or literal host:port`,
+      ].join("\n");
+    }
+    return buildLensUrl({ remoteHost: hostPort, threeD: opts.threeD, port: lensPort });
+  }
+
+  return buildLensUrl({ threeD: opts.threeD, port: lensPort });
+}
+
+// ---- Arg parser ----------------------------------------------------------
+
+export function parseUiArgs(args: string[]): UiOptions {
+  const opts: UiOptions = {};
+  for (const a of args) {
+    if (a === "--install") opts.install = true;
+    else if (a === "--tunnel") opts.tunnel = true;
+    else if (a === "--dev") opts.dev = true;
+    else if (a === "--3d") opts.threeD = true;
+    else if (!a.startsWith("--") && !opts.peer) opts.peer = a;
+  }
+  return opts;
+}
+
+// ---- Public entry --------------------------------------------------------
+
+export async function cmdUi(args: string[]): Promise<void> {
+  const opts = parseUiArgs(args);
+
+  if (opts.install) {
+    const { cmdUiInstall } = await import("./ui-install");
+    await cmdUiInstall(opts.peer); // peer arg doubles as version if --install is set
+    return;
+  }
+
+  console.log(renderUiOutput(opts));
+}
