@@ -39,7 +39,15 @@ export function isQuiet(): boolean {
   // --silent implies --quiet
   if (isSilent()) return true;
   if (storedFlags.quiet !== undefined) return storedFlags.quiet;
-  return process.env.MAW_QUIET === "1";
+  if (process.env.MAW_QUIET === "1") return true;
+  // #388.5 — help/version invocations: suppress bootstrap "loaded config:" /
+  // "loaded N plugins" chatter. Checked against argv directly because these
+  // lines fire from import-time side-effects (e.g. ssh.ts top-level
+  // loadConfig()) before cli.ts can call setVerbosityFlags(). Covers nested
+  // forms too — `maw oracle scan --help` etc.
+  return process.argv.some(
+    a => a === "--help" || a === "-h" || a === "--version" || a === "-v",
+  );
 }
 
 export function verbose(fn: () => void): void {
