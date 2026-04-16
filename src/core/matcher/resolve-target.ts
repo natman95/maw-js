@@ -23,20 +23,34 @@ export type ResolveResult<T extends { name: string }> =
 /**
  * Resolve a bare user-typed name against a list of named items.
  *
- * Three-tier cascade:
+ * Four-tier cascade (suffix-preferred — matches maw tmux naming):
  *
  * 1. **exact** (case-insensitive): name === target → { kind: "exact" }.
- * 2. **word-segment**: dash-bounded anywhere in the name — prefix
- *    (`target-*`), suffix (`*-target`), or middle (`*-target-*`). 1 match →
- *    "fuzzy" (auto-pick). 2+ matches → "ambiguous" (caller disambiguates).
- * 3. **substring fallback** (only if tier 2 was empty): `name.includes(target)`
+ * 2a. **suffix word-segment**: `*-target`. Matches maw's `NN-oracle-name`
+ *     session convention where user types the oracle name and expects to
+ *     attach to the numbered session. 1 match → "fuzzy" (auto-pick).
+ *     2+ matches → "ambiguous".
+ * 2b. **prefix or middle word-segment** (only if 2a empty): `target-*` or
+ *     `*-target-*`. Catches views/aux sessions shaped `<name>-view` when
+ *     the user is explicitly searching for the view itself. Same
+ *     auto-pick / ambiguous rules.
+ * 3. **substring fallback** (only if 2a and 2b were empty): `name.includes(target)`
  *    anywhere. Matches are returned as `hints` under `kind: "none"` — they
  *    never auto-pick and never become ambiguous. Callers can render
  *    "did you mean?" but the contract still says "not found".
  *
- * Invariant: the match ladder is exact → word-segment → none. Substring
- * matches are auxiliary hints, never a real match. This keeps resolution
- * predictable: a bare name either resolves cleanly or the caller refuses.
+ * Why suffix-preferred (alpha.77 fix):
+ *   User report — `maw a mawjs` said ambiguous between `101-mawjs`
+ *   (canonical oracle session) and `mawjs-view` (aux view). Pre-.77
+ *   treated both as Tier 2 equally. Suffix-preferred breaks the tie
+ *   toward the oracle convention. View sessions still resolve when
+ *   the user explicitly searches for them (e.g. target=`mawjs-view`
+ *   → exact; target=`view` → 2a suffix match for all `-view` aux sessions).
+ *
+ * Invariant: the match ladder is exact → suffix-segment → prefix/middle
+ * segment → none. Substring matches are auxiliary hints, never a real
+ * match. This keeps resolution predictable: a bare name either resolves
+ * cleanly or the caller refuses.
  *
  * The target is trimmed before matching. An empty target returns "none"
  * with no hints — we don't want the empty string to match everything.
@@ -52,17 +66,21 @@ export function resolveByName<T extends { name: string }>(
   const exact = items.find(it => it.name.toLowerCase() === lc);
   if (exact) return { kind: "exact", match: exact };
 
-  // Tier 2 — word-segment: dash-bounded prefix, suffix, or middle
-  const segment = items.filter(it => {
+  // Tier 2a — suffix-match preferred (`*-target`). Matches oracle session
+  // convention `NN-<name>` where user types `<name>` and wants the session.
+  const suffix = items.filter(it => it.name.toLowerCase().endsWith(`-${lc}`));
+  if (suffix.length === 1) return { kind: "fuzzy", match: suffix[0]! };
+  if (suffix.length >= 2) return { kind: "ambiguous", candidates: suffix };
+
+  // Tier 2b — prefix or middle (`target-*` or `*-target-*`). Only tried
+  // when there's no suffix match. Catches view/aux sessions when the user
+  // is specifically looking for one.
+  const prefixOrMid = items.filter(it => {
     const n = it.name.toLowerCase();
-    return (
-      n.startsWith(`${lc}-`) ||
-      n.endsWith(`-${lc}`) ||
-      n.includes(`-${lc}-`)
-    );
+    return n.startsWith(`${lc}-`) || n.includes(`-${lc}-`);
   });
-  if (segment.length === 1) return { kind: "fuzzy", match: segment[0]! };
-  if (segment.length >= 2) return { kind: "ambiguous", candidates: segment };
+  if (prefixOrMid.length === 1) return { kind: "fuzzy", match: prefixOrMid[0]! };
+  if (prefixOrMid.length >= 2) return { kind: "ambiguous", candidates: prefixOrMid };
 
   // Tier 3 — substring fallback. Never auto-picks, never ambiguous; only
   // populates `hints` so callers can render "did you mean?" next to the

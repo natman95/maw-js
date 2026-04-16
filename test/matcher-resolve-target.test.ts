@@ -65,15 +65,45 @@ describe("resolveByName — ambiguous (2+ fuzzy hits)", () => {
     }
   });
 
-  test("mixed prefix and suffix matches → ambiguous lists both", () => {
-    // "maw" matches both "maw-js" (prefix) and "110-maw" (suffix)
+  test("suffix-preferred over prefix (alpha.77) — `maw` → `110-maw`, NOT ambiguous with `maw-js`", () => {
+    // User report (alpha.77): `maw a mawjs` was ambiguous between
+    // `101-mawjs` (canonical NN-name session) and `mawjs-view` (aux view).
+    // Suffix now wins because that's the maw tmux naming convention —
+    // oracle sessions are `NN-oracle-name`. Prefix match is Tier 2b, only
+    // tried when no suffix match exists.
     const items = [sess("maw-js"), sess("110-maw"), sess("other")];
     const r = resolveByName("maw", items);
+    expect(r.kind).toBe("fuzzy");
+    if (r.kind === "fuzzy") {
+      expect(r.match.name).toBe("110-maw");
+    }
+  });
+
+  test("prefix-only match (no suffix competitor) → fuzzy (Tier 2b)", () => {
+    // With no `-maw` suffix in the list, Tier 2a is empty, Tier 2b fires.
+    const items = [sess("maw-js"), sess("other")];
+    const r = resolveByName("maw", items);
+    expect(r.kind).toBe("fuzzy");
+    if (r.kind === "fuzzy") {
+      expect(r.match.name).toBe("maw-js");
+    }
+  });
+
+  test("multiple suffix matches → ambiguous (Tier 2a)", () => {
+    const items = [sess("101-mawjs"), sess("102-mawjs"), sess("other")];
+    const r = resolveByName("mawjs", items);
     expect(r.kind).toBe("ambiguous");
     if (r.kind === "ambiguous") {
-      expect(r.candidates).toHaveLength(2);
-      const names = r.candidates.map(c => c.name).sort();
-      expect(names).toEqual(["110-maw", "maw-js"]);
+      expect(r.candidates.map(c => c.name).sort()).toEqual(["101-mawjs", "102-mawjs"]);
+    }
+  });
+
+  test("multiple prefix matches (no suffix competitor) → ambiguous (Tier 2b)", () => {
+    const items = [sess("mawjs-view"), sess("mawjs-debug"), sess("other")];
+    const r = resolveByName("mawjs", items);
+    expect(r.kind).toBe("ambiguous");
+    if (r.kind === "ambiguous") {
+      expect(r.candidates.map(c => c.name).sort()).toEqual(["mawjs-debug", "mawjs-view"]);
     }
   });
 
