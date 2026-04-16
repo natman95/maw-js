@@ -11,9 +11,9 @@ import { scanLocal } from "./registry-oracle-scan-local";
 import { scanRemote } from "./registry-oracle-scan-remote";
 
 /** Scan local, write cache, return entries */
-export function scanAndCache(mode: "local" | "remote" | "both" = "local"): RegistryCache {
+export function scanAndCache(mode: "local" | "remote" | "both" = "local", verbose = false): RegistryCache {
   const config = loadConfig();
-  const localEntries = mode !== "remote" ? scanLocal() : [];
+  const localEntries = mode !== "remote" ? scanLocal(verbose) : [];
 
   const cache: RegistryCache = {
     schema: 1,
@@ -29,7 +29,7 @@ export function scanAndCache(mode: "local" | "remote" | "both" = "local"): Regis
 export async function scanFull(orgs?: string[], verbose = false): Promise<RegistryCache> {
   const config = loadConfig();
   if (verbose) console.log(`  \x1b[90m⏳ scanning local...\x1b[0m`);
-  const localEntries = scanLocal();
+  const localEntries = scanLocal(verbose);
   if (verbose) console.log(`  \x1b[90m  ${localEntries.length} local oracles found\x1b[0m`);
   const remoteEntries = await scanRemote(orgs, verbose);
 

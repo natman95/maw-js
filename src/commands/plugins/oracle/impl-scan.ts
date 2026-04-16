@@ -25,25 +25,40 @@ export async function cmdOracleScan(opts: { force?: boolean; json?: boolean; loc
   if (mode === "local") {
     // Local scan — write-only: count + delta vs previous cache. No list dump.
     // Callers wanting the full list should `maw oracle ls` (or --json here).
+    // `--verbose` shows per-org + per-oracle detection breakdown.
     const prev = readCache();
     const prevKeys = new Set((prev?.oracles || []).map(o => `${o.org}/${o.repo}`));
 
-    const cache = scanAndCache("local");
+    if (opts.verbose) console.log();  // blank line before verbose output
+
+    const cache = scanAndCache("local", opts.verbose);
     const elapsed = ((Date.now() - start) / 1000).toFixed(1);
 
     if (opts.json) { console.log(JSON.stringify(cache, null, 2)); return; }
 
     const currKeys = new Set(cache.oracles.map(o => `${o.org}/${o.repo}`));
-    const added = [...currKeys].filter(k => !prevKeys.has(k)).length;
-    const removed = [...prevKeys].filter(k => !currKeys.has(k)).length;
+    const addedKeys = [...currKeys].filter(k => !prevKeys.has(k));
+    const removedKeys = [...prevKeys].filter(k => !currKeys.has(k));
 
     let delta: string;
     if (!prev) {
       delta = `${cache.oracles.length} new`;
-    } else if (added === 0 && removed === 0) {
+    } else if (addedKeys.length === 0 && removedKeys.length === 0) {
       delta = "no change";
     } else {
-      delta = `+${added} -${removed} since last`;
+      delta = `+${addedKeys.length} -${removedKeys.length} since last`;
+    }
+
+    // In verbose mode, enumerate delta + cache file location.
+    if (opts.verbose) {
+      if (addedKeys.length > 0) {
+        console.log(`  \x1b[32m+\x1b[0m added: ${addedKeys.join(", ")}`);
+      }
+      if (removedKeys.length > 0) {
+        console.log(`  \x1b[31m-\x1b[0m removed: ${removedKeys.join(", ")}`);
+      }
+      const { CACHE_FILE } = await import("../../../core/fleet/registry-oracle-types");
+      console.log(`  \x1b[90m  cache: ${CACHE_FILE}\x1b[0m`);
     }
 
     console.log(`\n  \x1b[32m✓\x1b[0m ${cache.oracles.length} oracles locally (${delta}) in ${elapsed}s\n`);
