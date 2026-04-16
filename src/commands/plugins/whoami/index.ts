@@ -6,8 +6,14 @@ export const command = { name: "whoami", description: "Print the current tmux se
 export default async function handler(_ctx: InvokeContext): Promise<InvokeResult> {
   const logs: string[] = [];
   const origLog = console.log, origError = console.error;
-  console.log = (...a: any[]) => logs.push(a.map(String).join(" "));
-  console.error = (...a: any[]) => logs.push(a.map(String).join(" "));
+  console.log = (...a: any[]) => {
+    if (_ctx.writer) _ctx.writer(...a);
+    else logs.push(a.map(String).join(" "));
+  };
+  console.error = (...a: any[]) => {
+    if (_ctx.writer) _ctx.writer(...a);
+    else logs.push(a.map(String).join(" "));
+  };
   try {
     await cmdWhoami();
     return { ok: true, output: logs.join("\n") || undefined };

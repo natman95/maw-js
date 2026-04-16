@@ -18,6 +18,20 @@ mock.module(join(root, "commands/plugins/capture/impl"), () => ({
 
 const { default: handler } = await import("../src/commands/plugins/capture/index");
 
+// Helper — CLI tests inject a writer so output is captured even when plugins
+// route CLI output through ctx.writer (alpha.47 writer injection pattern).
+function cliCtx(args: string[]): { ctx: InvokeContext; out: () => string } {
+  const captured: string[] = [];
+  return {
+    ctx: {
+      source: "cli",
+      args,
+      writer: (...a: unknown[]) => captured.push(a.map(String).join(" ")),
+    },
+    out: () => captured.join("\n"),
+  };
+}
+
 describe("capture plugin", () => {
   it("CLI — missing target returns usage", async () => {
     const ctx: InvokeContext = { source: "cli", args: [] };
@@ -27,31 +41,31 @@ describe("capture plugin", () => {
   });
 
   it("CLI — default captures 50 lines", async () => {
-    const ctx: InvokeContext = { source: "cli", args: ["mawjs-view"] };
+    const { ctx, out } = cliCtx(["mawjs-view"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("lines=50");
+    expect(result.output ?? out()).toContain("lines=50");
   });
 
   it("CLI — --lines overrides default", async () => {
-    const ctx: InvokeContext = { source: "cli", args: ["mawjs-view", "--lines", "200"] };
+    const { ctx, out } = cliCtx(["mawjs-view", "--lines", "200"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("lines=200");
+    expect(result.output ?? out()).toContain("lines=200");
   });
 
   it("CLI — --full mode", async () => {
-    const ctx: InvokeContext = { source: "cli", args: ["mawjs-view", "--full"] };
+    const { ctx, out } = cliCtx(["mawjs-view", "--full"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("full");
+    expect(result.output ?? out()).toContain("full");
   });
 
   it("CLI — --pane N included in output", async () => {
-    const ctx: InvokeContext = { source: "cli", args: ["mawjs-view", "--pane", "2"] };
+    const { ctx, out } = cliCtx(["mawjs-view", "--pane", "2"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("mawjs-view.2");
+    expect(result.output ?? out()).toContain("mawjs-view.2");
   });
 
   it("CLI — not found errors", async () => {

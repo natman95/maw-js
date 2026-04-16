@@ -78,6 +78,13 @@ export interface LoadedPlugin {
 export interface InvokeContext {
   source: "cli" | "api" | "peer";
   args: string[] | Record<string, unknown>;
+  /**
+   * Optional output writer injected by the invoker based on ctx.source.
+   * CLI source → streams to process.stdout (real-time terminal output).
+   * API/peer source → undefined; plugin falls back to logs[] capture.
+   * Plugins use: `ctx.writer?.(...args) ?? logs.push(args.join(" "))`
+   */
+  writer?: (...args: unknown[]) => void;
 }
 
 export interface InvokeResult {

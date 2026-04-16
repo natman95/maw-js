@@ -16,15 +16,14 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
   const logs: string[] = [];
   const origLog = console.log;
   const origError = console.error;
-  if (ctx.source === "cli") {
-    // CLI: print to terminal in real-time AND collect for return value
-    console.log = (...a: any[]) => { origLog(...a); logs.push(a.map(String).join(" ")); };
-    console.error = (...a: any[]) => { origError(...a); logs.push(a.map(String).join(" ")); };
-  } else {
-    // API: capture only, do not print to terminal
-    console.log = (...a: any[]) => logs.push(a.map(String).join(" "));
-    console.error = (...a: any[]) => logs.push(a.map(String).join(" "));
-  }
+  console.log = (...a: any[]) => {
+    if (ctx.writer) ctx.writer(...a);
+    else logs.push(a.map(String).join(" "));
+  };
+  console.error = (...a: any[]) => {
+    if (ctx.writer) ctx.writer(...a);
+    else logs.push(a.map(String).join(" "));
+  };
 
   try {
     if (ctx.source === "cli") {

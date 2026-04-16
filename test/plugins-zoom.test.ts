@@ -21,6 +21,20 @@ mock.module(join(root, "commands/plugins/zoom/impl"), () => ({
 
 const { default: handler } = await import("../src/commands/plugins/zoom/index");
 
+// Helper — CLI tests inject a writer so output is captured even when plugins
+// route CLI output through ctx.writer (alpha.47 writer injection pattern).
+function cliCtx(args: string[]): { ctx: InvokeContext; out: () => string } {
+  const captured: string[] = [];
+  return {
+    ctx: {
+      source: "cli",
+      args,
+      writer: (...a: unknown[]) => captured.push(a.map(String).join(" ")),
+    },
+    out: () => captured.join("\n"),
+  };
+}
+
 describe("zoom plugin", () => {
   it("CLI — missing target returns usage", async () => {
     const ctx: InvokeContext = { source: "cli", args: [] };
@@ -30,24 +44,24 @@ describe("zoom plugin", () => {
   });
 
   it("CLI — happy path toggles zoom", async () => {
-    const ctx: InvokeContext = { source: "cli", args: ["mawjs-view"] };
+    const { ctx, out } = cliCtx(["mawjs-view"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("zoom mawjs-view");
+    expect(result.output ?? out()).toContain("zoom mawjs-view");
   });
 
   it("CLI — --pane appends .N", async () => {
-    const ctx: InvokeContext = { source: "cli", args: ["mawjs-view", "--pane", "1"] };
+    const { ctx, out } = cliCtx(["mawjs-view", "--pane", "1"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("zoom mawjs-view.1");
+    expect(result.output ?? out()).toContain("zoom mawjs-view.1");
   });
 
   it("CLI — session:window preserved", async () => {
-    const ctx: InvokeContext = { source: "cli", args: ["mawjs-view:0"] };
+    const { ctx, out } = cliCtx(["mawjs-view:0"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("zoom mawjs-view:0");
+    expect(result.output ?? out()).toContain("zoom mawjs-view:0");
   });
 
   it("CLI — not found errors", async () => {

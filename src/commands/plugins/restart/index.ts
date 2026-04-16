@@ -47,8 +47,14 @@ export default async function handler(ctx: any, _flags?: any): Promise<InvokeRes
   const logs: string[] = [];
   const origLog = console.log;
   const origError = console.error;
-  console.log = (...a: any[]) => logs.push(a.map(String).join(" "));
-  console.error = (...a: any[]) => logs.push(a.map(String).join(" "));
+  console.log = (...a: any[]) => {
+    if (ctx.writer) ctx.writer(...a);
+    else logs.push(a.map(String).join(" "));
+  };
+  console.error = (...a: any[]) => {
+    if (ctx.writer) ctx.writer(...a);
+    else logs.push(a.map(String).join(" "));
+  };
   try {
     const noUpdate = args.includes("--no-update");
     const refIdx = args.indexOf("--ref");

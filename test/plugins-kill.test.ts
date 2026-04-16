@@ -30,6 +30,20 @@ mock.module(join(root, "commands/plugins/kill/impl"), () => ({
 
 const { default: handler } = await import("../src/commands/plugins/kill/index");
 
+// Helper — CLI tests inject a writer so output is captured even when plugins
+// route CLI output through ctx.writer (alpha.47 writer injection pattern).
+function cliCtx(args: string[]): { ctx: InvokeContext; out: () => string } {
+  const captured: string[] = [];
+  return {
+    ctx: {
+      source: "cli",
+      args,
+      writer: (...a: unknown[]) => captured.push(a.map(String).join(" ")),
+    },
+    out: () => captured.join("\n"),
+  };
+}
+
 describe("kill plugin", () => {
   it("CLI — missing target returns usage error", async () => {
     const ctx: InvokeContext = { source: "cli", args: [] };
@@ -46,24 +60,24 @@ describe("kill plugin", () => {
   });
 
   it("CLI — bare session kills the session", async () => {
-    const ctx: InvokeContext = { source: "cli", args: ["mawjs-view"] };
+    const { ctx, out } = cliCtx(["mawjs-view"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("killed session mawjs-view");
+    expect(result.output ?? out()).toContain("killed session mawjs-view");
   });
 
   it("CLI — session:window kills a window", async () => {
-    const ctx: InvokeContext = { source: "cli", args: ["mawjs-view:0"] };
+    const { ctx, out } = cliCtx(["mawjs-view:0"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("killed window mawjs-view:0");
+    expect(result.output ?? out()).toContain("killed window mawjs-view:0");
   });
 
   it("CLI — --pane N kills a pane", async () => {
-    const ctx: InvokeContext = { source: "cli", args: ["mawjs-view", "--pane", "1"] };
+    const { ctx, out } = cliCtx(["mawjs-view", "--pane", "1"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("killed pane mawjs-view:0.1");
+    expect(result.output ?? out()).toContain("killed pane mawjs-view:0.1");
   });
 
   it("CLI — not found errors with hint to retry", async () => {

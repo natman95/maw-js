@@ -32,20 +32,35 @@ mock.module(join(root, "commands/plugins/panes/impl"), () => ({
 
 const { default: handler } = await import("../src/commands/plugins/panes/index");
 
+// Helper — CLI tests inject a writer so output is captured even when plugins
+// route CLI output through ctx.writer (alpha.47 writer injection pattern).
+function cliCtx(args: string[]): { ctx: InvokeContext; out: () => string } {
+  const captured: string[] = [];
+  return {
+    ctx: {
+      source: "cli",
+      args,
+      writer: (...a: unknown[]) => captured.push(a.map(String).join(" ")),
+    },
+    out: () => captured.join("\n"),
+  };
+}
+
 describe("panes plugin", () => {
   it("CLI — no target lists current window panes", async () => {
-    const ctx: InvokeContext = { source: "cli", args: [] };
+    const { ctx, out } = cliCtx([]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("TARGET");
-    expect(result.output).toContain("current:0.0");
+    const output = result.output ?? out();
+    expect(output).toContain("TARGET");
+    expect(output).toContain("current:0.0");
   });
 
   it("CLI — session target listed", async () => {
-    const ctx: InvokeContext = { source: "cli", args: ["mawjs-view"] };
+    const { ctx, out } = cliCtx(["mawjs-view"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
-    expect(result.output).toContain("mawjs-view:0.0");
+    expect(result.output ?? out()).toContain("mawjs-view:0.0");
   });
 
   it("CLI — flag-looking arg rejected", async () => {
@@ -85,43 +100,45 @@ describe("panes plugin", () => {
 
   it("CLI — --all passes all=true to cmdPanes", async () => {
     calls.length = 0;
-    const ctx: InvokeContext = { source: "cli", args: ["--all"] };
+    const { ctx, out } = cliCtx(["--all"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
     expect(calls[0]!.opts.all).toBe(true);
     expect(calls[0]!.target).toBeUndefined();
-    expect(result.output).toContain("alpha:0.0");
-    expect(result.output).toContain("beta:1.0");
+    const output = result.output ?? out();
+    expect(output).toContain("alpha:0.0");
+    expect(output).toContain("beta:1.0");
   });
 
   it("CLI — -a alias behaves identically to --all", async () => {
     calls.length = 0;
-    const ctx: InvokeContext = { source: "cli", args: ["-a"] };
+    const { ctx, out } = cliCtx(["-a"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
     expect(calls[0]!.opts.all).toBe(true);
-    expect(result.output).toContain("alpha:0.0");
+    expect(result.output ?? out()).toContain("alpha:0.0");
   });
 
   it("CLI — --all composes with --pid", async () => {
     calls.length = 0;
-    const ctx: InvokeContext = { source: "cli", args: ["--all", "--pid"] };
+    const { ctx, out } = cliCtx(["--all", "--pid"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
     expect(calls[0]!.opts.all).toBe(true);
     expect(calls[0]!.opts.pid).toBe(true);
-    expect(result.output).toContain("PID");
+    expect(result.output ?? out()).toContain("PID");
   });
 
   it("CLI — --all + target warns and still shows all panes", async () => {
     calls.length = 0;
-    const ctx: InvokeContext = { source: "cli", args: ["mawjs", "--all"] };
+    const { ctx, out } = cliCtx(["mawjs", "--all"]);
     const result = await handler(ctx);
     expect(result.ok).toBe(true);
     expect(calls[0]!.opts.all).toBe(true);
     expect(calls[0]!.target).toBe("mawjs");
-    expect(result.output).toContain("--all ignores target");
-    expect(result.output).toContain("alpha:0.0");
+    const output = result.output ?? out();
+    expect(output).toContain("--all ignores target");
+    expect(output).toContain("alpha:0.0");
   });
 
   it("API — all=true routes to --all mode", async () => {

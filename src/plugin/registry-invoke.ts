@@ -82,7 +82,22 @@ export async function invokePlugin(
       const handler = mod.default || mod.handler;
       if (!handler) return { ok: false, error: "TS plugin has no default export or handler" };
 
-      const result = await handler(ctx);
+      // Inject writer based on ctx.source so plugins can stream to the
+      // terminal in real-time (CLI) or fall back to logs[] capture (API/peer).
+      // Callers (e.g. tests) may pre-set ctx.writer — we honor that.
+      const ctxWithWriter: InvokeContext = {
+        ...ctx,
+        writer:
+          ctx.writer ??
+          (ctx.source === "cli"
+            ? (...args: unknown[]) => {
+                const line = args.map(String).join(" ");
+                process.stdout.write(line + "\n");
+              }
+            : undefined),
+      };
+
+      const result = await handler(ctxWithWriter);
       if (result && typeof result === "object" && "ok" in result) return result;
       return { ok: true };
     } catch (err: any) {
