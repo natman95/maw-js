@@ -1,9 +1,17 @@
 /**
  * RepoDiscovery singleton + backward-compat shim.
  *
- * Selection: `MAW_REPO_DISCOVERY` env var picks the adapter.
- *   - "ghq" (default): GhqDiscovery — inherits ghq's 9 VCSes
- *   - future: "fs-scan" (plain filesystem walk), "jj", "manifest", ...
+ * Today: only `GhqDiscovery` is wired (inherits ghq's 9 VCSes — git/svn/hg/
+ * darcs/pijul/cvs/fossil/bzr/git-svn). The interface + singleton exist so a
+ * second backend (fs-scan, jj, manifest, ...) can drop in WITHOUT touching
+ * the 12 call sites — but env-var dispatch is intentionally NOT wired until
+ * the second backend lands. Reason: a tautological `kind === "ghq" ? Ghq : Ghq`
+ * branch tests only that the hook exists, not that it dispatches — see the
+ * critic-agent's alpha.55-58 retro that flagged this as the smoking gun for
+ * premature abstraction. We kept the seam, removed the lie.
+ *
+ * When the second backend ships (same PR), wire `process.env.MAW_REPO_DISCOVERY`
+ * here with a real branch.
  *
  * Tests may inject a mock via `setRepos(mock)` and clean up with `resetRepos()`.
  *
@@ -25,9 +33,7 @@ let _instance: RepoDiscovery | null = null;
 
 export function getRepos(): RepoDiscovery {
   if (_instance) return _instance;
-  const kind = process.env.MAW_REPO_DISCOVERY ?? "ghq";
-  // Only "ghq" is wired today. Future adapters (fs-scan, jj, ...) land here.
-  _instance = kind === "ghq" ? GhqDiscovery : GhqDiscovery;
+  _instance = GhqDiscovery;
   return _instance;
 }
 

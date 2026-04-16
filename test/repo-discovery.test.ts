@@ -262,69 +262,41 @@ describe("setRepos / resetRepos — test adapter injection", () => {
   });
 });
 
-// ─── 4. Env-var selection (MAW_REPO_DISCOVERY) ────────────────────────
+// ─── 4. Singleton behavior ────────────────────────────────────────────
+//
+// Note: env-var dispatch (MAW_REPO_DISCOVERY) was removed in alpha.60 —
+// it was a tautological branch (`kind === "ghq" ? Ghq : Ghq`) that tested
+// only that the hook existed, not that it dispatched. The interface is
+// preserved so a second backend can wire the env var when it lands in
+// the same PR. Until then, getRepos() always returns GhqDiscovery.
 
-describe("getRepos — MAW_REPO_DISCOVERY selection", () => {
-  let originalEnv: string | undefined;
-
+describe("getRepos — singleton + default backend", () => {
   beforeEach(() => {
-    originalEnv = process.env.MAW_REPO_DISCOVERY;
     resetRepos();
   });
 
-  afterEach(() => {
-    if (originalEnv === undefined) {
-      delete process.env.MAW_REPO_DISCOVERY;
-    } else {
-      process.env.MAW_REPO_DISCOVERY = originalEnv;
-    }
-    resetRepos();
-  });
-
-  test("unset → GhqDiscovery (default)", () => {
-    delete process.env.MAW_REPO_DISCOVERY;
-    resetRepos();
+  test("default backend is GhqDiscovery", () => {
     expect(getRepos()).toBe(GhqDiscovery);
     expect(getRepos().name).toBe("ghq");
   });
 
-  test('"ghq" → GhqDiscovery', () => {
-    process.env.MAW_REPO_DISCOVERY = "ghq";
-    resetRepos();
-    expect(getRepos()).toBe(GhqDiscovery);
-  });
-
-  test("selection logic exists — an unknown value does not throw", () => {
-    // Future-proof: today the selection is "ghq" → GhqDiscovery, all else
-    // → GhqDiscovery. This test asserts the *hook* exists (no crash on an
-    // arbitrary value) without over-specifying behavior for adapters that
-    // aren't wired yet. When fs-scan lands, tighten this to
-    // `expect(getRepos()).toBe(FsScanDiscovery)`.
-    process.env.MAW_REPO_DISCOVERY = "fs-scan";
-    resetRepos();
-    expect(() => getRepos()).not.toThrow();
-    // Honor the contract shape even on unknown values:
-    const r = getRepos();
-    expect(typeof r.list).toBe("function");
-    expect(typeof r.findBySuffix).toBe("function");
-  });
-
   test("getRepos is memoized — two calls return the same instance", () => {
-    resetRepos();
     const a = getRepos();
     const b = getRepos();
     expect(a).toBe(b);
   });
 
-  test("env-var is only re-read after resetRepos", () => {
-    // Caching behavior is important — call sites expect stability within
-    // a process. Without resetRepos, flipping the env var mid-run does
-    // NOT swap the adapter. This guards that contract.
-    process.env.MAW_REPO_DISCOVERY = "ghq";
-    resetRepos();
+  test("resetRepos forces a fresh resolution on next getRepos", () => {
     const first = getRepos();
-    process.env.MAW_REPO_DISCOVERY = "fs-scan"; // no reset
-    expect(getRepos()).toBe(first);
+    resetRepos();
+    const second = getRepos();
+    // Same backend (since only one is wired) but the cache was cleared —
+    // setRepos+getRepos in interleaved tests rely on this.
+    expect(second).toBe(GhqDiscovery);
+    // Object identity: both reference the same exported singleton object,
+    // so `===` would still hold; the contract being tested here is "cache
+    // was cleared so the resolution code path ran again", not identity.
+    expect(first).toBe(GhqDiscovery);
   });
 });
 
