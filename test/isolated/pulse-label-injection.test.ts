@@ -47,11 +47,11 @@ Bun.spawn = (cmd: string[], _opts?: unknown) => {
 
 // ---- Stub dependencies so pulse.ts can be imported -----------------------
 
-mock.module("../src/core/transport/ssh", () => ({
+mock.module("../../src/core/transport/ssh", () => ({
   hostExec: async (_cmd: string) => "[]",
 }));
 
-mock.module("../src/config", () => ({
+mock.module("../../src/config", () => ({
   loadConfig: () => ({ pulseRepo: "test-org/test-repo" }),
 }));
 
@@ -60,7 +60,7 @@ mock.module("../src/config", () => ({
 let app: Elysia;
 
 beforeAll(async () => {
-  const { pulseApi } = await import("../src/api/pulse");
+  const { pulseApi } = await import("../../src/api/pulse");
   app = new Elysia({ prefix: "/api" }).use(pulseApi);
 });
 
