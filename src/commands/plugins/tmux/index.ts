@@ -1,6 +1,6 @@
 import type { InvokeContext, InvokeResult } from "../../../plugin/types";
 import { parseFlags } from "../../../cli/parse-args";
-import { cmdTmuxPeek, cmdTmuxLs } from "./impl";
+import { cmdTmuxPeek, cmdTmuxLs, cmdTmuxSend } from "./impl";
 
 export const command = {
   name: "tmux",
@@ -24,7 +24,34 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
     const args = ctx.source === "cli" ? (ctx.args as string[]) : [];
     const sub = args[0]?.toLowerCase();
 
-    if (sub === "ls" || sub === "list") {
+    if (sub === "send") {
+      const flags = parseFlags(args, {
+        "--literal": Boolean,
+        "--allow-destructive": Boolean,
+        "--force": Boolean,
+        "--help": Boolean,
+        "-h": "--help",
+      }, 1);
+      if (flags["--help"]) {
+        console.log("usage: maw tmux send <target> <command> [--literal] [--allow-destructive] [--force]");
+        console.log("  target:  pane id (%N), session:w.p, team-agent, fleet stem, or session name");
+        console.log("  --literal:           don't append Enter (raw keystrokes)");
+        console.log("  --allow-destructive: bypass deny-list (rm/sudo/redirect/...)");
+        console.log("  --force:             bypass refusal-to-inject-into-claude-pane");
+        return { ok: true, output: logs.join("\n") || undefined };
+      }
+      const target = flags._[0];
+      const command = flags._.slice(1).join(" ");
+      if (!target || !command) {
+        console.log("usage: maw tmux send <target> <command> [--literal] [--allow-destructive] [--force]");
+        return { ok: false, error: "target and command required", output: logs.join("\n") };
+      }
+      await cmdTmuxSend(target, command, {
+        literal: !!flags["--literal"],
+        allowDestructive: !!flags["--allow-destructive"],
+        force: !!flags["--force"],
+      });
+    } else if (sub === "ls" || sub === "list") {
       const flags = parseFlags(args, {
         "--all": Boolean,
         "-a": "--all",
@@ -63,13 +90,14 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
       const history = !!flags["--history"];
       await cmdTmuxPeek(target, { lines, history });
     } else if (!sub || sub === "--help" || sub === "-h") {
-      console.log("usage: maw tmux <ls|peek> [args]");
-      console.log("  ls [--all]      list panes with fleet + team annotations");
-      console.log("  peek <target>   read content of a tmux pane");
+      console.log("usage: maw tmux <ls|peek|send> [args]");
+      console.log("  ls [--all]              list panes with fleet + team annotations");
+      console.log("  peek <target>           read content of a tmux pane");
+      console.log("  send <target> <cmd>     send keys to a pane (with safety gates)");
       return { ok: true, output: logs.join("\n") || undefined };
     } else {
       console.log(`unknown tmux subcommand: ${sub}`);
-      console.log("usage: maw tmux <ls|peek>");
+      console.log("usage: maw tmux <ls|peek|send>");
       return { ok: false, error: `unknown subcommand: ${sub}`, output: logs.join("\n") };
     }
 

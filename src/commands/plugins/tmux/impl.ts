@@ -4,6 +4,7 @@ import { homedir } from "os";
 import { hostExec, tmux } from "../../../sdk";
 import { resolveSessionTarget } from "../../../core/matcher/resolve-target";
 import { loadFleetEntries } from "../../shared/fleet-load";
+import { checkDestructive, isClaudeLikePane } from "./safety";
 
 const TEAMS_DIR = join(homedir(), ".claude/teams");
 
@@ -177,6 +178,75 @@ export async function cmdTmuxLs(opts: TmuxLsOpts = {}): Promise<void> {
 
 function pad(s: string, n: number): string {
   return s.length >= n ? s.slice(0, n) : s + " ".repeat(n - s.length);
+}
+
+export interface TmuxSendOpts {
+  /** Append Enter after the command. Default true. Use --literal for raw keystrokes. */
+  literal?: boolean;
+  /** Bypass destructive-pattern deny-list. Required for rm/sudo/redirect/etc. */
+  allowDestructive?: boolean;
+  /** Bypass claude-pane refusal. Required to inject into a live claude session. */
+  force?: boolean;
+}
+
+/**
+ * Send a command into a target tmux pane. Wraps `tmux send-keys` with
+ * three safety gates:
+ *
+ *   1. Destructive-command deny-list (unless --allow-destructive)
+ *   2. Refuse if pane is running a claude-like process (unless --force)
+ *   3. Pane existence check before sending
+ *
+ * Default appends Enter (Enter key after the literal); --literal sends
+ * the keys verbatim (useful for keystroke chains, escape sequences).
+ */
+export async function cmdTmuxSend(target: string, command: string, opts: TmuxSendOpts = {}): Promise<void> {
+  if (!command) {
+    throw new Error("usage: maw tmux send <target> <command> [--literal] [--allow-destructive] [--force]");
+  }
+
+  const hit = resolveTmuxTarget(target);
+  if (!hit) throw new Error(`cannot resolve target '${target}'`);
+  const { resolved, source } = hit;
+
+  // Gate 1 — destructive-command deny-list
+  const destCheck = checkDestructive(command);
+  if (destCheck.destructive && !opts.allowDestructive) {
+    throw new Error(
+      `refusing to send: command matches destructive patterns:\n` +
+      destCheck.reasons.map(r => `  - ${r}`).join("\n") +
+      `\n  pass --allow-destructive to bypass (review carefully first)`
+    );
+  }
+
+  // Gate 2 — refuse if target pane is running claude (would inject into a live AI turn)
+  let paneCurrentCommand: string | undefined;
+  try {
+    const out = await hostExec(`tmux display-message -p -t '${resolved}' '#{pane_current_command}'`);
+    paneCurrentCommand = out.trim();
+  } catch (e: any) {
+    throw new Error(`pane lookup failed for '${resolved}' (from ${source}): ${e?.message || e}`);
+  }
+  if (isClaudeLikePane(paneCurrentCommand) && !opts.force) {
+    throw new Error(
+      `refusing to send: pane '${resolved}' is running '${paneCurrentCommand}' (claude-like).\n` +
+      `  injecting keys would collide with the AI's turn.\n` +
+      `  pass --force to override (you really want to type into a live claude pane)`
+    );
+  }
+
+  // Send
+  const args = opts.literal
+    ? `tmux send-keys -t '${resolved}' '${command.replace(/'/g, "'\\''")}'`
+    : `tmux send-keys -t '${resolved}' '${command.replace(/'/g, "'\\''")}' Enter`;
+
+  try {
+    await hostExec(args);
+  } catch (e: any) {
+    throw new Error(`send-keys failed for '${resolved}': ${e?.message || e}`);
+  }
+
+  console.log(`\x1b[32m✓\x1b[0m sent to ${target} → ${resolved} \x1b[90m[${source}]${opts.literal ? " (literal)" : ""}${opts.allowDestructive ? " (destructive-allowed)" : ""}${opts.force ? " (force)" : ""}\x1b[0m`);
 }
 
 /**
