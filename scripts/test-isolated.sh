@@ -18,7 +18,6 @@ set -eo pipefail
 cd "$(dirname "$0")/.."
 
 IGNORE_ARGS=(
-  --path-ignore-patterns '**/maw-js/**'
   --path-ignore-patterns '**/agents/**'
 )
 
