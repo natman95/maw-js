@@ -37,11 +37,29 @@ export interface SshMockOverrides {
   getPaneCommand?: (...args: any[]) => any;
   getPaneCommands?: (...args: any[]) => any;
   getPaneInfos?: (...args: any[]) => any;
+  HostExecError?: any;
+}
+
+// #431 added HostExecError — mocks must re-export the class shape or
+// imports of the real module leak the pollution pattern above.
+class MockHostExecError extends Error {
+  readonly target: string;
+  readonly transport: "local" | "ssh";
+  readonly underlying: Error;
+  readonly exitCode?: number;
+  constructor(target: string, transport: "local" | "ssh", underlying: Error, exitCode?: number) {
+    super(`[${transport}:${target}] ${underlying.message}`);
+    this.name = "HostExecError";
+    this.target = target;
+    this.transport = transport;
+    this.underlying = underlying;
+    this.exitCode = exitCode;
+  }
 }
 
 export function mockSshModule(overrides: SshMockOverrides = {}) {
   return {
-    // All 10 real exports from src/core/transport/ssh.ts, stubbed.
+    // All real exports from src/core/transport/ssh.ts, stubbed.
     // Override any of these via the argument.
     hostExec: async () => "",
     ssh: async () => "",
@@ -54,6 +72,7 @@ export function mockSshModule(overrides: SshMockOverrides = {}) {
     getPaneCommand: async () => "",
     getPaneCommands: async () => ({}),
     getPaneInfos: async () => ({}),
+    HostExecError: MockHostExecError,
     ...overrides,
   };
 }
