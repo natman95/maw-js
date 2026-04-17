@@ -1,6 +1,6 @@
 import type { InvokeContext, InvokeResult } from "../../../plugin/types";
 import { parseFlags } from "../../../cli/parse-args";
-import { cmdTmuxPeek } from "./impl";
+import { cmdTmuxPeek, cmdTmuxLs } from "./impl";
 
 export const command = {
   name: "tmux",
@@ -24,7 +24,25 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
     const args = ctx.source === "cli" ? (ctx.args as string[]) : [];
     const sub = args[0]?.toLowerCase();
 
-    if (sub === "peek") {
+    if (sub === "ls" || sub === "list") {
+      const flags = parseFlags(args, {
+        "--all": Boolean,
+        "-a": "--all",
+        "--json": Boolean,
+        "--help": Boolean,
+        "-h": "--help",
+      }, 1);
+      if (flags["--help"]) {
+        console.log("usage: maw tmux ls [--all|-a] [--json]");
+        console.log("  default: panes in current session only");
+        console.log("  --all:   panes across every session");
+        return { ok: true, output: logs.join("\n") || undefined };
+      }
+      await cmdTmuxLs({
+        all: !!flags["--all"],
+        json: !!flags["--json"],
+      });
+    } else if (sub === "peek") {
       const flags = parseFlags(args, {
         "--lines": Number,
         "--history": Boolean,
@@ -45,12 +63,13 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
       const history = !!flags["--history"];
       await cmdTmuxPeek(target, { lines, history });
     } else if (!sub || sub === "--help" || sub === "-h") {
-      console.log("usage: maw tmux <peek> [args]");
+      console.log("usage: maw tmux <ls|peek> [args]");
+      console.log("  ls [--all]      list panes with fleet + team annotations");
       console.log("  peek <target>   read content of a tmux pane");
       return { ok: true, output: logs.join("\n") || undefined };
     } else {
       console.log(`unknown tmux subcommand: ${sub}`);
-      console.log("usage: maw tmux <peek>");
+      console.log("usage: maw tmux <ls|peek>");
       return { ok: false, error: `unknown subcommand: ${sub}`, output: logs.join("\n") };
     }
 
