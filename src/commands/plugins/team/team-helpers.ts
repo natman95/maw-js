@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync } from "fs";
-import { join } from "path";
+import { join, dirname } from "path";
 import { homedir } from "os";
 
 // Exported for testing — override with _setDirs
@@ -36,16 +36,24 @@ export function loadTeam(name: string): TeamConfig | null {
   catch { return null; }
 }
 
-/** Resolve ψ/ directory from cwd — the oracle vault root. */
+/**
+ * Resolve ψ/ directory by walking UP from cwd looking for an oracle root
+ * (marked by CLAUDE.md + ψ/). Falls back to cwd/ψ for backward compat when
+ * no marker is found. Prevents rogue nested vaults when the CLI is run from
+ * a sub-directory (#393 — Bug A).
+ */
 export function resolvePsi(): string {
-  const psi = join(process.cwd(), "ψ");
-  if (existsSync(psi)) return psi;
-  try {
-    const real = readFileSync(psi, "utf-8"); // will throw if not exists
-    return real;
-  } catch {
-    return psi; // return default — callers mkdir as needed
+  let dir = process.cwd();
+  // Walk up looking for an oracle root (CLAUDE.md + ψ/ both present)
+  while (true) {
+    const psi = join(dir, "ψ");
+    if (existsSync(psi) && existsSync(join(dir, "CLAUDE.md"))) return psi;
+    const parent = dirname(dir);
+    if (parent === dir) break; // reached filesystem root
+    dir = parent;
   }
+  // Fallback: legacy behavior — cwd/ψ, callers mkdir as needed
+  return join(process.cwd(), "ψ");
 }
 
 /**
