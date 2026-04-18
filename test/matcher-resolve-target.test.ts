@@ -154,6 +154,44 @@ describe("resolveByName — no match", () => {
   });
 });
 
+describe("resolveByName — #535 regression (numeric-prefix fleet collision)", () => {
+  test("`mawjs` does NOT match `114-mawjs-no2` via middle segment", () => {
+    // Repro: fleet has oracle `mawjs-no2` (Bloom) with session `114-mawjs-no2`.
+    // User types `mawjs` expecting their own oracle. Pre-fix: Tier 2b matched
+    // `-mawjs-` middle segment → silently resolved to the wrong oracle.
+    // Post-fix: numeric-prefix sessions skip Tier 2b; only Tier 2a (exact `-mawjs`
+    // suffix) can match them → no suffix match → `none`.
+    const items = [sess("114-mawjs-no2")];
+    const r = resolveByName("mawjs", items);
+    expect(r.kind).toBe("none");
+  });
+
+  test("`cli` still resolves via middle segment for non-numeric names", () => {
+    // Sanity check: the #535 fix must not break the `cli` → `skills-cli-view`
+    // middle-match case (that session has no numeric prefix).
+    const items = [sess("skills-cli-view"), sess("114-mawjs-no2")];
+    const r = resolveByName("cli", items);
+    expect(r.kind).toBe("fuzzy");
+    if (r.kind === "fuzzy") expect(r.match.name).toBe("skills-cli-view");
+  });
+
+  test("numeric-prefix fleet session still resolves via Tier 2a exact suffix", () => {
+    // Sanity check: `mawjs` → `101-mawjs` (exact suffix) still works.
+    const items = [sess("101-mawjs"), sess("114-mawjs-no2")];
+    const r = resolveByName("mawjs", items);
+    expect(r.kind).toBe("fuzzy");
+    if (r.kind === "fuzzy") expect(r.match.name).toBe("101-mawjs");
+  });
+
+  test("`mawjs-no2` correctly resolves to its own fleet session", () => {
+    // The other half of the #535 test: typing the actual oracle name works.
+    const items = [sess("114-mawjs-no2"), sess("101-mawjs")];
+    const r = resolveByName("mawjs-no2", items);
+    expect(r.kind).toBe("fuzzy");
+    if (r.kind === "fuzzy") expect(r.match.name).toBe("114-mawjs-no2");
+  });
+});
+
 describe("resolveByName — word-segment middle match (NEW)", () => {
   test("middle-segment match: target 'cli' matches 'skills-cli-view' via -cli-", () => {
     const items = [sess("skills-cli-view"), sess("unrelated")];

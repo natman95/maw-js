@@ -75,8 +75,15 @@ export function resolveByName<T extends { name: string }>(
   // Tier 2b — prefix or middle (`target-*` or `*-target-*`). Only tried
   // when there's no suffix match. Catches view/aux sessions when the user
   // is specifically looking for one.
+  //
+  // Numeric-prefixed fleet sessions (`NN-<oracle>`) are EXCLUDED here — they
+  // belong to the full suffix oracle (e.g. `114-mawjs-no2` IS `mawjs-no2`, not
+  // a sub-oracle `mawjs`). Tier 2a's exact-suffix rule is the only legitimate
+  // way to resolve into a fleet session. Without this exclusion, typing
+  // `mawjs` matches `114-mawjs-no2` via the `-mawjs-` middle segment — #535.
   const prefixOrMid = items.filter(it => {
     const n = it.name.toLowerCase();
+    if (/^\d+-/.test(n)) return false;
     return n.startsWith(`${lc}-`) || n.includes(`-${lc}-`);
   });
   if (prefixOrMid.length === 1) return { kind: "fuzzy", match: prefixOrMid[0]! };
