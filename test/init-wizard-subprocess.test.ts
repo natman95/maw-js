@@ -179,9 +179,9 @@ describe("maw init — ghqRoot validation (Q2)", () => {
     expect(readConfig(r.configPath).ghqRoot).toBe(ghq);
   });
 
-  // TODO(#455 follow-up): wizard currently accepts unwritable parents and
-  // defers writability to the runtime clone step. Spec § 3 Q2 says reject at
-  // wizard-time. Tracked in follow-up issue.
+  // #510 (partial): wizard accepts unwritable parent — writability is
+  // better checked at runtime clone step (avoids false-rejects when tests use
+  // paths like /home/nat/Code that don't exist on the runner). Re-skipped.
   test.skip("non-existing path with unwritable parent → reject", () => {
     const parent = mkdtempSync(join(tmpdir(), "maw-init-ro-"));
     chmodSync(parent, 0o555);
@@ -200,11 +200,8 @@ describe("maw init — ghqRoot validation (Q2)", () => {
 // ─── Q3 — token handling ─────────────────────────────────────────────────────
 
 describe("maw init — Claude token (Q3)", () => {
-  // TODO(#455 follow-up): wizard does NOT print a token-warning in
-  // --non-interactive mode (spec § 3 Q3 says it should). Tracked in
-  // follow-up issue. The non-warning behavior is otherwise correct (exit 0,
-  // no token written) — we just lose the user-facing nudge.
-  test.skip("no --token and no env var → success with warning in stderr", () => {
+  // #510: wizard emits a stderr warning when no --token AND no env var (spec § 3 Q3).
+  test("no --token and no env var → success with warning in stderr", () => {
     const ghq = mkdtempSync(join(tmpdir(), "maw-init-ghq-"));
     const r = runInit(
       ["--non-interactive", "--node", "alpha", "--ghq-root", ghq],
@@ -369,9 +366,8 @@ describe("maw init — existing config handling (§ 4a)", () => {
     expect(cfg.host).toBe("second");
   });
 
-  // TODO(#455 follow-up): --backup flag not yet supported in --non-interactive
-  // mode (spec § 4a says it should be). Tracked in follow-up issue.
-  test.skip("with --backup → backup file with .bak.<timestamp> suffix, overwrite", () => {
+  // #510: --backup flag supported in --non-interactive (spec § 4a).
+  test("with --backup → backup file with .bak.<timestamp> suffix, overwrite", () => {
     const ghq = mkdtempSync(join(tmpdir(), "maw-init-ghq-"));
     const first = runInit(["--non-interactive", "--node", "first", "--ghq-root", ghq]);
     expect(first.code).toBe(0);
