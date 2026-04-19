@@ -1,13 +1,16 @@
-FROM oven/bun:1.3-alpine
+FROM oven/bun:1.3.11-alpine
 
 RUN apk add --no-cache wget
 
 WORKDIR /app
 
 COPY package.json bun.lock* ./
+COPY packages/sdk/package.json packages/sdk/
 RUN bun install --frozen-lockfile
 
 COPY . .
+
+RUN chmod +x src/cli.ts && ln -sf /app/src/cli.ts /usr/local/bin/maw
 
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
