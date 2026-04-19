@@ -47,7 +47,7 @@ export const PROBE_HINTS: Record<ProbeErrorCode, string> = {
   REFUSED: "Host resolves but port is closed. Is the peer process running?",
   TIMEOUT: "Peer did not respond within 2s. Network path may be blocked.",
   TLS: "TLS handshake failed. Check cert validity / chain.",
-  HTTP_4XX: "Peer responded with a client error. /info endpoint may be missing.",
+  HTTP_4XX: "Peer responded with a client error. /info endpoint may be missing OR peer is running an old maw version — if you control the peer, try restarting it.",
   HTTP_5XX: "Peer returned a server error. Server-side fault.",
   BAD_BODY: "/info responded but body shape was unexpected.",
   UNKNOWN: "Probe failed for an unclassified reason.",
