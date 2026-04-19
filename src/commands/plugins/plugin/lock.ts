@@ -10,9 +10,9 @@
  * See ψ/writing/2026-04-18/plugin-hash-supply-chain-spec.md for the spec.
  */
 
-import { chmodSync, existsSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
 import { homedir } from "os";
-import { join } from "path";
+import { dirname, join } from "path";
 import { hashFile } from "../../../plugin/registry";
 import { readManifest } from "./install-manifest-helpers";
 import { extractTarball } from "./install-extraction";
@@ -164,6 +164,8 @@ export function writeLock(lock: Lock): void {
   const path = lockPath();
   const tmp = `${path}.tmp`;
   const content = JSON.stringify({ ...lock, updated: new Date().toISOString() }, null, 2) + "\n";
+  // Parent dir may not exist yet on fresh installs that haven't run `maw init`.
+  mkdirSync(dirname(path), { recursive: true });
   // Exclusive create on the tmp path — if a prior write crashed and left
   // <path>.tmp behind, we refuse to clobber without surfacing it.
   try {
