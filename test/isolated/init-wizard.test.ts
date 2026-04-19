@@ -17,6 +17,8 @@ import { tmpdir } from "os";
 
 const TEST_CONFIG_DIR = mkdtempSync(join(tmpdir(), "maw-init-455-"));
 process.env.MAW_CONFIG_DIR = TEST_CONFIG_DIR;
+// #680: init now bootstraps plugins.lock — isolate from user's real ~/.maw.
+process.env.MAW_PLUGINS_LOCK = join(TEST_CONFIG_DIR, "plugins.lock");
 
 let cmdInit: typeof import("../../src/commands/plugins/init/impl").cmdInit;
 let CONFIG_FILE: string;

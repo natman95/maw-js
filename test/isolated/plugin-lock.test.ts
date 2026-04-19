@@ -257,13 +257,15 @@ describe("pinPlugin / unpinPlugin", () => {
 // ─── install integration — the real adversarial check ───────────────────────
 
 describe("cmdPluginInstall + plugins.lock (#487)", () => {
-  test("unpinned tarball install → refused with actionable error", async () => {
+  test("unpinned tarball install → auto-initializes lock entry (#680 TOFU)", async () => {
     const fx = buildFixture();
-    const { exitCode, stderr } = await capture(() => cmdPluginInstall([fx.tarball]));
-    expect(exitCode).toBe(1);
-    expect(stderr).toContain("not in plugins.lock");
-    expect(stderr).toContain("maw plugin pin");
-    expect(existsSync(join(pluginsDir(), "hello"))).toBe(false);
+    expect(readLock().plugins.hello).toBeUndefined();
+    const { exitCode, stdout } = await capture(() => cmdPluginInstall([fx.tarball]));
+    expect(exitCode).toBeUndefined();
+    expect(stdout).toContain("installed");
+    expect(readLock().plugins.hello?.version).toBe("0.1.0");
+    expect(readLock().plugins.hello?.sha256).toBe(fx.sha256);
+    expect(existsSync(join(pluginsDir(), "hello", "index.js"))).toBe(true);
   });
 
   test("pinned-then-installed happy path", async () => {
@@ -281,14 +283,50 @@ describe("cmdPluginInstall + plugins.lock (#487)", () => {
     // artifact differs — so the lock-hash comparison is the one that catches it.
     const legit = buildFixture({ bundleSrc: "export default () => ({ real: true });\n" });
     pinPlugin("hello", legit.tarball);
+    const pinnedSha = readLock().plugins.hello!.sha256;
 
     // Adversary's tarball: same name+version, different content, consistent self-hash.
     const evil = buildFixture({ bundleSrc: "export default () => ({ evil: true });\n" });
     const { exitCode, stderr } = await capture(() => cmdPluginInstall([evil.tarball]));
     expect(exitCode).toBe(1);
-    expect(stderr).toContain("hash mismatch");
-    expect(stderr).toContain("lockfile");
+    expect(stderr).toContain("sha256 mismatch");
+    expect(stderr).toContain("refusing to install");
+    expect(stderr).toContain("--force to override");
+    expect(stderr).toContain("--pin to re-pin");
     expect(existsSync(join(pluginsDir(), "hello"))).toBe(false);
+    // Lock entry is untouched on refusal.
+    expect(readLock().plugins.hello?.sha256).toBe(pinnedSha);
+  });
+
+  test("pinned hash mismatch + --force → proceeds + re-pins lock to new sha", async () => {
+    const legit = buildFixture({ bundleSrc: "export default () => ({ real: true });\n" });
+    pinPlugin("hello", legit.tarball);
+    const origSha = readLock().plugins.hello!.sha256;
+
+    const replacement = buildFixture({ bundleSrc: "export default () => ({ real: 2 });\n" });
+    const { exitCode, stdout } = await capture(() =>
+      cmdPluginInstall([replacement.tarball, "--force"]),
+    );
+    expect(exitCode).toBeUndefined();
+    expect(stdout).toContain("installed");
+    // Lock entry rewritten to the new tarball's sha.
+    const after = readLock().plugins.hello!;
+    expect(after.sha256).toBe(replacement.sha256);
+    expect(after.sha256).not.toBe(origSha);
+    // Plugin landed on disk.
+    expect(existsSync(join(pluginsDir(), "hello", "index.js"))).toBe(true);
+  });
+
+  test("pinned hash mismatch + --pin → proceeds + re-pins lock (same as --force)", async () => {
+    const legit = buildFixture({ bundleSrc: "export default () => ({ real: true });\n" });
+    pinPlugin("hello", legit.tarball);
+
+    const replacement = buildFixture({ bundleSrc: "export default () => ({ real: 3 });\n" });
+    const { exitCode } = await capture(() =>
+      cmdPluginInstall([replacement.tarball, "--pin"]),
+    );
+    expect(exitCode).toBeUndefined();
+    expect(readLock().plugins.hello!.sha256).toBe(replacement.sha256);
   });
 
   test("pinned version skew → refused with clear error", async () => {

@@ -10,9 +10,9 @@
  * See ψ/writing/2026-04-18/plugin-hash-supply-chain-spec.md for the spec.
  */
 
-import { chmodSync, existsSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from "fs";
 import { homedir } from "os";
-import { join } from "path";
+import { dirname, join } from "path";
 import { hashFile } from "../../../plugin/registry";
 import { readManifest } from "./install-manifest-helpers";
 import { extractTarball } from "./install-extraction";
@@ -27,6 +27,8 @@ export interface LockEntry {
   source: string;
   added: string;
   signers?: string[];
+  /** True iff entry was written by a `--link` (dev-clone) install. */
+  linked?: boolean;
 }
 
 export interface Lock {
@@ -115,6 +117,7 @@ export function validateSchema(parsed: unknown): { ok: true; lock: Lock } | { ok
       source: e.source,
       added: typeof e.added === "string" ? e.added : updated,
       signers: Array.isArray(e.signers) ? (e.signers as string[]).filter(s => typeof s === "string") : undefined,
+      ...(e.linked === true ? { linked: true } : {}),
     };
   }
   return { ok: true, lock: { schema: LOCK_SCHEMA, updated, plugins: out } };
@@ -161,6 +164,8 @@ export function writeLock(lock: Lock): void {
   const path = lockPath();
   const tmp = `${path}.tmp`;
   const content = JSON.stringify({ ...lock, updated: new Date().toISOString() }, null, 2) + "\n";
+  // Parent dir may not exist yet on fresh installs that haven't run `maw init`.
+  mkdirSync(dirname(path), { recursive: true });
   // Exclusive create on the tmp path — if a prior write crashed and left
   // <path>.tmp behind, we refuse to clobber without surfacing it.
   try {
@@ -241,6 +246,57 @@ export function pinPlugin(name: string, source: string, opts: PinOptions = {}): 
   lock.plugins[name] = entry;
   writeLock(lock);
   return { name, entry, previous };
+}
+
+/**
+ * #680 ask #1 — happy-path install writer.
+ *
+ * Called after a successful `maw plugin install`. Persists the artifact's
+ * sha256 into plugins.lock so subsequent installs have local truth to verify
+ * against. Idempotent: re-installing `<name>` updates the entry but preserves
+ * the original `added` timestamp.
+ *
+ * Separate from `pinPlugin` (which hashes a tarball on disk): this one trusts
+ * the caller's already-verified sha256 so we don't double-hash the artifact
+ * in the common install flow.
+ */
+export interface RecordInstallInput {
+  name: string;
+  version: string;
+  /** Canonical 64-hex sha256. For --link installs, hash of plugin.json content. */
+  sha256: string;
+  /** Tarball path, URL, or `link:<abs-path>` for --link. */
+  source: string;
+  /** True iff this was a --link (dev-clone) install. */
+  linked?: boolean;
+  signers?: string[];
+}
+
+export function recordInstall(input: RecordInstallInput): LockEntry {
+  const nv = validateName(input.name);
+  if (!nv.ok) throw new Error(nv.error);
+  const hv = validateSha256(input.sha256);
+  if (!hv.ok) throw new Error(`recordInstall(${input.name}): ${hv.error}`);
+  if (typeof input.version !== "string" || !input.version) {
+    throw new Error(`recordInstall(${input.name}): version required`);
+  }
+  if (typeof input.source !== "string" || !input.source) {
+    throw new Error(`recordInstall(${input.name}): source required`);
+  }
+  const lock = readLock();
+  const previous = lock.plugins[input.name];
+  const now = new Date().toISOString();
+  const entry: LockEntry = {
+    version: input.version,
+    sha256: input.sha256,
+    source: input.source,
+    added: previous?.added ?? now,
+    ...(input.linked === true ? { linked: true } : {}),
+    ...(input.signers && input.signers.length ? { signers: input.signers } : {}),
+  };
+  lock.plugins[input.name] = entry;
+  writeLock(lock);
+  return entry;
 }
 
 export interface UnpinResult {

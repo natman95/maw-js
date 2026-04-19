@@ -12,6 +12,7 @@ import {
   writeConfigAtomic,
 } from "./write-config";
 import { generateFederationToken } from "./federation";
+import { bootstrapPluginsLock } from "./bootstrap-plugins-lock";
 
 const CYAN = "\x1b[36m";
 const GREEN = "\x1b[32m";
@@ -102,6 +103,12 @@ export async function cmdInit(opts: CmdInitOpts): Promise<CmdInitResult> {
 
     writeConfigAtomic(CONFIG_FILE, config, /* overwrite */ true);
     write(`${GREEN}✓${RESET} Wrote ${CONFIG_FILE}`);
+    try {
+      const boot = bootstrapPluginsLock();
+      if (boot.created) write(`${GREEN}✓${RESET} plugins.lock (bootstrap) ${GRAY}${boot.path}${RESET}`);
+    } catch (e: any) {
+      write(`${GRAY}warning: plugins.lock bootstrap skipped — ${e?.message ?? String(e)}${RESET}`);
+    }
     if (federationToken && parsed.opts.federate) {
       write(`${CYAN}federation token${RESET}: ${federationToken}`);
       write(`${GRAY}  share with each peer in their maw.config.json${RESET}`);
@@ -148,6 +155,12 @@ export async function cmdInit(opts: CmdInitOpts): Promise<CmdInitResult> {
 
   write("");
   write(`${GREEN}✓${RESET} Wrote ${CONFIG_FILE}`);
+  try {
+    const boot = bootstrapPluginsLock();
+    if (boot.created) write(`${GREEN}✓${RESET} plugins.lock (bootstrap) ${GRAY}${boot.path}${RESET}`);
+  } catch (e: any) {
+    write(`${GRAY}warning: plugins.lock bootstrap skipped — ${e?.message ?? String(e)}${RESET}`);
+  }
   if (existsSync(FLEET_DIR)) {
     const fleetCount = readdirSync(FLEET_DIR).filter(f => f.endsWith(".json")).length;
     write(`${GREEN}✓${RESET} Fleet dir ready: ${FLEET_DIR} ${GRAY}(${fleetCount} entr${fleetCount === 1 ? "y" : "ies"})${RESET}`);

@@ -11,7 +11,8 @@ import { formatSdkMismatchError, runtimeSdkVersion, satisfies } from "../../../p
 import { installRoot, removeExisting } from "./install-source-detect";
 import { extractTarball, downloadTarball, verifyArtifactHash, verifyArtifactHashAgainst } from "./install-extraction";
 import { readManifest, printInstallSuccess } from "./install-manifest-helpers";
-import { readLock, pinPlugin } from "./lock";
+import { readLock, recordInstall } from "./lock";
+import { createHash } from "crypto";
 
 /**
  * #404 — preserve category across replace. Category is derived from `weight`
@@ -145,6 +146,20 @@ export async function installFromDir(
   // the author never has to run a per-repo setup.sh.
   ensurePluginMawJsLink(srcDir);
 
+  // #680 ask #1 — persist lock entry for --link installs. sha256 is of the
+  // plugin.json content (stable identity; the symlinked source isn't a
+  // sealed artifact so there's no tarball hash to record).
+  const absSrc = resolve(srcDir);
+  const pluginJsonBytes = readFileSync(join(absSrc, "plugin.json"));
+  const sha = `sha256:${createHash("sha256").update(pluginJsonBytes).digest("hex")}`;
+  recordInstall({
+    name: manifest!.name,
+    version: manifest!.version,
+    sha256: sha,
+    source: `link:${absSrc}`,
+    linked: true,
+  });
+
   printInstallSuccess(manifest!, dest, "linked (dev)");
 }
 
@@ -186,9 +201,16 @@ export async function installFromTarball(
     throw new Error(selfHashResult.error);
   }
 
-  // Registry-pinned verification (#487 Option A). The expected hash comes from
-  // the operator-curated lockfile, not the tarball itself — this is what
-  // closes the MITM / CDN-swap threat.
+  // Registry-pinned verification (#487 Option A, #680 ask 2). The expected
+  // hash comes from the operator-curated lockfile, not the tarball itself —
+  // this is what closes the MITM / CDN-swap threat.
+  //
+  // Gate behavior (#680 ask 2):
+  //   • No entry for <name>  → proceed (writer agent, #680 ask 1, persists).
+  //   • Entry + sha matches  → proceed.
+  //   • Entry + sha differs  → refuse unless --force OR --pin.
+  //       --force: override, re-write lock to new sha.
+  //       --pin:   re-pin, same effect — semantically an explicit re-trust.
   let lock;
   try {
     lock = readLock();
@@ -198,16 +220,7 @@ export async function installFromTarball(
   }
   const pinned = lock.plugins[manifest!.name];
   if (!pinned) {
-    if (!opts.pin) {
-      rmSync(staging, { recursive: true, force: true });
-      throw new Error(
-        `plugin '${manifest!.name}' not in plugins.lock — run: maw plugin pin ${manifest!.name} ${opts.source}\n` +
-        `  (or re-run install with --pin to add it now)`,
-      );
-    }
-    // --pin: accept this install AND stage the lock entry using the hash we
-    // just verified via the manifest. Safe because we already asserted the
-    // tarball is internally consistent; --pin is an explicit trust handshake.
+    void opts.pin;
   } else {
     if (pinned.version !== manifest!.version) {
       rmSync(staging, { recursive: true, force: true });
@@ -217,11 +230,17 @@ export async function installFromTarball(
     }
     const pinnedResult = verifyArtifactHashAgainst(staging, manifest!, pinned.sha256);
     if (!pinnedResult.ok) {
-      rmSync(staging, { recursive: true, force: true });
-      throw new Error(
-        `plugin '${manifest!.name}' ${pinnedResult.error}\n` +
-        `  lockfile hash did not match — this is the real adversarial check (#487).`,
-      );
+      if (!opts.force && !opts.pin) {
+        rmSync(staging, { recursive: true, force: true });
+        const observed = manifest!.artifact?.sha256 ?? "(unknown)";
+        throw new Error(
+          `plugin '${manifest!.name}' sha256 mismatch — refusing to install.\n` +
+          `  plugins.lock: ${pinned.sha256}\n` +
+          `  tarball:      ${observed}\n` +
+          `  --force to override (updates lock), --pin to re-pin`,
+        );
+      }
+      // --force / --pin: operator re-trusted; recordInstall() below overwrites.
     }
   }
 
@@ -250,12 +269,14 @@ export async function installFromTarball(
     rmSync(staging, { recursive: true, force: true });
   }
 
-  // --pin: after a successful install, stage the lockfile entry. We pin using
-  // the original tarball path so `maw plugin pin --verify` (future) can
-  // re-hash from the same source.
-  if (opts.pin && !lock.plugins[manifest!.name]) {
-    pinPlugin(manifest!.name, tarballPath);
-  }
+  // #680 — persist lock entry on every successful tarball install. TOFU on
+  // first install; overwrites on --force/--pin re-trust.
+  recordInstall({
+    name: manifest!.name,
+    version: manifest!.version,
+    sha256: manifest!.artifact!.sha256!,
+    source: opts.source,
+  });
 
   const sourceNote = opts.source.startsWith("http") ? `from ${opts.source}` : "";
   printInstallSuccess(
