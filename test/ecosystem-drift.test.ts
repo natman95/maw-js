@@ -64,7 +64,10 @@ describe("ecosystem.config.cjs — drift guard", () => {
       const src = readFileSync(launcherAbs, "utf8");
 
       // Look for `path.join(__dirname, "..", "src", "foo.ts")` style refs.
-      const joinRe = /path\.join\(\s*__dirname\s*,\s*((?:['"][^'"]+['"]\s*,?\s*)+)\)/g;
+      // Two-pass parse to avoid nested quantifiers (CodeQL ReDoS):
+      //   1. Capture the arg list with a single negated class ([^)]+).
+      //   2. Extract quoted strings from the arg list separately.
+      const joinRe = /path\.join\(\s*__dirname\s*,\s*([^)]+)\)/g;
       const matches = [...src.matchAll(joinRe)];
       for (const m of matches) {
         const parts = [...m[1].matchAll(/['"]([^'"]+)['"]/g)].map((x) => x[1]);
