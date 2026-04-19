@@ -82,9 +82,17 @@ Scope record shape:
   "lead": "mawjs",                             // authorizes add/remove (see §4)
   "created": "2026-04-19T10:00:00Z",
   "ttl": null,                                 // or ISO date
-  "signedBy": "mawjs@white#ed25519:abc…"       // §4 — optional, required for federated
+  "owner": "a1b2c3d4e5f6a7b8",                 // fingerprint of scope-owner key (rfc-identity #629)
+  "epoch": 1                                    // bump on member change / revocation
 }
 ```
+
+Members are **fingerprints**, not nicknames, on the wire. Display uses a
+local nickname→fingerprint map (DNS→IP analogy). A fingerprint is
+`sha256(spki-pubkey).slice(0, 16)` — 16 hex chars, 2^64 collision work,
+offline-verifiable. Locally the scope record may carry both
+(`{"fingerprint": "a1b2…", "nickname": "mawjs"}`) but only the fingerprint
+is authoritative.
 
 ## 4. Trust anchoring per scope
 
@@ -93,21 +101,58 @@ Scope membership is a **claim**. Trust decides who can make that claim believabl
 | Scope type | Anchor | Who can add members | Proof on the wire |
 |---|---|---|---|
 | `personal` | local file owner (unix uid) | oracle itself | none — local-only routing |
-| `team` | the `lead` field | lead, or any member with `delegate: true` | HMAC with shared team key (already in federation-auth.ts) |
+| `team` | the `owner` fingerprint | owner, or any member with `delegate: true` | HMAC with shared team key (already in federation-auth.ts) |
 | `public` | node operator (human) | human only via `maw scope public --add` | none — intra-node only |
-| `federated` | `lead`'s signing key | lead signs scope record; members sign join | ed25519 signature (needs rfc-identity primitive) |
+| `federated` | `owner`'s ed25519 signing key | owner issues per-member credentials | signed scope-member credential per request (ed25519, rfc-identity #629) |
 
-Concretely: when an agent says *"route this to `@marketplace-work:security`"*,
-the receiver validates that (a) it is itself listed as a member of
-`marketplace-work`, and (b) the sender is listed too. For federated scopes, (a)
-and (b) additionally require a valid signature on the scope record, produced by
-an identity primitive owned by the `lead`.
+### 4.1 Signed scope-member credential (federated only)
 
-> **Awaiting rfc-identity reply**: whether the identity primitive signs scope
-> assertions, or whether scope records are validated by out-of-band key
-> distribution. Will fold in their answer before the packet merges; federated
-> scope is the only scope type that depends on this — personal/team/public can
-> ship first.
+rfc-identity (#629) provides the signing primitive. The scope owner issues a
+credential to each member:
+
+```
+canonical = "scope-member/v1\n"
+          + "scope="      + SCOPE_NAME + "\n"
+          + "member="     + MEMBER_FINGERPRINT + "\n"
+          + "epoch="      + SCOPE_EPOCH + "\n"
+          + "issued-at="  + ISO8601 + "\n"
+          + "expires-at=" + ISO8601_OR_never
+signature = ed25519.sign(SCOPE_OWNER_PRIVKEY, canonical)
+```
+
+Members stash credentials locally in `~/.maw/scopes/<name>/creds/<fingerprint>.b64`.
+When sending `@<scope>:<target>` to a federated scope, the sender attaches
+two HTTP headers (composes cleanly with existing federation transport):
+
+- `X-Maw-Identity: <sender-fingerprint>` (from rfc-identity Phase 3)
+- `X-Maw-Scope-Credential: <b64-credential>`
+
+Receiver verifies in order: (1) credential signature against the known
+scope-owner pubkey (pinned from `peers.json` / `/info`), (2) credential
+`member` field equals `X-Maw-Identity`, (3) credential's epoch matches the
+receiver's current epoch for that scope, (4) credential not expired. Any
+failure → drop + log, no queue (forged claim ≠ approval request).
+
+Revocation = bump `SCOPE_EPOCH` and re-issue creds to remaining members.
+Ex-members' old-epoch creds fail verification step (3) from then on. No CRL
+machinery needed.
+
+**Per-request, not per-hop.** One signature on the outer envelope; transport
+is direct peer-to-peer HTTP with no relays.
+
+### 4.2 Scope ownership in federation
+
+**Single owner = creator (v1).** The oracle that runs
+`maw scope create --federated <name>` becomes the permanent owner; its
+fingerprint is baked into the scope record. Ownership transfer is a v2
+feature (`maw scope transfer <name> <new-fingerprint>`, requires current
+owner's signature on the transfer record).
+
+Rationale: consensus ownership needs BFT machinery we don't have, and for
+v1 the human operator is the real authority — if they want the scope under
+a different owner, that's a new scope.
+
+### 4.3 Safety signals
 
 **STUCK / ABORT / safety signals bypass all gates.** `maw hey --system` flag
 marks a delivery as a safety signal; the gate always routes, but the fact is
@@ -138,9 +183,10 @@ Why `@scope:agent` over `scope://addr`:
 Resolution rules for `@scope:agent`:
 
 1. Load `~/.maw/scopes/<scope>.json`. If missing → error `unknown_scope`.
-2. Assert sender ∈ `members`. If not → error `not_in_scope` (caller may escalate to `maw scope join`).
-3. Resolve `agent` inside the scope's member list. If member is a bare name, treat as local; if `node:agent`, route via peer URL. In either case, **skip the #644 per-pair consent check** — scope membership is the authorization, trust.json isn't consulted twice.
-4. If `agent` not a member → error `target_out_of_scope` (caller may request approval via `maw hey --approve` per §6).
+2. Resolve `agent` via local nickname→fingerprint map; assert the resulting fingerprint ∈ `members`. If sender's fingerprint ∉ `members` → error `not_in_scope` (caller may escalate to `maw scope join`).
+3. If scope type is `federated`, attach `X-Maw-Scope-Credential` + `X-Maw-Identity` headers (§4.1). Receiver re-verifies; wire claim is a hint, re-verification is authority.
+4. For any scope type, route to the resolved target (local tmux / self-node / peer per existing `resolveTarget`). **Skip the #644 per-pair consent check** — scope membership is the authorization, trust.json isn't consulted twice.
+5. If `agent` not a scope member → error `target_out_of_scope` (caller may request approval via `maw hey --approve` per §6).
 
 ### 5.1 Container-oracle addressing
 
@@ -162,7 +208,7 @@ Scope this tight — everything else is Phase 2+.
 3. Wire into `comm-send.ts` — parse `@scope:agent` form, populate `GateContext.scope`, call `maybeGateScope` first, `maybeGateConsent` second. ~40 LOC.
 4. Minimal CLI: `maw scope list`, `maw scope show <name>` only. ~40 LOC.
 
-**Out (Phase 2+):** scope create/edit, federated signing, `--approve` UX, audit log, wildcard trust, cross-node scope sync, batched approval.
+**Out (Phase 2+):** scope create/edit CLI, federated scope signing + credential issuance (depends on rfc-identity #629 landing signing primitive), `--approve` UX, audit log, wildcard trust, cross-node scope sync, batched approval, ownership transfer, key rotation credential chain.
 
 Default behavior: unscoped `maw hey` continues to work unchanged. `@scope:agent`
 is the only new code path. Rollback = don't type `@`.
@@ -172,15 +218,21 @@ Env flag: `MAW_SCOPED_ROUTING=1` — when off, `@scope:agent` errors with
 
 ## 7. Open questions
 
-1. **Scope on receive side.** When a remote peer delivers `@marketplace-work:security`, does the receiver trust the scope assertion from the wire, or re-verify against its own `~/.maw/scopes/`? (Proposal: re-verify. Wire assertion is a hint, not authority.)
-2. **Scope record distribution.** How does `marketplace-work.json` land on each member's filesystem? Sync via `ψ/`? Pull via `maw scope fetch <lead>`? Handshake during `maw scope join`? (Leaning toward `maw scope fetch` — explicit over magic.)
-3. **Agent renaming.** If `mawjs` is renamed, does the scope record update? (Memory says oracles have stable identity via `node` field; scope members should probably reference the identity primitive from #629 rather than the display name. Blocked on rfc-identity.)
-4. **Overlap + precedence.** An agent can be in multiple scopes. If target is reachable via scope A (allowed) and scope B (denied), which wins? (Proposal: any allowed scope permits the send — ACL-union, not ACL-intersection. This matches intuition: being in the team-scope shouldn't be weakened by *also* being on the personal-scope exclusion list of someone you're not messaging.)
+1. **Scope on receive side** — RESOLVED via rfc-identity. Receiver re-verifies: credential signature + epoch + fingerprint match. Wire claim is a hint, receiver's copy of scope-owner pubkey is authority. See §4.1.
+2. **Scope record distribution.** How does the record land on each member's filesystem? (Leaning `maw scope fetch <owner-fingerprint>` — explicit over magic. Record is public-keyed by owner fingerprint so transport need not be trusted; fetched record is self-verifying.)
+3. **Agent renaming** — RESOLVED via rfc-identity. Members are fingerprints, not names. Renaming is a local display-map update; fingerprint is stable until key rotation. Key rotation is a v2 concern (will need a rotation credential chain).
+4. **Overlap + precedence.** An agent can be in multiple scopes. If target is reachable via scope A (allowed) and scope B (denied), which wins? (Proposal: ACL-union — any allowed scope permits the send. Personal-scope exclusion lists don't weaken team-scope permissions for unrelated targets.)
 5. **Audit log location.** `ψ/` (shared, auditable across federation) vs `~/.maw/audit/` (local, private). Memory "Vault sync scope" warns ψ/ is not fully cross-node synced, so leaning local with opt-in ψ/ mirror for team scopes.
-6. **Phase 3 deprecation.** Spec says "require every `maw hey` to cite scope." That's a breaking change; needs its own issue. Out of scope here — this RFC only earns us the *ability* to require it later.
-7. **Interaction with #644 trust.json.** Is per-pair trust still useful once scopes exist? Argument for keep: legacy unscoped routing still needs it. Argument against: two overlapping ACL systems. (Proposal: keep; #644 is the fallback for public-scope and legacy callers.)
+6. **Phase 3 deprecation.** "Require every `maw hey` to cite scope" is a breaking change; needs its own issue. Out of scope here — this RFC only earns us the *ability* to require it later.
+7. **Interaction with #644 trust.json.** Proposal: keep. #644 is the fallback for public-scope and legacy unscoped callers. Scoped sends skip #644 (§5 rule 4) so we never double-gate.
+8. **Relationship to #627 team-invite action** — RESOLVED via rfc-team consult. The `team-invite` consent action stays (governs *joining*); scope record governs *messaging*. One ceremony to join, no per-pair trust accumulation after. See §3 table / §5 rule 4.
+9. **Container scope default** — tentative pending container-proto. Working model: container-oracle boots into a fresh `personal` scope, scope-owner = container host's fingerprint; host runs `maw scope join <team> <container-fingerprint>` after attestation. No `container://` scheme needed; addressing is `<host-node>:<agent>`.
 
 ---
 
-*Deliverable for task #3. Cross-consult replies pending from rfc-identity (§4,
-§7.3) and container-proto (§5.1) will be folded in before merge.*
+## 8. Changelog
+
+- **2026-04-19 r1**: initial packet (commit ee4c7b1).
+- **2026-04-19 r2**: folded rfc-identity reply — fingerprint primitive in §3, signed credential + header integration in §4.1, v1 single-owner decision in §4.2, fingerprint-based renaming in §7.3 resolved. Folded rfc-team consult — §7.8 documents team-invite (join) vs scope (message) separation.
+
+*Container-proto reply still pending; §7.9 remains tentative until they land.*
