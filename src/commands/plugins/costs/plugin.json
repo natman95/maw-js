@@ -9,11 +9,5 @@
     "command": "costs",
     "help": "maw costs — show token usage and cost breakdown per agent"
   },
-  "api": {
-    "path": "/api/costs",
-    "methods": [
-      "GET"
-    ]
-  },
   "weight": 50
 }
