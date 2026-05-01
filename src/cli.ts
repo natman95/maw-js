@@ -48,6 +48,46 @@ async function main(): Promise<void> {
     // Load plugins from ~/.maw/plugins/ — the single source of truth
     await scanCommands(pluginDir, "user");
 
+    // Auto-restore: if no tmux sessions and a recent snapshot exists, offer to restore.
+    if (cmd && cmd !== "--help" && cmd !== "-h") {
+      try {
+        const { listSessions } = await import("./sdk");
+        const live = await listSessions().catch(() => [] as any[]);
+        if (live.length === 0) {
+          const { latestSnapshot } = await import("./core/fleet/snapshot");
+          const snap = latestSnapshot();
+          if (snap) {
+            const ageMs = Date.now() - new Date(snap.timestamp).getTime();
+            if (ageMs < 24 * 60 * 60 * 1000) {
+              const mins = Math.round(ageMs / 60000);
+              const ageStr = mins >= 60 ? `${Math.round(mins / 60)}h ago` : `${mins}m ago`;
+              console.log(`\x1b[36m📸\x1b[0m Last snapshot: ${snap.sessions.length} sessions (${ageStr})`);
+              for (const s of snap.sessions) console.log(`   ${s.name}`);
+              process.stdout.write(`\nRestore all? [y/N] `);
+              const buf = new Uint8Array(64);
+              const fd = require("fs").openSync("/dev/tty", "r");
+              const n = require("fs").readSync(fd, buf);
+              require("fs").closeSync(fd);
+              const answer = new TextDecoder().decode(buf.subarray(0, n)).trim().toLowerCase();
+              if (answer === "y" || answer === "yes") {
+                const { cmdWake } = await import("./commands/shared/wake-cmd");
+                for (const s of snap.sessions) {
+                  const oracle = s.name.replace(/^\d+-/, "");
+                  try {
+                    await cmdWake(oracle, { attach: false });
+                    console.log(`  \x1b[32m✓\x1b[0m ${s.name}`);
+                  } catch (e: any) {
+                    console.log(`  \x1b[31m✗\x1b[0m ${s.name}: ${e?.message || String(e)}`);
+                  }
+                }
+                console.log("");
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
     if (!cmd || cmd === "--help" || cmd === "-h") {
       usage();
     } else {

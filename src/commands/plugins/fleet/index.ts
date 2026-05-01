@@ -82,6 +82,20 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
           console.log(`  ${w.name}`);
         }
       }
+
+      if (args.includes("--all")) {
+        const { cmdWake } = await import("../../shared/wake-cmd");
+        console.log("");
+        for (const s of snap.sessions) {
+          const oracle = s.name.replace(/^\d+-/, "");
+          try {
+            await cmdWake(oracle, { attach: false });
+            console.log(`  \x1b[32m✓\x1b[0m ${s.name}`);
+          } catch (e: any) {
+            console.log(`  \x1b[31m✗\x1b[0m ${s.name}: ${e?.message || String(e)}`);
+          }
+        }
+      }
     } else if (sub === "snapshot") {
       const { takeSnapshot } = await import("../../../core/fleet/snapshot");
       const trigger = args[1] || "manual";

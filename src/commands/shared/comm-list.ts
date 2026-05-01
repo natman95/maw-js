@@ -107,6 +107,22 @@ export async function cmdList(opts: { fix?: boolean } = {}) {
 
   if (sessions.length === 0 && orphans.length === 0) {
     console.log("\x1b[90mNo active sessions.\x1b[0m");
+
+    try {
+      const { latestSnapshot } = await import("../../core/fleet/snapshot");
+      const snap = latestSnapshot();
+      if (snap) {
+        const ageMs = Date.now() - new Date(snap.timestamp).getTime();
+        if (ageMs < 24 * 60 * 60 * 1000) {
+          const mins = Math.round(ageMs / 60000);
+          const ageStr = mins >= 60 ? `${Math.round(mins / 60)}h ago` : `${mins}m ago`;
+          console.log(`\n\x1b[36m📸\x1b[0m Last snapshot (${ageStr}):`);
+          for (const s of snap.sessions) console.log(`   \x1b[33m${s.name}\x1b[0m`);
+          console.log(`\n\x1b[90m  → maw fleet restore --all   wake all from snapshot\x1b[0m`);
+        }
+      }
+    } catch {}
+
     console.log("\x1b[90m  → maw bud <name>     create new oracle\x1b[0m");
     console.log("\x1b[90m  → maw wake <name>    attach existing\x1b[0m");
   }
