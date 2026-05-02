@@ -130,25 +130,6 @@ export function compareBases(a: string, b: string): number {
   return 0;
 }
 
-/**
- * #819: pick the effective base for the next bump — the later of today's
- * clock-derived base and the package.json-derived base. This prevents the
- * post-stable-cut downgrade where package.json carries `YY.M.(D+1)` but the
- * clock still reads `YY.M.D` (tomorrow's stable already cut, today's clock
- * still ticking). Without this, the script targets `YY.M.D-alpha.0` — a
- * downgrade against `YY.M.(D+1)-alpha.N`.
- *
- * Ghost-date guard: if the package.json base has a day > 31 (impossible
- * calendar date), it's a ghost from legacy monotonic stable bumps. Always
- * fall back to today's real date in that case.
- */
-export function effectiveBase(todayBase: string, packageVersion: string): string {
-  const pkgBase = extractBaseFromVersion(packageVersion);
-  if (!pkgBase) return todayBase;
-  if (!isValidCalendarDate(pkgBase)) return todayBase;
-  return compareBases(pkgBase, todayBase) > 0 ? pkgBase : todayBase;
-}
-
 const DAYS_IN_MONTH = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 export function isValidCalendarDate(base: string): boolean {
@@ -158,6 +139,26 @@ export function isValidCalendarDate(base: string): boolean {
   if (m < 1 || m > 12) return false;
   if (d < 1 || d > DAYS_IN_MONTH[m]) return false;
   return true;
+}
+
+/**
+ * #819: pick the effective base for the next bump — the later of today's
+ * clock-derived base and the package.json-derived base. This prevents the
+ * post-stable-cut downgrade where package.json carries `YY.M.(D+1)` but the
+ * clock still reads `YY.M.D` (tomorrow's stable already cut, today's clock
+ * still ticking). Without this, the script targets `YY.M.D-alpha.0` — a
+ * downgrade against `YY.M.(D+1)-alpha.N`.
+ *
+ * #1015 ghost-date guard: if the package.json base has a day that doesn't
+ * exist in the calendar (e.g. April 53), fall back to today — the base is
+ * corrupted. main() auto-fixes package.json before reaching here, but
+ * direct callers get a safe fallback instead of a crash.
+ */
+export function effectiveBase(todayBase: string, packageVersion: string): string {
+  const pkgBase = extractBaseFromVersion(packageVersion);
+  if (!pkgBase) return todayBase;
+  if (!isValidCalendarDate(pkgBase)) return todayBase;
+  return compareBases(pkgBase, todayBase) > 0 ? pkgBase : todayBase;
 }
 
 /**
@@ -262,11 +263,30 @@ async function main() {
   const pkgPath = join(process.cwd(), "package.json");
   const pkg = JSON.parse(readFileSync(pkgPath, "utf-8"));
 
-  const base = args.stable ? todayBase : effectiveBase(todayBase, pkg.version ?? "");
+  // #1015: auto-fix ghost dates in package.json. A ghost (e.g. April 53)
+  // is a corrupted CalVer base from legacy monotonic stable bumps. Instead
+  // of erroring, reset to today's real date and continue.
   const pkgBase = extractBaseFromVersion(pkg.version ?? "");
   if (pkgBase && !isValidCalendarDate(pkgBase)) {
-    console.error(`⚠ ghost date in package.json: ${pkg.version} (day ${pkgBase.split(".")[2]} doesn't exist) → using ${todayBase}`);
+    const [, mo, da] = pkgBase.split(".").map(Number);
+    const MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const DAYS = [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const maxDay = mo >= 1 && mo <= 12 ? DAYS[mo] : "?";
+    console.error(`\n⚠ ghost date in package.json: ${pkg.version}`);
+    console.error(`  day ${da} doesn't exist in ${MONTH_NAMES[mo] || `month ${mo}`} (max: ${maxDay})`);
+    console.error(`\n  CalVer scheme: v{YY}.{M}.{D}[-{channel}.{HMM}]`);
+    console.error(`    YY   = year (${now.getFullYear() % 100})`);
+    console.error(`    M    = month 1-12 (${now.getMonth() + 1} = ${MONTH_NAMES[now.getMonth() + 1]})`);
+    console.error(`    D    = day of month 1-${DAYS[now.getMonth() + 1]} (today: ${now.getDate()})`);
+    console.error(`    HMM  = hour*100 + minute (wall clock)`);
+    console.error(`\n  auto-fix: resetting base to ${todayBase}\n`);
+    pkg.version = todayBase;
+    writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + "\n");
   }
+
+  // #819: choose the effective base before fetching tags so we list tags for
+  // the correct date when package.json is future-dated.
+  const base = args.stable ? todayBase : effectiveBase(todayBase, pkg.version ?? "");
 
   const channelForTags: Channel = args.channel ?? "alpha";
   const tags = args.stable ? [] : await listChannelTags(base, channelForTags);
