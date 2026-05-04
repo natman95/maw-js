@@ -105,7 +105,17 @@ export async function cmdWake(oracle: string, opts: { task?: string; wt?: string
     await tmux.newSession(session, { window: mainWindowName, cwd: repoPath });
     await setSessionEnv(session);
     await new Promise(r => setTimeout(r, 300));
-    await tmux.sendText(`${session}:${mainWindowName}`, buildCommandInDir(mainWindowName, repoPath, opts.engine));
+    // Auto-detect channel config for this oracle (#1096)
+    const { getChannelPluginIds, getChannelEnv } = await import("./channel-loader");
+    const channelIds = getChannelPluginIds(oracle);
+    const channelEnv = getChannelEnv(oracle);
+    for (const [k, v] of Object.entries(channelEnv)) {
+      await tmux.setEnvironment(session, k, v);
+    }
+    const wakeOpts = channelIds.length
+      ? { engine: opts.engine, channels: channelIds }
+      : opts.engine;
+    await tmux.sendText(`${session}:${mainWindowName}`, buildCommandInDir(mainWindowName, repoPath, wakeOpts));
     console.log(`\x1b[32m+\x1b[0m created session '${session}' (main: ${mainWindowName})`);
 
     // Auto-register agent in config.agents so federation peers can route to it (#285)

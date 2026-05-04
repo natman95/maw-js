@@ -7,18 +7,34 @@ function matchGlob(pattern: string, name: string): boolean {
   return false;
 }
 
-export function buildCommand(agentName: string, engine?: string): string {
+export interface BuildCommandOpts {
+  engine?: string;
+  channels?: string[];
+  devChannels?: boolean;
+}
+
+export function buildCommand(agentName: string, optsOrEngine?: string | BuildCommandOpts): string {
+  const opts: BuildCommandOpts = typeof optsOrEngine === "string"
+    ? { engine: optsOrEngine }
+    : (optsOrEngine || {});
   const config = loadConfig();
   let cmd: string;
 
-  if (engine && config.commands[engine]) {
-    cmd = config.commands[engine];
+  if (opts.engine && config.commands[opts.engine]) {
+    cmd = config.commands[opts.engine];
   } else {
     cmd = config.commands.default || "claude";
     for (const [pattern, command] of Object.entries(config.commands)) {
       if (pattern === "default") continue;
       if (matchGlob(pattern, agentName)) { cmd = command; break; }
     }
+  }
+
+  if (opts.channels?.length) {
+    cmd += " --channels " + opts.channels.join(" ");
+  }
+  if (opts.devChannels) {
+    cmd += " --dangerously-load-development-channels";
   }
 
   // Strip --dangerously-skip-permissions when running as root (#181)
@@ -58,8 +74,8 @@ export function buildCommand(agentName: string, engine?: string): string {
  * already sets the initial pane cwd, and the scrollback noise wasn't worth
  * the reboot-recovery edge case. `cwd` param kept for API compat + future use.
  */
-export function buildCommandInDir(agentName: string, _cwd: string, engine?: string): string {
-  return buildCommand(agentName, engine);
+export function buildCommandInDir(agentName: string, _cwd: string, optsOrEngine?: string | BuildCommandOpts): string {
+  return buildCommand(agentName, optsOrEngine);
 }
 
 export function getEnvVars(): Record<string, string> {

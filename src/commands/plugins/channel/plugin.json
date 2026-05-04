@@ -1,0 +1,17 @@
+{
+  "name": "channel",
+  "version": "1.0.0",
+  "entry": "./index.ts",
+  "sdk": "^1.0.0",
+  "description": "Manage Claude Code channels per oracle — add, remove, list, setup.",
+  "cli": {
+    "command": "channel",
+    "help": "maw channel <add|rm|ls|setup> [oracle] [plugin]",
+    "flags": {
+      "--env": "string",
+      "--pass": "string",
+      "--dev": "boolean"
+    }
+  },
+  "weight": 10
+}
