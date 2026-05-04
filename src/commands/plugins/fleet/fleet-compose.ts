@@ -1,43 +1,68 @@
 /**
- * fleet-compose.ts — Generate docker-compose.yml from fleet configs.
+ * fleet-compose.ts — Generate docker-compose.yml for `maw serve`.
  *
- * Each oracle becomes a service with bun + tmux + claude CLI.
- * Central maw-serve container manages the API.
+ * Single-service compose. `docker compose up` runs the maw API server
+ * (port 3456) with all required volumes mounted.
  *
- * Usage: maw fleet compose [--output <path>] [--include <names>]
+ * Usage: maw fleet compose [--output <path>] [--port <N>]
  */
 
-import { loadFleetEntries, type FleetEntry } from "../../shared/fleet-load";
-import { getChannelPluginIds } from "../../shared/channel-loader";
-import { writeFileSync } from "fs";
+import { writeFileSync } from "node:fs";
 
 interface ComposeService {
-  image: string;
+  build?: { context: string; dockerfile: string };
+  image?: string;
   container_name: string;
-  working_dir: string;
+  command: string;
+  ports: string[];
   volumes: string[];
   environment: Record<string, string>;
-  command: string;
-  depends_on?: string[];
-  ports?: string[];
   restart: string;
+  healthcheck?: {
+    test: string[];
+    interval: string;
+    timeout: string;
+    retries: number;
+  };
 }
 
 interface ComposeFile {
-  version: string;
   services: Record<string, ComposeService>;
   volumes: Record<string, { driver: string }>;
 }
 
-export function generateCompose(opts: { include?: string[] } = {}): { yaml: string; serviceCount: number } {
-  const entries = loadFleetEntries();
-  const filtered = opts.include?.length
-    ? entries.filter(e => opts.include!.some(n => e.groupName.includes(n)))
-    : entries;
+export function generateServeCompose(opts: { port?: number } = {}): { yaml: string } {
+  const port = opts.port ?? 3456;
+  const tlsPort = port + 1;
 
   const compose: ComposeFile = {
-    version: "3.8",
-    services: {},
+    services: {
+      "maw-serve": {
+        build: { context: ".", dockerfile: "Dockerfile.serve" },
+        container_name: "maw-serve",
+        command: `maw serve ${port} --host 0.0.0.0`,
+        ports: [`${port}:${port}`, `${tlsPort}:${tlsPort}`],
+        volumes: [
+          "claude-config:/root/.claude",
+          "maw-config:/root/.config/maw",
+          "code-repos:/root/Code",
+          "/var/run/docker.sock:/var/run/docker.sock",
+        ],
+        environment: {
+          MAW_HOST: "0.0.0.0",
+          MAW_PORT: String(port),
+          NODE_ENV: "production",
+          TMUX_TMPDIR: "/tmp/tmux",
+        },
+        restart: "unless-stopped",
+        healthcheck: {
+          test: ["CMD", "curl", "-sf", `http://localhost:${port}/api/health`],
+          interval: "15s",
+          timeout: "5s",
+          retries: 3,
+        },
+      },
+    },
     volumes: {
       "claude-config": { driver: "local" },
       "maw-config": { driver: "local" },
@@ -45,76 +70,34 @@ export function generateCompose(opts: { include?: string[] } = {}): { yaml: stri
     },
   };
 
-  compose.services["maw-serve"] = {
-    image: "maw-js:latest",
-    container_name: "maw-serve",
-    working_dir: "/root",
-    command: "maw serve --host 0.0.0.0",
-    ports: ["3456:3456", "3457:3457"],
-    volumes: [
-      "claude-config:/root/.claude",
-      "maw-config:/root/.config/maw",
-      "code-repos:/root/Code",
-    ],
-    environment: {
-      MAW_HOST: "0.0.0.0",
-      NODE_ENV: "production",
-    },
-    restart: "unless-stopped",
-  };
-
-  for (const entry of filtered) {
-    const oracleName = entry.session.windows?.[0]?.name || entry.groupName;
-    const repo = entry.session.windows?.[0]?.repo || "";
-    const serviceName = entry.groupName.replace(/[^a-z0-9-]/gi, "-").toLowerCase();
-    const channels = getChannelPluginIds(oracleName.replace(/-oracle$/, ""));
-    const channelFlag = channels.length ? ` --channels ${channels.join(" ")}` : "";
-    const skipPerms = channels.length ? " --dangerously-skip-permissions" : "";
-
-    compose.services[serviceName] = {
-      image: "claude-oracle:latest",
-      container_name: serviceName,
-      working_dir: `/root/Code/github.com/${repo}`,
-      command: `bash -c "tmux new-session -d -s ${entry.session.name} && tmux send-keys -t ${entry.session.name} 'claude${skipPerms} --continue${channelFlag}' Enter && tail -f /dev/null"`,
-      volumes: [
-        "claude-config:/root/.claude",
-        "maw-config:/root/.config/maw",
-        "code-repos:/root/Code",
-      ],
-      environment: {
-        ORACLE_NAME: oracleName,
-        MAW_NODE: "docker",
-        TMUX_TMPDIR: "/tmp/tmux",
-      },
-      depends_on: ["maw-serve"],
-      restart: "unless-stopped",
-    };
-  }
-
-  const yaml = toYaml(compose);
-  return { yaml, serviceCount: filtered.length + 1 };
+  return { yaml: toYaml(compose) };
 }
 
 function toYaml(obj: ComposeFile): string {
-  const lines: string[] = [`version: "${obj.version}"`, "", "services:"];
+  const lines: string[] = ["services:"];
 
   for (const [name, svc] of Object.entries(obj.services)) {
     lines.push(`  ${name}:`);
-    lines.push(`    image: ${svc.image}`);
-    lines.push(`    container_name: ${svc.container_name}`);
-    lines.push(`    working_dir: ${svc.working_dir}`);
-    lines.push(`    command: ${svc.command}`);
-    if (svc.ports?.length) {
-      lines.push("    ports:");
-      for (const p of svc.ports) lines.push(`      - "${p}"`);
+    if (svc.build) {
+      lines.push(`    build:`);
+      lines.push(`      context: ${svc.build.context}`);
+      lines.push(`      dockerfile: ${svc.build.dockerfile}`);
     }
+    if (svc.image) lines.push(`    image: ${svc.image}`);
+    lines.push(`    container_name: ${svc.container_name}`);
+    lines.push(`    command: ${svc.command}`);
+    lines.push("    ports:");
+    for (const p of svc.ports) lines.push(`      - "${p}"`);
     lines.push("    volumes:");
     for (const v of svc.volumes) lines.push(`      - ${v}`);
     lines.push("    environment:");
     for (const [k, v] of Object.entries(svc.environment)) lines.push(`      ${k}: "${v}"`);
-    if (svc.depends_on?.length) {
-      lines.push("    depends_on:");
-      for (const d of svc.depends_on) lines.push(`      - ${d}`);
+    if (svc.healthcheck) {
+      lines.push("    healthcheck:");
+      lines.push(`      test: ${JSON.stringify(svc.healthcheck.test)}`);
+      lines.push(`      interval: ${svc.healthcheck.interval}`);
+      lines.push(`      timeout: ${svc.healthcheck.timeout}`);
+      lines.push(`      retries: ${svc.healthcheck.retries}`);
     }
     lines.push(`    restart: ${svc.restart}`);
     lines.push("");
@@ -132,16 +115,18 @@ function toYaml(obj: ComposeFile): string {
 export async function cmdFleetCompose(args: string[]): Promise<void> {
   const outputIdx = args.indexOf("--output");
   const outputPath = outputIdx >= 0 ? args[outputIdx + 1] : undefined;
-  const includeIdx = args.indexOf("--include");
-  const include = includeIdx >= 0 ? args.slice(includeIdx + 1).filter(a => !a.startsWith("--")) : undefined;
+  const portIdx = args.indexOf("--port");
+  const port = portIdx >= 0 ? parseInt(args[portIdx + 1], 10) : undefined;
 
-  const { yaml, serviceCount } = generateCompose({ include });
+  const { yaml } = generateServeCompose({ port });
 
   if (outputPath) {
     writeFileSync(outputPath, yaml);
-    console.log(`\x1b[32m✓\x1b[0m docker-compose.yml written to ${outputPath} (${serviceCount} services)`);
+    console.log(`\x1b[32m✓\x1b[0m docker-compose.yml written to ${outputPath}`);
+    console.log(`\x1b[90m  next: docker compose up -d\x1b[0m`);
   } else {
     console.log(yaml);
-    console.log(`\n\x1b[90m# ${serviceCount} services — pipe to file: maw fleet compose > docker-compose.yml\x1b[0m`);
+    console.log(`\n\x1b[90m# pipe to file: maw fleet compose --output docker-compose.yml\x1b[0m`);
+    console.log(`\x1b[90m# then run:    docker compose up -d\x1b[0m`);
   }
 }
