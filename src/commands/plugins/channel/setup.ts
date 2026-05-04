@@ -198,20 +198,40 @@ async function setupOfficial(oracle: string, provider: string, opts: SetupOpts) 
     console.log(`  \x1b[32m✓\x1b[0m ready`);
   }
 
-  // Step 5: Access config
-  s(5, "Access config");
+  // Step 5: Access config + auto-seed Nat
+  s(5, "Access config + seed");
   const accessPath = join(stateDir, "access.json");
+  const NAT_DISCORD_ID = "691531480689541170";
+  const seedAccess = {
+    dmPolicy: "allowlist",
+    allowFrom: [NAT_DISCORD_ID],
+    groups: {},
+    pending: {},
+  };
+
   if (!existsSync(accessPath)) {
-    const { writeFileSync } = require("fs");
-    writeFileSync(accessPath, JSON.stringify({
-      dmPolicy: "pairing",
-      allowFrom: [],
-      groups: {},
-      pending: {},
-    }, null, 2) + "\n");
-    console.log(`  \x1b[32m✓\x1b[0m access.json initialized (dmPolicy: pairing)`);
+    writeFileSync(accessPath, JSON.stringify(seedAccess, null, 2) + "\n");
+    console.log(`  \x1b[32m✓\x1b[0m access.json seeded (Nat pre-approved, dmPolicy: allowlist)`);
+    console.log(`  \x1b[90mno pairing needed — Nat can DM immediately\x1b[0m`);
   } else {
-    console.log(`  \x1b[32m✓\x1b[0m access.json exists`);
+    // Check if Nat is already in allowFrom
+    try {
+      const existing = JSON.parse(readFileSync(accessPath, "utf8"));
+      if (!existing.allowFrom?.includes(NAT_DISCORD_ID)) {
+        existing.allowFrom = existing.allowFrom || [];
+        existing.allowFrom.push(NAT_DISCORD_ID);
+        existing.dmPolicy = "allowlist";
+        delete existing.pending;
+        existing.pending = {};
+        writeFileSync(accessPath, JSON.stringify(existing, null, 2) + "\n");
+        console.log(`  \x1b[32m✓\x1b[0m Nat seeded into existing access.json`);
+      } else {
+        console.log(`  \x1b[32m✓\x1b[0m Nat already in allowlist`);
+      }
+    } catch {
+      writeFileSync(accessPath, JSON.stringify(seedAccess, null, 2) + "\n");
+      console.log(`  \x1b[32m✓\x1b[0m access.json reset + Nat seeded`);
+    }
   }
 
   // Step 6: Register
@@ -334,20 +354,8 @@ function printNextSteps(oracle: string, provider: string) {
   console.log(`\n  \x1b[32m✅ Setup complete!\x1b[0m\n`);
   console.log(`  Start oracle with channels:`);
   console.log(`    \x1b[36mmaw wake ${oracle}\x1b[0m\n`);
-
+  console.log(`  \x1b[90mNat pre-approved — no pairing needed. Bot responds immediately.\x1b[0m`);
   if (provider !== "imessage") {
-    console.log(`  Then pair yourself:`);
-    if (provider === "discord") {
-      console.log(`    1. DM the bot on Discord`);
-      console.log(`    2. \x1b[36m/discord:access pair <code>\x1b[0m`);
-      console.log(`    3. \x1b[36m/discord:access policy allowlist\x1b[0m`);
-    } else if (provider === "telegram") {
-      console.log(`    1. DM your bot on Telegram`);
-      console.log(`    2. \x1b[36m/telegram:access pair <code>\x1b[0m`);
-      console.log(`    3. \x1b[36m/telegram:access policy allowlist\x1b[0m`);
-    }
-  } else {
-    console.log(`  Text yourself on iMessage — it works immediately.`);
-    console.log(`  Add others: \x1b[36m/imessage:access allow +15551234567\x1b[0m`);
+    console.log(`  \x1b[90mAdd others: /discord:access allow <user-id>\x1b[0m`);
   }
 }
