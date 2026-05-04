@@ -27,11 +27,11 @@ describe("resolveByName — exact match", () => {
 });
 
 describe("resolveByName — fuzzy match (single hit)", () => {
-  test("suffix match → fuzzy (fleet-numbered session: 110-yeast)", () => {
+  test("suffix match → exact (fleet-numbered session: 110-yeast, #1102 stem upgrade)", () => {
     const items = [sess("110-yeast"), sess("120-brew")];
     const r = resolveByName("yeast", items);
-    expect(r.kind).toBe("fuzzy");
-    if (r.kind === "fuzzy") expect(r.match.name).toBe("110-yeast");
+    expect(r.kind).toBe("exact");
+    if (r.kind === "exact") expect(r.match.name).toBe("110-yeast");
   });
 
   test("prefix match → fuzzy (mawjs matches mawjs-view)", () => {
@@ -73,8 +73,8 @@ describe("resolveByName — ambiguous (2+ fuzzy hits)", () => {
     // tried when no suffix match exists.
     const items = [sess("maw-js"), sess("110-maw"), sess("other")];
     const r = resolveByName("maw", items);
-    expect(r.kind).toBe("fuzzy");
-    if (r.kind === "fuzzy") {
+    expect(r.kind).toBe("exact"); // #1102 stem upgrade: "110-maw" stem === "maw" exactly
+    if (r.kind === "exact") {
       expect(r.match.name).toBe("110-maw");
     }
   });
@@ -175,20 +175,20 @@ describe("resolveSessionTarget — #535 regression (numeric-prefix fleet collisi
     if (r.kind === "fuzzy") expect(r.match.name).toBe("skills-cli-view");
   });
 
-  test("numeric-prefix fleet session still resolves via Tier 2a exact suffix", () => {
-    // Sanity check: `mawjs` → `101-mawjs` (exact suffix) still works.
+  test("numeric-prefix fleet session resolves via Tier 1.5 exact stem (#1102)", () => {
+    // Sanity check: `mawjs` → `101-mawjs` (stem === "mawjs") works.
     const items = [sess("101-mawjs"), sess("114-mawjs-no2")];
     const r = resolveSessionTarget("mawjs", items);
-    expect(r.kind).toBe("fuzzy");
-    if (r.kind === "fuzzy") expect(r.match.name).toBe("101-mawjs");
+    expect(r.kind).toBe("exact");
+    if (r.kind === "exact") expect(r.match.name).toBe("101-mawjs");
   });
 
-  test("`mawjs-no2` correctly resolves to its own fleet session", () => {
+  test("`mawjs-no2` correctly resolves to its own fleet session via Tier 1.5", () => {
     // The other half of the #535 test: typing the actual oracle name works.
     const items = [sess("114-mawjs-no2"), sess("101-mawjs")];
     const r = resolveSessionTarget("mawjs-no2", items);
-    expect(r.kind).toBe("fuzzy");
-    if (r.kind === "fuzzy") expect(r.match.name).toBe("114-mawjs-no2");
+    expect(r.kind).toBe("exact");
+    if (r.kind === "exact") expect(r.match.name).toBe("114-mawjs-no2");
   });
 
   test("worktree path (no fleetSessions flag) still middle-matches numeric prefixes", () => {
@@ -292,11 +292,11 @@ describe("resolveByName — target trimming", () => {
     if (r.kind === "exact") expect(r.match.name).toBe("view");
   });
 
-  test("whitespace-trimmed target still resolves fuzzy", () => {
+  test("whitespace-trimmed target still resolves exact (#1102 stem upgrade)", () => {
     const items = [sess("110-yeast")];
     const r = resolveByName("\tyeast\n", items);
-    expect(r.kind).toBe("fuzzy");
-    if (r.kind === "fuzzy") expect(r.match.name).toBe("110-yeast");
+    expect(r.kind).toBe("exact");
+    if (r.kind === "exact") expect(r.match.name).toBe("110-yeast");
   });
 });
 
