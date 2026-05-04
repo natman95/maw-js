@@ -28,7 +28,12 @@ export function loadFleet(): FleetSession[] {
   const files = readdirSync(FLEET_DIR)
     .filter(f => f.endsWith(".json") && !f.endsWith(".disabled"))
     .sort();
-  return files.map(f => require(join(FLEET_DIR, f)) as FleetSession);
+  // #1133 — skip malformed configs (missing name) so downstream
+  // sess.name.replace(...) doesn't crash. Test fixtures from #484
+  // were the trigger.
+  return files
+    .map(f => require(join(FLEET_DIR, f)) as FleetSession)
+    .filter(s => s && typeof s.name === "string");
 }
 
 export function loadFleetEntries(): FleetEntry[] {
