@@ -32,18 +32,45 @@ export function encodePath(path: string): string {
   return path.replace(/^\//, "-").replace(/[/.]/g, "-");
 }
 
+/** @internal — pure validation, returns error string or null if valid */
+export function validateRename(oldName: string, newName: string): string | null {
+  if (!/^[a-z0-9-]+$/.test(newName)) {
+    return `new name must match /^[a-z0-9-]+$/ (got '${newName}')`;
+  }
+  if (oldName === newName) {
+    return "old and new names are identical";
+  }
+  if (!oldName) {
+    return "old name required";
+  }
+  return null;
+}
+
+/** @internal — compute rename plan paths for testing */
+export function computeRenamePlan(oldName: string, newName: string, org: string, home: string) {
+  const oldRepoPath = `${home}/Code/github.com/${org}/${oldName}-oracle`;
+  const newRepoPath = `${home}/Code/github.com/${org}/${newName}-oracle`;
+  return {
+    oldRepoPath,
+    newRepoPath,
+    oldEncoded: encodePath(oldRepoPath),
+    newEncoded: encodePath(newRepoPath),
+    oldProjectDir: `${home}/.claude/projects/${encodePath(oldRepoPath)}`,
+    newProjectDir: `${home}/.claude/projects/${encodePath(newRepoPath)}`,
+    oldRepoSlug: `${org}/${oldName}-oracle`,
+    newRepoSlug: `${org}/${newName}-oracle`,
+  };
+}
+
 export async function cmdOracleRename(oldName: string, newName: string, opts: RenameOpts = {}): Promise<void> {
   const org = opts.org || "Soul-Brews-Studio";
   const dryRun = opts.dryRun || false;
   const prefix = dryRun ? "[dry-run] " : "";
 
   // 1. Validate names
-  if (!/^[a-z0-9-]+$/.test(newName)) {
-    console.error(`\x1b[31merror\x1b[0m: new name must match /^[a-z0-9-]+$/ (got '${newName}')`);
-    process.exit(1);
-  }
-  if (oldName === newName) {
-    console.error(`\x1b[31merror\x1b[0m: old and new names are identical`);
+  const validationError = validateRename(oldName, newName);
+  if (validationError) {
+    console.error(`\x1b[31merror\x1b[0m: ${validationError}`);
     process.exit(1);
   }
 
