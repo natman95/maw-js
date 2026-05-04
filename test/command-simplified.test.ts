@@ -53,16 +53,21 @@ afterEach(() => {
   (process as any).getuid = origGetuid;
 });
 
+// #1091 terminal reset suffix appended by buildCommand to all output
+const RESET = `; printf "\\e[?1049l\\e[0m"; stty sane 2>/dev/null; clear`;
+const wrap = (cmd: string) => cmd + RESET;
+const wrapFallback = (primary: string, fallback: string) => `{ ${primary} || ${fallback}; }${RESET}`;
+
 describe("buildCommand — post-#541 contract", () => {
-  test("returns bare default when no --continue", () => {
+  test("returns bare default when no --continue (#1091 reset suffix)", () => {
     fakeConfig.commands = { default: "claude" };
-    expect(buildCommand("any-agent")).toBe("claude");
+    expect(buildCommand("any-agent")).toBe(wrap("claude"));
   });
 
-  test("emits || fallback when default has --continue", () => {
+  test("emits || fallback when default has --continue (#1091 reset suffix)", () => {
     fakeConfig.commands = { default: "claude --continue --dangerously-skip-permissions" };
     expect(buildCommand("any-agent")).toBe(
-      "claude --continue --dangerously-skip-permissions || claude --dangerously-skip-permissions",
+      wrapFallback("claude --continue --dangerously-skip-permissions", "claude --dangerously-skip-permissions"),
     );
   });
 
