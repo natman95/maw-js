@@ -27,7 +27,8 @@ interface RenameOpts {
   dryRun?: boolean;
 }
 
-function encodePath(path: string): string {
+/** @internal — exported for tests only */
+export function encodePath(path: string): string {
   return path.replace(/^\//, "-").replace(/[/.]/g, "-");
 }
 
