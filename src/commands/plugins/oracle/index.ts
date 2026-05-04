@@ -51,6 +51,7 @@ subcommands:
   register <name>          register an oracle
   set-nickname <name> <nick>  set display alias
   get-nickname <name>      get display alias
+  rename <old> <new>       full identity rename (#1111)
   about <name>             show oracle details`,
         };
       }
@@ -143,6 +144,15 @@ subcommands:
         await cmdOracleSearch(query, { json: flags["--json"], awake: flags["--awake"], org: flags["--org"] });
       } else if (subcmd === "about" && args[1]) {
         await cmdOracleAbout(args[1]);
+      } else if (subcmd === "rename") {
+        const oldName = args[1];
+        const newName = args[2];
+        if (!oldName || !newName) {
+          return { ok: false, error: "usage: maw oracle rename <old> <new> [--org <org>] [--dry-run]" };
+        }
+        const flags = parseFlags(args, { "--org": String, "--dry-run": Boolean }, 3);
+        const { cmdOracleRename } = await import("./impl-rename");
+        await cmdOracleRename(oldName, newName, { org: flags["--org"], dryRun: flags["--dry-run"] });
       } else {
         return { ok: false, error: "usage: maw oracle [ls|scan|search <query>|prune|register <name>|set-nickname <name> <nickname>|get-nickname <name>|about <name>]" };
       }
