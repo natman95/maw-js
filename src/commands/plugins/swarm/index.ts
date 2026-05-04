@@ -69,6 +69,7 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
       applyTeamLayout, applyTiledLayout, getWindowTarget,
     } = await import("../tmux/layout-manager");
     const { hostExec, withPaneLock } = await import("../../../sdk");
+    const { PANE_INIT_PRELUDE } = await import("../../shared/pane-prelude");
     const { existsSync, readFileSync, writeFileSync, mkdirSync } = await import("fs");
     const { join } = await import("path");
     const { homedir } = await import("os");
@@ -104,21 +105,21 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
       paneIds.push({ name, agentId, agentCmd, label, color });
     }
 
-    // Phase 1: Split all panes (empty shells) — no agents yet
+    // Phase 1: Split placeholder panes — sleep, no shell init, immune to SIGWINCH
     const spawned: { name: string; agentId: string; agentCmd: string; label: string; color: AgentColor; paneId: string }[] = [];
     for (const agent of paneIds) {
       const targetFlag = anchor ? `-t '${anchor}' ` : "";
       let paneId = "";
       await withPaneLock(async () => {
         paneId = (await hostExec(
-          `tmux split-window ${targetFlag}-h -P -F '#{pane_id}' 'exec zsh -li'`,
+          `tmux split-window ${targetFlag}-h -P -F '#{pane_id}' 'sleep infinity'`,
         )).trim();
         await new Promise(r => setTimeout(r, 100));
       });
       spawned.push({ ...agent, paneId });
     }
 
-    // Phase 2: Apply layout ONCE — all panes get their final sizes
+    // Phase 2: Apply layout ONCE — all panes get their final sizes (only sleep is running)
     const window = await getWindowTarget();
     if (tiled) {
       await applyTiledLayout(window);
@@ -128,13 +129,13 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
     await enableBorderStatus(window);
     await new Promise(r => setTimeout(r, 200));
 
-    // Phase 3: Start agents in correctly-sized panes
+    // Phase 3: Respawn panes with real shell + agent — shell inits at final pane size
     for (const agent of spawned) {
       await stylePaneBorder(agent.paneId, `${agent.name} (${agent.label})`, agent.color);
 
       const escaped = agent.agentCmd.replace(/'/g, "'\\''");
       await hostExec(
-        `tmux send-keys -t '${agent.paneId}' '${escaped}; stty sane 2>/dev/null; printf "\\e[?1049l\\e[0m"; clear; exec zsh -li' Enter`,
+        `tmux respawn-pane -k -t '${agent.paneId}' '${PANE_INIT_PRELUDE}; ${escaped}; stty sane 2>/dev/null; printf "\\e[?1049l\\e[0m"; clear; exec zsh -li'`,
       );
       await new Promise(r => setTimeout(r, 200));
 

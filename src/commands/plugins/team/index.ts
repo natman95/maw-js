@@ -8,6 +8,7 @@ import {
 } from "./impl";
 import { parseFlags } from "../../../cli/parse-args";
 import { hostExec } from "../../../sdk";
+import { PANE_INIT_PRELUDE } from "../../shared/pane-prelude";
 
 export const command = {
   name: "team",
@@ -314,7 +315,7 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
         let paneId = "";
         await withPaneLock(async () => {
           paneId = (await hostExec(
-            `tmux split-window ${targetFlag}-h -P -F '#{pane_id}' 'echo "\\x1b[${colorAnsi(color)}m${name} ready\\x1b[0m" && exec zsh'`,
+            `tmux split-window ${targetFlag}-h -P -F '#{pane_id}' '${PANE_INIT_PRELUDE}; echo "\\x1b[${colorAnsi(color)}m${name} ready\\x1b[0m" && exec zsh'`,
           )).trim();
           await new Promise(r => setTimeout(r, 200));
         });

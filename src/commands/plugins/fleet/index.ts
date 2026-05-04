@@ -96,6 +96,9 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
           }
         }
       }
+    } else if (sub === "adopt") {
+      const { cmdFleetAdopt } = await import("./fleet-adopt");
+      await cmdFleetAdopt(args.slice(1));
     } else if (sub === "snapshot") {
       const { takeSnapshot } = await import("../../../core/fleet/snapshot");
       const trigger = args[1] || "manual";
@@ -107,7 +110,7 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
     } else {
       return {
         ok: false,
-        error: `unknown fleet subcommand: ${sub}\nusage: maw fleet <init|ls|renumber|validate|health|doctor|consolidate|sync|sync-windows|snapshots|restore|snapshot>`,
+        error: `unknown fleet subcommand: ${sub}\nusage: maw fleet <init|ls|renumber|validate|health|doctor|consolidate|sync|sync-windows|snapshots|restore|snapshot|adopt>`,
       };
     }
 

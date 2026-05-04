@@ -1,0 +1,24 @@
+{
+  "name": "split",
+  "version": "1.0.0",
+  "entry": "./index.ts",
+  "sdk": "^1.0.0",
+  "description": "Split current tmux pane and attach to a session (vesicle beside).",
+  "cli": {
+    "command": "split",
+    "help": "maw split <target> [--from <oracle>] [--pct N] [--vertical] [--no-attach]",
+    "flags": {
+      "--from": "string",
+      "--pct": "number",
+      "--vertical": "boolean",
+      "--no-attach": "boolean"
+    }
+  },
+  "api": {
+    "path": "/api/split",
+    "methods": [
+      "POST"
+    ]
+  },
+  "weight": 10
+}

@@ -1,0 +1,20 @@
+{
+  "name": "team",
+  "version": "1.0.0",
+  "entry": "./index.ts",
+  "sdk": "^1.0.0",
+  "description": "Agent reincarnation engine \u2014 create, spawn, send, shutdown, resume, lives.",
+  "cli": {
+    "command": "team",
+    "help": "maw team <create|spawn|send|shutdown|list|status|tasks>",
+    "flags": {}
+  },
+  "api": {
+    "path": "/api/team",
+    "methods": [
+      "POST",
+      "GET"
+    ]
+  },
+  "weight": 10
+}
