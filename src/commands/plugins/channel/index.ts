@@ -137,12 +137,26 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
         }
       }
 
+    } else if (sub === "providers") {
+      const providers = getProviders();
+      console.log(`  \x1b[36;1mChannel Providers\x1b[0m (${providers.length} available)\n`);
+      console.log(`  ${"Provider".padEnd(15)} ${"Type".padEnd(10)} ${"Plugin ID".padEnd(45)} Status`);
+      console.log(`  ${"─".repeat(15)} ${"─".repeat(10)} ${"─".repeat(45)} ${"─".repeat(10)}`);
+      for (const p of providers) {
+        const installed = isPluginInstalled(p.shortName);
+        const status = installed ? "\x1b[32m✓ installed\x1b[0m" : "\x1b[90mnot installed\x1b[0m";
+        console.log(`  ${p.shortName.padEnd(15)} ${p.type.padEnd(10)} ${p.pluginId.padEnd(45)} ${status}`);
+      }
+      console.log(`\n  Install: \x1b[36m/plugin install <provider>@claude-plugins-official\x1b[0m`);
+      console.log(`  Custom:  \x1b[36mmaw channel add <oracle> server:<name>\x1b[0m (for .mcp.json servers)`);
+
     } else {
-      console.log("usage: maw channel <add|rm|ls> [oracle] [plugin]");
-      console.log("");
+      console.log("usage: maw channel <add|rm|ls|providers> [oracle] [plugin]\n");
+      console.log("  maw channel providers                       list available channel providers");
       console.log("  maw channel ls                              list all oracle channels");
       console.log("  maw channel ls hermes-discord                show one oracle's channels");
-      console.log("  maw channel add hermes-discord discord       register discord channel");
+      console.log("  maw channel add hermes-discord discord       register official channel");
+      console.log("  maw channel add myoracle server:webhook      register custom channel");
       console.log("  maw channel rm hermes-discord discord        remove channel");
       console.log("");
       console.log("  maw wake <oracle> auto-injects --channels when config exists");
@@ -159,4 +173,47 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
 function expandPluginId(short: string): string {
   if (short.includes(":") || short.includes("@")) return short;
   return `plugin:${short}@claude-plugins-official`;
+}
+
+interface Provider {
+  shortName: string;
+  pluginId: string;
+  type: "chat" | "webhook" | "custom";
+}
+
+function getProviders(): Provider[] {
+  const official: Provider[] = [
+    { shortName: "discord", pluginId: "plugin:discord@claude-plugins-official", type: "chat" },
+    { shortName: "telegram", pluginId: "plugin:telegram@claude-plugins-official", type: "chat" },
+    { shortName: "imessage", pluginId: "plugin:imessage@claude-plugins-official", type: "chat" },
+    { shortName: "fakechat", pluginId: "plugin:fakechat@claude-plugins-official", type: "chat" },
+  ];
+
+  // Scan for custom channels in .mcp.json
+  const { existsSync, readFileSync } = require("fs");
+  const { join } = require("path");
+  const mcpPaths = [
+    join(process.cwd(), ".mcp.json"),
+    join(require("os").homedir(), ".claude.json"),
+  ];
+
+  for (const p of mcpPaths) {
+    if (!existsSync(p)) continue;
+    try {
+      const data = JSON.parse(readFileSync(p, "utf8"));
+      const servers = data.mcpServers || {};
+      for (const [name, _config] of Object.entries(servers)) {
+        official.push({ shortName: name, pluginId: `server:${name}`, type: "custom" });
+      }
+    } catch { /* skip malformed */ }
+  }
+
+  return official;
+}
+
+function isPluginInstalled(shortName: string): boolean {
+  const { existsSync } = require("fs");
+  const { join } = require("path");
+  const pluginDir = join(require("os").homedir(), ".claude/plugins/cache/claude-plugins-official", shortName);
+  return existsSync(pluginDir);
 }
