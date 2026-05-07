@@ -10,7 +10,7 @@ import { attachToSession, ensureSessionRunning, createWorktree } from "./wake-se
 import { maybeSplit } from "./wake-maybe-split";
 import { parseWakeTarget, ensureCloned } from "./wake-target";
 
-export async function cmdWake(oracle: string, opts: { task?: string; wt?: string; prompt?: string; incubate?: string; fresh?: boolean; attach?: boolean; listWt?: boolean; split?: boolean; repoPath?: string; urlRepoName?: string; allLocal?: boolean; engine?: string }): Promise<string> {
+export async function cmdWake(oracle: string, opts: { task?: string; wt?: string; prompt?: string; incubate?: string; fresh?: boolean; attach?: boolean; noAttach?: boolean; listWt?: boolean; split?: boolean; repoPath?: string; urlRepoName?: string; allLocal?: boolean; engine?: string }): Promise<string> {
   // #1151 — reject flag-shaped names. parseFlags lands unrecognized flags
   // (e.g. --help) in positional `_`, so they reach here as oracle="--help"
   // and (without this guard) get sanitized into session names like `26---help`.
@@ -18,6 +18,11 @@ export async function cmdWake(oracle: string, opts: { task?: string; wt?: string
     console.error(`\x1b[31m✗\x1b[0m invalid oracle name: "${oracle}" — did you mean 'maw --help'?`);
     throw new UserError(`invalid oracle name: "${oracle}"`);
   }
+
+  // --no-attach wins over --attach; normalize early so all downstream
+  // `opts.attach` checks honor caller intent. Lets api/sessions.ts and
+  // friends pass `noAttach: true` cleanly without needing `attach: false`.
+  if (opts.noAttach) opts.attach = false;
 
   // Canonicalize the bare name before any lookup — strips trailing `/`, `/.git`, `/.git/`
   // so `maw wake token-oracle/` (tab-completion artifact) resolves the same as `token-oracle`.
@@ -276,18 +281,6 @@ export async function cmdWake(oracle: string, opts: { task?: string; wt?: string
       }
 
       console.log(`\x1b[32m⚡\x1b[0m '${existingWindow}' running in ${session}`);
-      if (!opts.attach && process.stdin.isTTY) {
-        process.stdout.write(`  attach? [y/N] `);
-        const { openSync, readSync, closeSync } = await import("fs");
-        try {
-          const fd = openSync("/dev/tty", "r");
-          const buf = Buffer.alloc(8);
-          const n = readSync(fd, buf, 0, buf.length, null);
-          closeSync(fd);
-          const answer = buf.slice(0, n).toString().trim().toLowerCase();
-          if (answer === "y" || answer === "yes") opts.attach = true;
-        } catch {}
-      }
       if (opts.attach) {
         await tmux.selectWindow(target);
         await attachToSession(session);

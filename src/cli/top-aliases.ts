@@ -146,6 +146,7 @@ export async function invokeDirectHandler(
       "--incubate": String,
       "--fresh": Boolean,
       "--attach": Boolean, "-a": "--attach",
+      "--no-attach": Boolean,
       "--list": Boolean,
       "--split": Boolean,
       "--all-local": Boolean,
@@ -156,7 +157,7 @@ export async function invokeDirectHandler(
     const positional = flags._;
     const oracle = positional[0];
     if (!oracle) {
-      console.error("usage: maw wake <oracle> [--task <s>] [--wt <s>] [-p|--prompt <s>] [--incubate <slug>] [--fresh] [-a|--attach] [--list] [--split] [--all-local] [-e|--engine <name>] [--dry-run]");
+      console.error("usage: maw wake <oracle> [--task <s>] [--wt <s>] [-p|--prompt <s>] [--incubate <slug>] [--fresh] [-a|--attach] [--no-attach] [--list] [--split] [--all-local] [-e|--engine <name>] [--dry-run]");
       throw new UserError("wake: missing oracle name");
     }
 
@@ -185,6 +186,7 @@ export async function invokeDirectHandler(
       incubate?: string;
       fresh?: boolean;
       attach?: boolean;
+      noAttach?: boolean;
       listWt?: boolean;
       split?: boolean;
       allLocal?: boolean;
@@ -196,6 +198,7 @@ export async function invokeDirectHandler(
     if (flags["--incubate"]) opts.incubate = flags["--incubate"];
     if (flags["--fresh"]) opts.fresh = true;
     if (flags["--attach"]) opts.attach = true;
+    if (flags["--no-attach"]) opts.noAttach = true;
     if (flags["--list"]) opts.listWt = true;
     if (flags["--split"]) opts.split = true;
     if (flags["--all-local"]) opts.allLocal = true;
