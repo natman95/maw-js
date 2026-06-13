@@ -3,14 +3,17 @@ import { join } from "node:path";
 import { resolveTargetCwd as defaultResolveCwd } from "../../commands/shared/target-cwd";
 
 /**
- * Marker the MAW dashboard injects when Boss attaches an image.
+ * Marker the MAW dashboard injects when Boss attaches a file to an Oracle.
  * Source of truth: maw-ui `TerminalModal.tsx` / `TerminalView.tsx`
- *   send({ type: "send", target, text: `[ภาพแนบ — โปรดดู: ${path}]\n`, force: true })
- * Keep this regex in sync with that string.
+ *   image:     send({ ..., text: `[ภาพแนบ — โปรดดู: ${path}]\n` })
+ *   any file:  send({ ..., text: `[ไฟล์แนบ — โปรดดู: ${path}]\n` })
+ * Boss can now attach pdf/word/excel/txt as well as images (2026-06-13), so the
+ * marker label is either ภาพแนบ (image) or ไฟล์แนบ (any other file). Keep this
+ * regex in sync with both strings.
  */
-const ATTACH_RE = /\[ภาพแนบ[^\]]*?:\s*([^\]\s]+)\s*\]/;
+const ATTACH_RE = /\[(?:ภาพแนบ|ไฟล์แนบ)[^\]]*?:\s*([^\]\s]+)\s*\]/;
 
-/** Extract the attached-image path from an injected `send` text, or null. */
+/** Extract the attached-file path from an injected `send` text, or null. */
 export function extractAttachPath(text: string): string | null {
   if (!text) return null;
   const m = text.match(ATTACH_RE);
@@ -67,8 +70,8 @@ export async function dropImageNotifyStub(
 
     const now = deps.now ?? (() => Date.now());
     const ts = Math.floor(now() / 1000);
-    const file = attachPath.split("/").pop() || "image";
-    const stubName = `${ts}_from-boss_image-${file}.md`;
+    const file = attachPath.split("/").pop() || "attachment";
+    const stubName = `${ts}_from-boss_attach-${file}.md`;
     const inboxDir = join(cwd, "ψ", "inbox");
     const stubPath = join(inboxDir, stubName);
 
@@ -76,20 +79,20 @@ export async function dropImageNotifyStub(
       "---",
       "from: boss",
       `to: ${target}`,
-      "subject: 📎 Image attachment received via MAW dashboard",
-      "type: image-notify",
+      "subject: 📎 File attachment received via MAW dashboard",
+      "type: attach-notify",
       "status: delivered",
       "---",
       "",
-      "Boss attached an image — it was injected into this session as a live prompt:",
+      "Boss attached a file — it was injected into this session as a live prompt:",
       "",
-      `  [ภาพแนบ — โปรดดู: ${attachPath}]`,
+      `  [ไฟล์แนบ — โปรดดู: ${attachPath}]`,
       "",
       `Open it with: \`Read ${attachPath}\``,
       "",
       "_Auto-stub from the maw bridge so the inbox sweep wakes idle sessions. The",
-      "image prompt above was already delivered to the pane; this file exists only",
-      "to trigger a wake when the session was idle at arrival._",
+      "attachment prompt above was already delivered to the pane; this file exists",
+      "only to trigger a wake when the session was idle at arrival._",
       "",
     ].join("\n");
 

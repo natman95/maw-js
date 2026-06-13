@@ -7,7 +7,12 @@ describe("extractAttachPath", () => {
     expect(extractAttachPath(text)).toBe("/root/imports/maw-attach/1780534701_21814.jpg");
   });
 
-  it("returns null for ordinary (non-image) send text", () => {
+  it("parses the dashboard non-image file marker (ไฟล์แนบ)", () => {
+    const text = "[ไฟล์แนบ — โปรดดู: /root/imports/maw-attach/1780534701_invoice.pdf]\n";
+    expect(extractAttachPath(text)).toBe("/root/imports/maw-attach/1780534701_invoice.pdf");
+  });
+
+  it("returns null for ordinary (non-attachment) send text", () => {
     expect(extractAttachPath("สวัสดี ช่วยดู PR หน่อย")).toBeNull();
     expect(extractAttachPath("")).toBeNull();
   });
@@ -41,7 +46,7 @@ describe("dropImageNotifyStub", () => {
       resolveCwd: () => "/root/projects/echo-oracle",
     });
     expect(out).toBe(
-      "/root/projects/echo-oracle/ψ/inbox/1780534800_from-boss_image-1780534701_21814.jpg.md",
+      "/root/projects/echo-oracle/ψ/inbox/1780534800_from-boss_attach-1780534701_21814.jpg.md",
     );
     expect(r.mkdirs).toContain("/root/projects/echo-oracle/ψ/inbox");
     expect(r.writes).toHaveLength(1);
@@ -50,7 +55,7 @@ describe("dropImageNotifyStub", () => {
     expect(name.endsWith(".md")).toBe(true);
     expect(name.startsWith(".")).toBe(false);
     expect(name.startsWith("__CANARY-")).toBe(false);
-    expect(r.writes[0].data).toContain("type: image-notify");
+    expect(r.writes[0].data).toContain("type: attach-notify");
     expect(r.writes[0].data).toContain("/root/imports/maw-attach/1780534701_21814.jpg");
   });
 
@@ -62,11 +67,11 @@ describe("dropImageNotifyStub", () => {
       resolveCwd: () => "/root/projects/tconhr",
     });
     expect(out).toBe(
-      "/root/projects/tconhr/ψ/inbox/1780534800_from-boss_image-1780534701_21814.jpg.md",
+      "/root/projects/tconhr/ψ/inbox/1780534800_from-boss_attach-1780534701_21814.jpg.md",
     );
   });
 
-  it("skips (returns null) for a non-image send", async () => {
+  it("skips (returns null) for a non-attachment send", async () => {
     const r = recorder();
     const out = await dropImageNotifyStub("04-echo:0", "just a normal message", {
       ...r.deps,
