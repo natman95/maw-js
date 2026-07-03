@@ -11,6 +11,7 @@ import { oracleApi } from "./oracle";
 import { federationApi } from "./federation";
 import { worktreesApi } from "./worktrees";
 import { uiStateApi } from "./ui-state";
+import { dispatchApi } from "./dispatch";
 import { deprecatedApi } from "./deprecated";
 import { costsApi } from "./costs";
 import { triggersApi } from "./triggers";
@@ -58,6 +59,7 @@ export const api = new Elysia({ prefix: "/api" })
   .use(federationApi)
   .use(worktreesApi)
   .use(uiStateApi)
+  .use(dispatchApi)
   .use(deprecatedApi)
   .use(costsApi)
   .use(triggersApi)
