@@ -157,6 +157,24 @@ describe("peer configuration and session aggregation", () => {
     expect(curlCalls).toHaveLength(2); // cache hit, no new peer fetch
   });
 
+  test("getAggregatedSessions skips peers flagged hideSessions but keeps them routable", async () => {
+    config.namedPeers = [
+      { name: "white", url: "http://white:3456", hideSessions: true },
+      { name: "open", url: "http://open:3456" },
+    ];
+    responses = [
+      { match: "open:3456/api/sessions?local=true", res: { ok: true, status: 200, data: [session("visible")] } },
+      { match: "white:3456/api/sessions?local=true", res: { ok: true, status: 200, data: [session("hidden")] } },
+    ];
+
+    const out = await getAggregatedSessions([session("local")]);
+    expect(out.map((s) => `${s.source}:${s.name}`)).toEqual(["local:local", "http://open:3456:visible"]);
+    // hidden peer was never even fetched
+    expect(curlCalls.map((c) => c.url)).toEqual(["http://open:3456/api/sessions?local=true"]);
+    // ...but remains a federation peer, so hey/send routing is unaffected
+    expect(getPeers()).toContain("http://white:3456");
+  });
+
   test("peer session fetch failures, non-ok responses, and non-arrays fail closed", async () => {
     config.peers = ["http://down:3456", "http://bad:3456", "http://shape:3456"];
     responses = [

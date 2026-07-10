@@ -239,10 +239,14 @@ export function createSessionsApi(deps: SessionsApiDeps = {}) {
   api.get("/capture", async ({ query, set }) => {
     const target = query.target;
     if (!target) { set.status = 400; return { error: "target required" }; }
+    // Scrollback: default 1000 lines (was 80 — one screen of history).
+    // ?lines= overrides, clamped to 1..2000 (tmux history-limit is 2000).
+    const requested = Number.parseInt(query.lines ?? "", 10);
+    const lines = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 1000, 1), 2000);
     try {
       const sessions = await d.listSessions();
       const resolved = resolveCapture(target, sessions, d);
-      return { content: await d.capture(resolved) };
+      return { content: await d.capture(resolved, lines) };
     } catch (e: any) {
       // #1908 — when the failure is "can't find window: N", enrich the
       // response with the session's actual window indices and a hint
@@ -275,6 +279,7 @@ export function createSessionsApi(deps: SessionsApiDeps = {}) {
   }, {
     query: t.Object({
       target: t.Optional(t.String()),
+      lines: t.Optional(t.String()),
     }),
   });
 

@@ -14,6 +14,13 @@ export interface TriggerConfig {
 export interface PeerConfig {
   name: string;
   url: string;
+  /**
+   * Hide this peer's sessions from /api/sessions aggregation (dashboard
+   * sidebar / fleet views) while keeping hey/send routing via the
+   * `<name>:<target>` prefix intact. Tenant isolation: a node can talk to
+   * a peer without displaying the peer's oracles in its own UI.
+   */
+  hideSessions?: boolean;
 }
 
 export interface MawIntervals {
