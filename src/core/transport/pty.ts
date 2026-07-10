@@ -74,9 +74,11 @@ interface PtyHandlers {
 }
 
 function replayLinesFromControl(value: unknown): number {
-  if (value === undefined) return 2000;
+  // Default matches tmux history-limit (10000) + xterm.js scrollback in maw-ui;
+  // Boss 2026-07-10: mobile viewer must scroll far enough back to re-read reports.
+  if (value === undefined) return 10_000;
   const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return 2000;
+  if (!Number.isFinite(n)) return 10_000;
   return Math.max(0, Math.min(10_000, Math.floor(n)));
 }
 

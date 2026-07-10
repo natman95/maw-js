@@ -240,9 +240,9 @@ export function createSessionsApi(deps: SessionsApiDeps = {}) {
     const target = query.target;
     if (!target) { set.status = 400; return { error: "target required" }; }
     // Scrollback: default 1000 lines (was 80 — one screen of history).
-    // ?lines= overrides, clamped to 1..2000 (tmux history-limit is 2000).
+    // ?lines= overrides, clamped to 1..10000 (tmux history-limit is 10000).
     const requested = Number.parseInt(query.lines ?? "", 10);
-    const lines = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 1000, 1), 2000);
+    const lines = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 1000, 1), 10_000);
     try {
       const sessions = await d.listSessions();
       const resolved = resolveCapture(target, sessions, d);
