@@ -2,6 +2,7 @@ import { dirname, join } from "path";
 import { existsSync, renameSync, unlinkSync, readdirSync } from "fs";
 import { tmux } from "../../sdk";
 import { countDisabledFleetFiles, fleetDirForWrite, loadFleetEntries, getSessionNames, type FleetEntry } from "./fleet-load";
+import { UserError } from "../../core/util/user-error";
 
 export interface FleetManageDeps {
   loadFleetEntries: typeof loadFleetEntries;
@@ -35,7 +36,7 @@ function stripNumberPrefix(name: string): string {
 
 function validateFleetRenameName(label: string, name: string): void {
   if (!name || !/^[A-Za-z0-9._-]+$/.test(name) || name.startsWith("-") || name.includes("..")) {
-    throw new Error(`invalid ${label}: ${JSON.stringify(name)}`);
+    throw new UserError(`invalid ${label}: ${JSON.stringify(name)}`);
   }
 }
 
@@ -43,6 +44,26 @@ function peerAliases(name: string): Set<string> {
   const clean = stripJson(name);
   const stem = stripNumberPrefix(clean);
   return new Set([clean, stem]);
+}
+
+function migrateFleetRefs<T extends { sync_peers?: string[]; budded_from?: string }>(
+  session: T,
+  aliases: Set<string>,
+  newName: string,
+): { session: T; changed: boolean } {
+  let changed = false;
+  const next: T = { ...session };
+  if (Array.isArray(session.sync_peers)) {
+    const originalPeers = session.sync_peers;
+    const syncPeers = originalPeers.map(peer => aliases.has(peer) ? newName : peer);
+    changed = changed || syncPeers.some((peer, index) => peer !== originalPeers[index]);
+    next.sync_peers = syncPeers;
+  }
+  if (typeof session.budded_from === "string" && aliases.has(session.budded_from)) {
+    next.budded_from = newName;
+    changed = true;
+  }
+  return { session: next, changed };
 }
 
 function entryPath(io: FleetManageDeps, entry: FleetEntry): string {
@@ -89,15 +110,22 @@ function isMalformedEntry(entry: FleetEntry): boolean {
 }
 
 export function renderFleetLs(entries: FleetEntry[], disabled: number, runningSessions: string[]): string[] {
-  // Detect conflicts (duplicate numbers)
+  // Detect conflicts (duplicate numbers or duplicate fleet names)
   const numCount = new Map<number, string[]>();
+  const groupCount = new Map<string, string[]>();
   for (const e of entries) {
-    const list = numCount.get(e.num) || [];
-    list.push(e.groupName);
-    numCount.set(e.num, list);
+    const numList = numCount.get(e.num) || [];
+    numList.push(e.groupName);
+    numCount.set(e.num, numList);
+
+    const groupList = groupCount.get(e.groupName) || [];
+    groupList.push(e.file);
+    groupCount.set(e.groupName, groupList);
   }
 
-  const conflicts = [...numCount.entries()].filter(([, names]) => names.length > 1);
+  const numberConflicts = [...numCount.entries()].filter(([, names]) => names.length > 1);
+  const nameConflicts = [...groupCount.entries()].filter(([, files]) => files.length > 1);
+  const conflictCount = numberConflicts.length + nameConflicts.length;
   const lines: string[] = [];
 
   lines.push(`\n  \x1b[36mFleet Configs\x1b[0m (${entries.length} active, ${disabled} disabled)\n`);
@@ -110,7 +138,7 @@ export function renderFleetLs(entries: FleetEntry[], disabled: number, runningSe
     const name = sessionName.padEnd(20);
     const wins = String(displayWindowCount(e)).padEnd(5);
     const isRunning = runningSessions.includes(sessionName);
-    const isConflict = (numCount.get(e.num)?.length ?? 0) > 1;
+    const isConflict = (numCount.get(e.num)?.length ?? 0) > 1 || (groupCount.get(e.groupName)?.length ?? 0) > 1;
 
     let status = isRunning ? "\x1b[32mrunning\x1b[0m" : "\x1b[90mstopped\x1b[0m";
     if (isConflict) status += "  \x1b[31mCONFLICT\x1b[0m";
@@ -119,8 +147,10 @@ export function renderFleetLs(entries: FleetEntry[], disabled: number, runningSe
     lines.push(`  ${numStr}  ${name} ${wins} ${status}`);
   }
 
-  if (conflicts.length > 0) {
-    lines.push(`\n  \x1b[31m⚠ ${conflicts.length} conflict(s) found.\x1b[0m Run \x1b[36mmaw fleet renumber\x1b[0m to fix.`);
+  if (conflictCount > 0) {
+    const numberHint = numberConflicts.length > 0 ? `Run \x1b[36mmaw fleet renumber\x1b[0m for duplicate numbers.` : "";
+    const nameHint = nameConflicts.length > 0 ? "Rename or remove duplicate fleet names first." : "";
+    lines.push(`\n  \x1b[31m⚠ ${conflictCount} conflict(s) found.\x1b[0m ${[numberHint, nameHint].filter(Boolean).join(" ")}`);
   }
   lines.push("");
   return lines;
@@ -144,7 +174,7 @@ export async function cmdFleetRename(
   const newName = stripJson(options.newName);
   validateFleetRenameName("old fleet name", oldName);
   validateFleetRenameName("new fleet name", newName);
-  if (oldName === newName) throw new Error("old and new fleet names are identical");
+  if (oldName === newName) throw new UserError("old and new fleet names are identical");
 
   const entries = io.loadFleetEntries();
   const target = entries.find(e =>
@@ -153,7 +183,7 @@ export async function cmdFleetRename(
     e.groupName === oldName ||
     stripNumberPrefix(displaySessionName(e)) === oldName
   );
-  if (!target) throw new Error(`fleet not found: ${oldName}`);
+  if (!target) throw new UserError(`fleet not found: ${oldName}`);
 
   const existing = entries.find(e => e !== target && (
     stripJson(e.file) === newName ||
@@ -164,19 +194,14 @@ export async function cmdFleetRename(
   const targetDir = entryDir(io, target);
   const oldPath = entryPath(io, target);
   const newPath = io.join(targetDir, newFile);
-  if (existing || (newPath !== oldPath && io.existsSync(newPath))) throw new Error(`target fleet already exists: ${newName}`);
+  if (existing || (newPath !== oldPath && io.existsSync(newPath))) throw new UserError(`target fleet already exists: ${newName}`);
 
   const aliases = peerAliases(oldName);
   aliases.add(displaySessionName(target));
   aliases.add(target.groupName);
-  const peerRefs = entries
-    .filter(e => e !== target)
-    .filter(e => (e.session.sync_peers || []).some(peer => aliases.has(peer)));
-  if (peerRefs.length > 0 && !options.force) {
-    throw new Error(
-      `refusing to rename ${oldName}; referenced by sync_peers in ${peerRefs.map(e => e.file).join(", ")} (use --force to break)`,
-    );
-  }
+  const refUpdates = entries
+    .map(entry => ({ entry, ...migrateFleetRefs(entry.session, aliases, newName) }))
+    .filter(update => update.entry !== target && update.changed);
 
   const oldSessionName = displaySessionName(target);
   const newSession = { ...target.session, name: newName };
@@ -185,22 +210,33 @@ export async function cmdFleetRename(
     || runningSessions.find(s => stripNumberPrefix(s) === stripNumberPrefix(oldSessionName));
 
   io.log(`\n  \x1b[36mRenaming fleet...\x1b[0m ${oldSessionName} → ${newName}\n`);
-  if (peerRefs.length > 0 && options.force) {
-    io.log(`  \x1b[33m⚠\x1b[0m leaving sync_peers references in ${peerRefs.map(e => e.file).join(", ")}`);
+  if (refUpdates.length > 0) {
+    io.log(`  updating fleet references in ${refUpdates.map(({ entry }) => entry.file).join(", ")}`);
   }
 
   if (options.dryRun) {
     io.log(`  dry-run: would write ${newFile}`);
+    for (const { entry } of refUpdates) io.log(`  dry-run: would update refs in ${entry.file}`);
     if (target.file !== newFile) io.log(`  dry-run: would delete ${target.file}`);
     if (runningMatch && runningMatch !== newName) io.log(`  dry-run: would tmux rename ${runningMatch} → ${newName}`);
     io.log("\n  \x1b[32mDry run complete.\x1b[0m No files changed.\n");
     return;
   }
 
+  const migratedTarget = migrateFleetRefs(newSession, aliases, newName).session;
   const tmpPath = io.join(targetDir, `.tmp-${newFile}`);
-  await io.writeFile(tmpPath, JSON.stringify(newSession, null, 2) + "\n");
+  await io.writeFile(tmpPath, JSON.stringify(migratedTarget, null, 2) + "\n");
   io.renameSync(tmpPath, newPath);
   if (target.file !== newFile && io.existsSync(oldPath)) io.unlinkSync(oldPath);
+
+  for (const { entry, session } of refUpdates) {
+    const dir = entryDir(io, entry);
+    const tmpRefPath = io.join(dir, `.tmp-${entry.file}`);
+    const refPath = entryPath(io, entry);
+    await io.writeFile(tmpRefPath, JSON.stringify(session, null, 2) + "\n");
+    io.renameSync(tmpRefPath, refPath);
+    io.log(`  ${entry.file.padEnd(28)} refs updated`);
+  }
 
   if (runningMatch && runningMatch !== newName) {
     try {
@@ -223,11 +259,25 @@ export async function cmdFleetRenumber(deps: Partial<FleetManageDeps> = {}) {
   // Check for conflicts first
   const numCount = new Map<number, number>();
   for (const e of entries) numCount.set(e.num, (numCount.get(e.num) || 0) + 1);
-  const hasConflicts = [...numCount.values()].some(c => c > 1);
+  const groupFiles = new Map<string, string[]>();
+  for (const e of entries) {
+    const files = groupFiles.get(e.groupName) || [];
+    files.push(e.file);
+    groupFiles.set(e.groupName, files);
+  }
+  const duplicateFleetNames = [...groupFiles.entries()].filter(([, files]) => files.length > 1);
+  const hasConflicts = [...numCount.values()].some(c => c > 1) || duplicateFleetNames.length > 0;
 
   if (!hasConflicts) {
     io.log("\n  \x1b[32mNo conflicts found.\x1b[0m Fleet numbering is clean.\n");
     return;
+  }
+
+  if (duplicateFleetNames.length > 0) {
+    const details = duplicateFleetNames
+      .map(([name, files]) => `${name} (${files.join(", ")})`)
+      .join(", ");
+    throw new UserError(`duplicate fleet name(s): ${details}; renumber cannot safely merge duplicate fleets`);
   }
 
   const runningSessions = await io.getSessionNames();
@@ -240,12 +290,21 @@ export async function cmdFleetRenumber(deps: Partial<FleetManageDeps> = {}) {
   // Skip 99-overview from renumbering
   const regular = sorted.filter(e => e.num !== 99);
 
-  let num = 1;
-  for (const e of regular) {
+  const plans = regular.map((e, index) => {
+    const num = index + 1;
     const newNum = String(num).padStart(2, "0");
     const newFile = `${newNum}-${e.groupName}.json`;
     const newName = `${newNum}-${e.groupName}`;
     const oldName = e.session.name;
+    const exactRunning = runningSessions.find(s => s === oldName) ?? null;
+    const sameFleetRunning = runningSessions.find(s => stripNumberPrefix(s) === e.groupName && s !== oldName);
+    if (sameFleetRunning) {
+      throw new UserError(`fleet '${e.groupName}' already running as ${sameFleetRunning}; refusing to renumber ${oldName} → ${newName}`);
+    }
+    return { e, newFile, newName, oldName, runningMatch: exactRunning };
+  });
+
+  for (const { e, newFile, newName, oldName, runningMatch } of plans) {
 
     if (newFile !== e.file) {
       // Update config.name in JSON — write to temp file then atomically rename
@@ -261,9 +320,8 @@ export async function cmdFleetRenumber(deps: Partial<FleetManageDeps> = {}) {
         io.unlinkSync(oldPath);
       }
 
-      // Rename running tmux session (#84) — try exact name first, then pattern match
-      const runningMatch = runningSessions.find(s => s === oldName)
-        || runningSessions.find(s => s.replace(/^\d+-/, "") === e.groupName);
+      // Rename only the exact running tmux session. A different numbered
+      // session with the same fleet name is a collision, not a safe fallback.
       if (runningMatch && runningMatch !== newName) {
         try {
           await io.tmuxRun("rename-session", "-t", runningMatch, newName);
@@ -277,7 +335,6 @@ export async function cmdFleetRenumber(deps: Partial<FleetManageDeps> = {}) {
     } else {
       io.log(`  ${e.file.padEnd(28)}   (unchanged)`);
     }
-    num++;
   }
 
   io.log(`\n  \x1b[32mDone.\x1b[0m ${regular.length} configs renumbered.\n`);

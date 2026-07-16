@@ -1,6 +1,6 @@
 import { join } from "path";
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
-import { fleetDirForWrite, loadFleetEntries } from "maw-js/commands/shared/fleet-load";
+import { fleetLoadDirForWrite, loadFleetEntries } from "maw-js/sdk";
 
 /** Step 2: Create ψ/ vault directory structure. Returns the psiDir path. */
 export function initVault(budRepoPath: string): string {
@@ -80,9 +80,45 @@ Form: \`Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>\`
 - After acting on a \`ψ/inbox\` message, run \`maw inbox read <id>\` so consumed work stops counting as unread.
 - Leave messages unread only while they still need attention from this oracle.
 
+## Request-Reply Protocol
+
+When you receive a message starting with \`[request:<correlationId>]\`:
+1. Extract the correlationId (e.g. \`req-1-abc123-xyz\`)
+2. Do the requested work
+3. When done, reply with: \`maw reply <correlationId> "<your answer>"\`
+
+To see pending requests awaiting your reply: \`maw reply --list\`
+
 Run \`/awaken\` for the full identity setup ceremony.
 `);
   console.log(`  \x1b[32m✓\x1b[0m CLAUDE.md generated`);
+}
+
+/** Step 3.5: Create .claude/settings.json with status-reporter hooks. */
+export function generateClaudeSettings(budRepoPath: string): void {
+  const settingsDir = join(budRepoPath, ".claude");
+  const settingsPath = join(settingsDir, "settings.json");
+  if (existsSync(settingsPath)) {
+    console.log(`  \x1b[90m○\x1b[0m .claude/settings.json exists`);
+    return;
+  }
+
+  const hookScript = join(process.env.HOME!, ".config/maw/hooks/status-reporter.sh");
+  const makeHook = (event: string) => ({
+    matcher: "",
+    hooks: [{ type: "command", command: `CLAUDE_HOOK_EVENT=${event} ${hookScript}` }],
+  });
+
+  const settings = {
+    hooks: {
+      SessionStart: [makeHook("SessionStart")],
+      Stop: [makeHook("Stop")],
+    },
+  };
+
+  mkdirSync(settingsDir, { recursive: true });
+  writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+  console.log(`  \x1b[32m✓\x1b[0m .claude/settings.json + status hooks`);
 }
 
 /** Step 4: Create or update fleet config. Returns the fleet file path. */
@@ -93,7 +129,7 @@ export function configureFleet(name: string, org: string, budRepoName: string, p
   let fleetFile: string;
 
   if (existing) {
-    fleetFile = existing.path ?? join(fleetDirForWrite(), existing.file);
+    fleetFile = existing.path ?? join(fleetLoadDirForWrite(), existing.file);
     const cfg = JSON.parse(readFileSync(fleetFile, "utf-8"));
     let updated = false;
     if (!cfg.budded_from && parentName) { cfg.budded_from = parentName; updated = true; }
@@ -107,7 +143,7 @@ export function configureFleet(name: string, org: string, budRepoName: string, p
   } else {
     const maxNum = entries.reduce((max, e) => Math.max(max, e.num), 0);
     const budNum = maxNum + 1;
-    const writeDir = fleetDirForWrite();
+    const writeDir = fleetLoadDirForWrite();
     mkdirSync(writeDir, { recursive: true });
     fleetFile = join(writeDir, `${String(budNum).padStart(2, "0")}-${name}.json`);
     const fleetConfig: Record<string, unknown> = {

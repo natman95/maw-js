@@ -59,7 +59,7 @@ const send: Handler = async (ws, data, engine) => {
   // turn on its own). Fire-and-forget + fully fail-safe inside the helper — it
   // must never block or break the send-keys delivery on the next line.
   void dropImageNotifyStub(data.target, data.text);
-  sendKeys(data.target, data.text)
+  return sendKeys(data.target, data.text)
     .then(() => {
       ws.send(JSON.stringify({ type: "sent", ok: true, target: data.target, text: data.text }));
       setTimeout(() => engine.pushCapture(ws), 300);
@@ -68,11 +68,11 @@ const send: Handler = async (ws, data, engine) => {
 };
 
 const sleep: Handler = (ws, data) => {
-  runAction(ws, "sleep", data.target, () => sendKeys(data.target, "\x03"));
+  return runAction(ws, "sleep", data.target, () => sendKeys(data.target, "\x03"));
 };
 
 const stop: Handler = (ws, data) => {
-  runAction(ws, "stop", data.target, () => tmux.killWindow(data.target));
+  return runAction(ws, "stop", data.target, () => tmux.killWindow(data.target));
 };
 
 /**
@@ -100,12 +100,12 @@ function buildSpawnCmd(data: { target?: string; command?: string; cwd?: string }
 
 const wake: Handler = (ws, data) => {
   const cmd = buildSpawnCmd(data);
-  runAction(ws, "wake", data.target, () => sendKeys(data.target, cmd + "\r"));
+  return runAction(ws, "wake", data.target, () => sendKeys(data.target, cmd + "\r"));
 };
 
 const restart: Handler = (ws, data) => {
   const cmd = buildSpawnCmd(data);
-  runAction(ws, "restart", data.target, async () => {
+  return runAction(ws, "restart", data.target, async () => {
     await sendKeys(data.target, "\x03"); // Ctrl+C
     await new Promise(r => setTimeout(r, 2000));
     await sendKeys(data.target, "\x03"); // Ctrl+C again (in case first was caught)

@@ -1,16 +1,19 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, utimesSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { basename, dirname, join } from "path";
-import { loadConfig } from "maw-js/config";
-import { ghqFind } from "maw-js/core/ghq";
-import { loadFleetEntries } from "maw-js/commands/shared/fleet-load";
 import {
   deletePending,
+  ghqFind,
+  loadConfig,
+  loadFleetEntries,
   loadPending,
   loadPendingById,
+  updateInboxStatusBadge,
   updatePending,
+  hostExec,
+  tmuxCmd,
   type PendingMessage,
-} from "maw-js/commands/shared/queue-store";
+} from "maw-js/sdk";
 
 // Re-export queue-store helpers so callers can import from one place.
 export {
@@ -23,8 +26,8 @@ export {
   pendingPath,
   isExpired,
   TTL_MS,
-} from "maw-js/commands/shared/queue-store";
-export type { PendingMessage } from "maw-js/commands/shared/queue-store";
+} from "maw-js/sdk";
+export type { PendingMessage } from "maw-js/sdk";
 
 // File naming: YYYY-MM-DD_HH-MM_<from>_<slug>.md
 // Frontmatter: from / to / timestamp / read
@@ -107,6 +110,9 @@ const SAFE_DRAIN_PATTERNS: Array<{ reason: string; pattern: RegExp }> = [
   { reason: "verified", pattern: /(?:✅|🏆).{0,120}\bverified\b|\b(?:verified\s+[0-9a-f]{7,}|[0-9a-f]{7,}\s+verified)\b|\bslice\s+\d+.{0,80}\bverified\b|\b#\d+\s+verified\b|\bbatch verified\b/i },
   { reason: "next-slice-shipped", pattern: /\bshipped next slice\b/i },
   { reason: "slice-shipped", pattern: /\bshipped\b.{0,80}\bslice\b/i },
+  { reason: "delivery-confirm", pattern: /\bdelivery\s*[- ]?confirm(?:ed|s)?\b/i },
+  { reason: "council", pattern: /\b(ratified|no\s*response\s*needed|co-?sign(?:ed|ing)?|โหวต|ปิดวง|ไม่ต้อง\s*ตอบ)\b/i },
+  { reason: "council", pattern: /\bstage\s+\d+\s+closed\b/i },
 ];
 
 export function resolveInboxDir(): string {
@@ -122,10 +128,10 @@ function parseFrontmatter(content: string): { frontmatter: InboxFrontmatter; bod
   const fm: InboxFrontmatter = { from: "unknown", to: "unknown", timestamp: "", read: false };
   if (!match) return { frontmatter: fm, body: content };
   for (const line of match[1].split("\n")) {
-    const colon = line.indexOf(": ");
+    const colon = line.indexOf(":");
     if (colon < 0) continue;
-    const k = line.slice(0, colon);
-    const v = line.slice(colon + 2).trim();
+    const k = line.slice(0, colon).trim();
+    const v = line.slice(colon + 1).trim();
     if (k === "from") fm.from = v;
     else if (k === "to") fm.to = v;
     else if (k === "timestamp" || k === "date") fm.timestamp = v;
@@ -326,11 +332,12 @@ function buildInboxStatus(
   nowMs: number,
   cursor: InboxCursorStore,
 ): InboxStatus {
-  const files = topLevelInboxFiles(inboxDir);
-  const unread = files.length;
+  const messages = loadInboxMessages(inboxDir);
+  const unreadMessages = messages.filter(msg => !msg.frontmatter.read);
+  const unread = unreadMessages.length;
 
-  const oldestTimestampMs = files
-    .map(file => parseInboxFilenameTimestamp(file)?.getTime() ?? null)
+  const oldestTimestampMs = unreadMessages
+    .map(msg => msg.timestamp.getTime())
     .filter((time): time is number => time !== null && isFinite(time))
     .sort((a, b) => a - b)[0] ?? null;
   const oldestAgeSeconds = oldestTimestampMs === null ? null : ageSeconds(oldestTimestampMs, nowMs);
@@ -624,8 +631,25 @@ export function loadInboxMessages(inboxDir: string): InboxMessage[] {
   return messages.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 }
 
+
+function countUnreadMessages(messages: InboxMessage[]): number {
+  return messages.filter((msg) => !msg.frontmatter.read).length;
+}
+
+async function refreshCurrentInboxStatusBadge(messages: InboxMessage[]): Promise<void> {
+  if (!process.env.TMUX) return;
+  try {
+    const session = (await hostExec(`${tmuxCmd()} display-message -p '#S'`)).trim();
+    if (!session) return;
+    await updateInboxStatusBadge(session, countUnreadMessages(messages));
+  } catch {
+    // Badge refresh is advisory UI; inbox reads/listing must stay reliable.
+  }
+}
 export async function cmdInboxLs(opts: { unread?: boolean; from?: string; last?: number } = {}) {
-  let msgs = loadInboxMessages(resolveInboxDir());
+  const inboxDir = resolveInboxDir();
+  let msgs = loadInboxMessages(inboxDir);
+  await refreshCurrentInboxStatusBadge(msgs);
   if (opts.unread) msgs = msgs.filter(m => !m.frontmatter.read);
   if (opts.from) msgs = msgs.filter(m => m.frontmatter.from === opts.from);
   if (!msgs.length) { console.log("\x1b[90mno inbox messages\x1b[0m"); return; }
@@ -646,6 +670,22 @@ export async function cmdInboxLs(opts: { unread?: boolean; from?: string; last?:
   console.log();
 }
 
+function markInboxFrontmatterRead(content: string, timestamp = new Date().toISOString()): string {
+  if (!content.startsWith("---\n")) return content;
+  const end = content.indexOf("\n---", 4);
+  if (end < 0) return content;
+  let frontmatter = content.slice(0, end + "\n---".length);
+  if (/^read:\s*false\s*$/im.test(frontmatter)) {
+    frontmatter = frontmatter.replace(/^read:\s*false\s*$/im, "read: true");
+  } else if (!/^read:/im.test(frontmatter)) {
+    frontmatter = frontmatter.replace(/\n---$/, "\nread: true\n---");
+  }
+  if (!/^readAt:/im.test(frontmatter)) {
+    frontmatter = frontmatter.replace(/\n---$/, `\nreadAt: ${timestamp}\n---`);
+  }
+  return frontmatter + content.slice(end + "\n---".length);
+}
+
 export async function cmdInboxMarkRead(id: string) {
   if (!id) { console.error("usage: maw inbox read <id>"); return; }
   const msgs = loadInboxMessages(resolveInboxDir());
@@ -653,25 +693,21 @@ export async function cmdInboxMarkRead(id: string) {
   if (!msg) { console.error(`\x1b[31merror\x1b[0m: message not found: ${id}`); return; }
   if (msg.frontmatter.read) { console.log(`\x1b[90malready read:\x1b[0m ${msg.filename}`); return; }
   const content = readFileSync(msg.path, "utf-8");
-  let updated = content.replace(/^read: false$/m, "read: true");
-  if (updated === content && /^---\r?\n/.test(content)) {
-    // Rich-frontmatter message (git-dispatch family style) with no `read:` key —
-    // the replace above silently no-ops, which used to false-positive "✓ marked
-    // read" while the message stayed unread forever. Inject the key instead.
-    updated = content.replace(/^---\r?\n/, "---\nread: true\n");
-  }
+  const updated = markInboxFrontmatterRead(content);
   if (updated === content) {
-    console.error(`\x1b[31merror\x1b[0m: could not mark read (no frontmatter to carry read-state): ${msg.filename}`);
+    console.error(`\x1b[31merror\x1b[0m: could not mark read: ${msg.filename}`);
     process.exitCode = 1;
     return;
   }
   writeFileSync(msg.path, updated);
+  await refreshCurrentInboxStatusBadge(loadInboxMessages(resolveInboxDir()));
   console.log(`\x1b[32m✓\x1b[0m marked read: ${msg.filename}`);
 }
 
 // Legacy write shim — used by the oracle inbox skill
 export async function cmdInboxRead(target?: string) {
   const msgs = loadInboxMessages(resolveInboxDir());
+  await refreshCurrentInboxStatusBadge(msgs);
   if (!msgs.length) { console.log("\x1b[90mno inbox messages\x1b[0m"); return; }
   const n = target ? parseInt(target) : NaN;
   const msg = !target ? msgs[0]
@@ -788,7 +824,7 @@ export async function cmdApprove(idOrPrefix: string): Promise<PendingMessage> {
   // Re-issue the send. Use the original query string when present (preserves
   // node prefix routing); fall back to target name otherwise.
   const query = updated.query ?? updated.target;
-  const { cmdSend } = await import("maw-js/commands/shared/comm-send");
+  const { cmdSend } = await import("maw-js/sdk");
   // Pass `force=true` plus a sentinel to bypass ACL on the second pass:
   // the human approval IS the gate — re-checking here would loop forever.
   process.env.MAW_ACL_BYPASS = "1";

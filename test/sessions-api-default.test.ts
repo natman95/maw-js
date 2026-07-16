@@ -59,8 +59,12 @@ function makeHarness(overrides: SessionsApiDeps = {}) {
     createTmux: () => ({
       sendKeysLiteral: async (target: string, text: string) => { calls.push(["literal", target, text]); },
       sendKeys: async (target: string, key: string) => { calls.push(["tmuxKeys", target, key]); },
+      listPanes: async () => [],
+      capture: async (target: string, lines?: number) => { calls.push(["tmuxCapture", target, lines]); return ""; },
+      run: async (...args: string[]) => { calls.push(["tmuxRun", ...args]); return ""; },
     } as any),
     emitMessageLifecycle: (input) => { lifecycle.push(input); },
+    countUnreadInbox: () => 1,
     writeReceiverInbox: null,
     sleep: async (ms: number) => { calls.push(["sleep", ms]); },
     shouldAutoWake: () => ({ wake: false, reason: "policy" }),
@@ -169,12 +173,63 @@ describe("sessions, capture, and mirror routes", () => {
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=300")));
     expect(h.calls[1]).toEqual(["capture", "local:neo", 300]);
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=99999")));
-    expect(h.calls[2]).toEqual(["capture", "local:neo", 2000]);
+    expect(h.calls[2]).toEqual(["capture", "local:neo", 10000]);
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=bogus")));
     expect(h.calls[3]).toEqual(["capture", "local:neo", 1000]);
 
     const err = makeHarness({ capture: async () => { throw new Error("capture boom"); } });
     expect(await readJson(await err.app.handle(new Request("http://local/capture?target=neo")))).toEqual({ content: "", error: "capture boom" });
+  });
+
+  test("GET /captures returns ANSI captures for every tmux pane using 200 lines", async () => {
+    const captureCalls: any[] = [];
+    const h = makeHarness({
+      createTmux: () => ({
+        sendKeysLiteral: async () => {},
+        sendKeys: async () => {},
+        listPanes: async () => [
+          { id: "%1", command: "zsh", target: "maw:main.0", title: "one", pid: 101, cwd: "/tmp" },
+          { id: "%2", command: "bun", target: "maw:api.0", title: "two", pid: 102, cwd: "/repo" },
+        ],
+        capture: async (target: string, lines?: number) => {
+          captureCalls.push([target, lines]);
+          return target === "%1" ? "\x1b[31mred\x1b[0m" : "second pane";
+        },
+      } as any),
+    });
+
+    const res = await h.app.handle(new Request("http://local/captures"));
+
+    expect(res.status).toBe(200);
+    expect(await readJson(res)).toEqual({
+      captures: {
+        "%1": "\x1b[31mred\x1b[0m",
+        "%2": "second pane",
+      },
+    });
+    expect(captureCalls).toEqual([["%1", 200], ["%2", 200]]);
+  });
+
+  test("GET /captures keeps pane keys when a pane closes during capture", async () => {
+    const h = makeHarness({
+      createTmux: () => ({
+        sendKeysLiteral: async () => {},
+        sendKeys: async () => {},
+        listPanes: async () => [
+          { id: "%1", command: "zsh", target: "maw:main.0", title: "one", pid: 101, cwd: "/tmp" },
+          { id: "%2", command: "bun", target: "maw:api.0", title: "two", pid: 102, cwd: "/repo" },
+        ],
+        capture: async (target: string) => {
+          if (target === "%2") throw new Error("pane gone");
+          return "still here";
+        },
+      } as any),
+    });
+
+    const res = await h.app.handle(new Request("http://local/captures"));
+
+    expect(res.status).toBe(200);
+    expect(await readJson(res)).toEqual({ captures: { "%1": "still here", "%2": "" } });
   });
 
   test("GET /mirror validates target and processes captured output", async () => {

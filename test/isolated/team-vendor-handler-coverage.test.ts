@@ -4,6 +4,7 @@ const calls: Record<string, unknown[]> = {
   cmdTeamCreate: [],
   cmdTeamSpawn: [],
   cmdTeamList: [],
+  cmdTeamPrune: [],
   cmdTeamSend: [],
   cmdTeamBroadcast: [],
   cmdTeamBring: [],
@@ -17,11 +18,16 @@ const calls: Record<string, unknown[]> = {
   cmdOracleMembers: [],
   cmdTeamStatus: [],
   cmdTeamDelete: [],
+  cmdTeamReassign: [],
 };
 
 let parseFlagsReturn: Record<string, unknown> = {};
 
 mock.module("maw-js/sdk", () => ({
+  parseFlags: (_args: string[], _schema: Record<string, unknown>, _start = 0) => ({
+    _: [],
+    ...(parseFlagsReturn || {}),
+  }),
   hostExec: async () => "",
   tmux: {
     listPaneIds: async () => new Set<string>(),
@@ -39,6 +45,7 @@ mock.module("maw-js/cli/parse-args", () => ({
 mock.module("../../src/vendor/mpr-plugins/team/impl", () => ({
   cmdTeamList: () => { calls.cmdTeamList.push([]); },
   cmdTeamCreate: (...args: unknown[]) => calls.cmdTeamCreate.push(args),
+  cmdTeamPrune: async (...args: unknown[]) => calls.cmdTeamPrune.push(args),
   cmdTeamSpawn: async (...args: unknown[]) => calls.cmdTeamSpawn.push(args),
   cmdTeamSend: (...args: unknown[]) => calls.cmdTeamSend.push(args),
   cmdTeamBroadcast: async (...args: unknown[]) => calls.cmdTeamBroadcast.push(args),
@@ -69,6 +76,13 @@ mock.module("../../src/vendor/mpr-plugins/team/team-charter", () => ({
   formatTeamCharterLoad: () => "team loaded",
   spawnFromTeamCharter: async () => ({ ok: true }),
   formatTeamCharterSpawn: () => "team spawn started",
+}));
+
+mock.module("../../src/vendor/mpr-plugins/team/team-reassign", () => ({
+  cmdTeamReassign: async (...args: unknown[]) => {
+    calls.cmdTeamReassign.push(args);
+    return { team: "alpha", session: "lead", member: "worker", issue: 123, target: "worker", actions: [] as any, output: "team reassign: alpha" };
+  },
 }));
 
 mock.module("../../src/vendor/mpr-plugins/team/team-comms", () => ({
@@ -164,7 +178,15 @@ describe("vendor team handler coverage slice", () => {
       engine: "codex",
       dryRun: true,
       split: true,
+      gather: false,
     }]]);
+  });
+
+
+  test("prune dispatches to lifecycle helper", async () => {
+    const result = await teamHandler({ source: "cli", args: ["prune"] });
+    expect(result.ok).toBe(true);
+    expect(calls.cmdTeamPrune).toEqual([[]]);
   });
 
   test("members uses --team flag when provided", async () => {
@@ -189,5 +211,14 @@ describe("vendor team handler coverage slice", () => {
     const result = await teamHandler({ source: "cli", args: ["enter", "agent-a"] });
     expect(result.ok).toBe(false);
     expect(result.error).toBe("team not found");
+  });
+
+  test("reassign delegates to cmdTeamReassign", async () => {
+    process.env.MAW_TEAM = "alpha";
+    const result = await teamHandler({ source: "cli", args: ["reassign", "worker", "123"] });
+    expect(result.ok).toBe(true);
+    expect(result.output).toBe("team reassign: alpha");
+    expect(calls.cmdTeamReassign).toEqual([["alpha", "worker", 123]]);
+    delete process.env.MAW_TEAM;
   });
 });

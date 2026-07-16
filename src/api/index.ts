@@ -9,7 +9,6 @@ import { fleetApi } from "./fleet";
 import { asksApi } from "./asks";
 import { oracleApi } from "./oracle";
 import { federationApi } from "./federation";
-import { worktreesApi } from "./worktrees";
 import { uiStateApi } from "./ui-state";
 import { dispatchApi } from "./dispatch";
 import { deprecatedApi } from "./deprecated";
@@ -28,8 +27,9 @@ import { uploadApi } from "./upload";
 import { pairApi } from "./pair";
 import { consentApi } from "./consent";
 import { claudeFleetApi } from "./claude-fleet";
-import { peerDiscoveriesApi } from "./peers-discoveries";
 import { engineApi } from "./engine";
+import { statusApi } from "./status";
+import { requestReplyApi } from "./request-reply";
 import { discoverPackages, invokePlugin } from "../plugin/registry";
 import { federationAuth, fromSigningAuth } from "../lib/elysia-auth";
 
@@ -57,7 +57,6 @@ export const api = new Elysia({ prefix: "/api" })
   .use(asksApi)
   .use(oracleApi)
   .use(federationApi)
-  .use(worktreesApi)
   .use(uiStateApi)
   .use(dispatchApi)
   .use(deprecatedApi)
@@ -76,8 +75,9 @@ export const api = new Elysia({ prefix: "/api" })
   .use(pairApi)
   .use(consentApi)
   .use(claudeFleetApi)
-  .use(peerDiscoveriesApi)
-  .use(engineApi);
+  .use(engineApi)
+  .use(statusApi)
+  .use(requestReplyApi);
 
 // Snapshot direct-handler routes before plugin auto-mount (#705)
 const directRoutes = new Set(

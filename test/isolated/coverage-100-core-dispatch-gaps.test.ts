@@ -263,7 +263,14 @@ describe("coverage-100 core resolve and routing dispatch gaps", () => {
       reader,
     });
     reader.emit("end");
-    await expect(picked).resolves.toBeNull();
+    await expect(picked).resolves.toMatchObject({
+      owner: "o",
+      repo: "r-oracle",
+      path: undefined,
+      lastActivityMs: 0,
+      hasLiveSession: false,
+      recommended: true,
+    });
     await expect(coreResolve.pickOracle([{ owner: "o", repo: "r-oracle" }], {
       stream: { write: () => true } as any,
       reader: { on: () => { throw new Error("tty gone"); }, resume: () => {} } as any,
@@ -365,14 +372,14 @@ describe("coverage-100 core resolve and routing dispatch gaps", () => {
     expect(rendered.join("\n")).toContain("CONFLICT");
     expect(rendered.join("\n")).toContain("INVALID");
 
+    const peerEntry = fleetEntry("02-peer.json", 2, "peer", "02-peer", ["neo", "01-neo"]);
     const entries = [
       fleetEntry("01-neo.json", 1, "neo", "01-neo"),
-      fleetEntry("02-peer.json", 2, "peer", "02-peer", ["neo", "01-neo"]),
+      { ...peerEntry, session: { ...peerEntry.session, budded_from: "neo" } },
     ];
     const dry = fleetDeps(entries, { running: ["01-neo"], exists: (path) => path.endsWith("01-neo.json") });
-    await expect(fleetManage.cmdFleetRename({ oldName: "neo.json", newName: "neo-new", dryRun: true }, dry.deps)).rejects.toThrow("referenced by sync_peers");
-    await fleetManage.cmdFleetRename({ oldName: "neo.json", newName: "neo-new", dryRun: true, force: true }, dry.deps);
-    expect(dry.localLogs.join("\n")).toContain("leaving sync_peers");
+    await fleetManage.cmdFleetRename({ oldName: "neo.json", newName: "neo-new", dryRun: true }, dry.deps);
+    expect(dry.localLogs.join("\n")).toContain("would update refs");
     expect(dry.localLogs.join("\n")).toContain("would tmux rename");
     expect(dry.writes).toHaveLength(0);
 
@@ -398,7 +405,7 @@ describe("coverage-100 core resolve and routing dispatch gaps", () => {
       fleetEntry("02-beta.json", 2, "beta", "02-beta"),
       fleetEntry("02-alpha.json", 2, "alpha", "02-alpha"),
       fleetEntry("99-overview.json", 99, "overview", "99-overview"),
-    ], { running: ["alpha", "02-beta"] });
+    ], { running: ["02-alpha", "02-beta"] });
     await fleetManage.cmdFleetRenumber(conflict.deps);
     expect(conflict.writes.map(([path]) => path)).toEqual(["/fleet/.tmp-01-alpha.json"]);
     expect(conflict.localLogs.join("\n")).toContain("02-alpha.json");

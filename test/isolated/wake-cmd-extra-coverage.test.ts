@@ -102,7 +102,8 @@ mock.module(import.meta.resolve("../../src/config"), () => ({
   buildCommandInDir: (windowName: string, cwd: string, engine?: string) =>
     `cd ${cwd} && ${engine ?? "codex"} --agent ${windowName}`,
   cfgTimeout: () => 0,
-  loadConfig: () => ({ node: "m5", agents: { neo: "m5" } }),
+  cfgLimit: () => 0,
+  loadConfig: () => ({ node: "m5", agents: { neo: "m5" }, commands: { default: "claude" } }),
   saveConfig: () => {},
 }));
 
@@ -122,6 +123,8 @@ mock.module(import.meta.resolve("../../src/commands/shared/wake-resolve"), () =>
 mock.module(import.meta.resolve("../../src/commands/shared/wake-session"), () => ({
   attachToSession: async () => {},
   reconcileParentClaudeDir: async () => {},
+  readWorktreeEngineFile: () => undefined,
+  writeWorktreeEngineFile: () => {},
   waitForEngine: async () => {},
   ensureSessionRunning: async (session: string) => {
     ensureSessionRunningCalls.push(session);
@@ -154,12 +157,14 @@ mock.module(import.meta.resolve("../../src/commands/shared/wake-concurrency"), (
 
 mock.module(import.meta.resolve("../../src/core/fleet/snapshot"), () => ({
   latestSnapshot: () => snapshotReturn,
+  listSnapshots: () => snapshotReturn ? [{ file: "latest.json", timestamp: snapshotReturn.timestamp ?? "latest" }] : [],
   loadSnapshot: () => snapshotReturn,
 }));
 
 mock.module(import.meta.resolve("../../src/commands/shared/wake-cmd-helpers"), () => ({
   buildWakeBudLineage: () => "",
   findWakeSnapshotSession: () => snapshotSessionReturn,
+  filterMergedWorktreesForRehydrate: async (worktrees: any[]) => worktrees,
   planRehydrateWorktreeWindows: () => [],
   planSnapshotRestoreWindows: () => plannedSnapshotWindows,
   retryFreshSessionTmuxStep: async (_session: string, _label: string, fn: () => unknown) => await fn(),
@@ -216,7 +221,11 @@ describe("wake-cmd extra isolated coverage", () => {
     expect(sentText).toEqual([
       {
         target: "54-neo:neo-oracle",
-        text: `cd ${repoPath} && codex --agent neo-oracle -p 'it'\\''s alive'`,
+        text: `cd ${repoPath} && codex --agent neo-oracle`,
+      },
+      {
+        target: "54-neo:neo-oracle",
+        text: "it's alive",
       },
     ]);
     expect(maybeSplitCalls).toEqual(["54-neo:neo-oracle"]);

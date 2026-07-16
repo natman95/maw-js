@@ -30,7 +30,7 @@ await mock.module("fs", () => ({
   ...realFs,
   readFileSync: ((path: string | Buffer | URL, ...args: unknown[]) => {
     const pathText = String(path);
-    if (pathText === MOCK_CONFIG_FILE) {
+    if (pathText.startsWith(MOCK_CONFIG_FILE)) {
       readCalls.push(pathText);
       if (readError) throw readError;
       return rawConfigText;
@@ -39,7 +39,7 @@ await mock.module("fs", () => ({
   }) as typeof realFs.readFileSync,
   writeFileSync: ((path: string | Buffer | URL, data: string | ArrayBufferView, ...args: unknown[]) => {
     const pathText = String(path);
-    if (pathText === MOCK_CONFIG_FILE) {
+    if (pathText.startsWith(MOCK_CONFIG_FILE)) {
       writeCalls.push({ path: pathText, data: String(data) });
       if (writeError) throw writeError;
       return;
@@ -172,6 +172,29 @@ describe("config load second pass coverage", () => {
     expect(stderrWrites.filter((line) => line.includes("config.ghqRoot is deprecated"))).toHaveLength(2);
   });
 
+  test("loaded config banner is one-shot across default and cwd loads until reset (#2825)", () => {
+    rawConfigText = JSON.stringify({ unused: true });
+    validatedConfig = {
+      triggers: [{ id: "t1" }],
+      pluginSources: [{ name: "plugins-a" }],
+      peers: [{ name: "peer-a" }],
+    };
+
+    config.loadConfig();
+    config.loadConfig({ cwd: "/tmp/alternate-cwd" });
+
+    expect(infoMessages).toEqual([
+      "loaded config: 1 trigger, 1 declared plugin, 1 peer",
+    ]);
+
+    config.resetConfig();
+    config.loadConfig();
+    expect(infoMessages).toEqual([
+      "loaded config: 1 trigger, 1 declared plugin, 1 peer",
+      "loaded config: 1 trigger, 1 declared plugin, 1 peer",
+    ]);
+  });
+
   test("bind-address migration preserves an existing bind and ignores empty fleet merge results", () => {
     verboseEnabled = false;
     rawConfigText = JSON.stringify({ host: "127.0.0.1" });
@@ -211,7 +234,7 @@ describe("config load second pass coverage", () => {
     expect(loaded.host).toBe("local");
     expect(loaded.node).toBe("m5");
     expect(writeCalls).toHaveLength(1);
-    expect(writeCalls[0]?.path).toBe(MOCK_CONFIG_FILE);
+    expect(writeCalls[0]?.path.startsWith(MOCK_CONFIG_FILE)).toBe(true);
     expect(stderrWrites.some((line) => line.includes("legacy init bug (#906)"))).toBe(true);
     expect(
       stderrWrites.some((line) =>
@@ -232,7 +255,6 @@ describe("config load second pass coverage", () => {
       port: 3456,
       oracleUrl: "http://localhost:47779",
       env: {},
-      commands: { default: "claude" },
       sessions: {},
     });
     expect(validateCalls).toBe(0);

@@ -11,6 +11,7 @@ import {
   type FleetManageDeps,
 } from "../src/commands/shared/fleet-manage";
 import type { FleetEntry, FleetSession } from "../src/commands/shared/fleet-load";
+import { isUserError } from "../src/core/util/user-error";
 
 const session = (name: string, windows: Array<{ name: string; repo?: string }> = []): FleetSession => ({
   name,
@@ -90,13 +91,14 @@ describe("renderFleetLs", () => {
     const lines = renderFleetLs([
       entry("01-alpha.json", 1, "alpha", session("01-alpha", [{ name: "alpha-oracle" }])),
       entry("01-beta.json", 1, "beta", session("01-beta", [])),
+      entry("02-beta.json", 2, "beta", session("02-beta", [])),
       entry("bad.json", 3, "fallback", { windows: "bad" } as unknown as FleetSession),
       entry(".json", 4, "", {} as unknown as FleetSession),
     ], 2, ["01-alpha"]);
 
     const out = text(lines);
     expect(out).toContain("Fleet Configs");
-    expect(out).toContain("4 active, 2 disabled");
+    expect(out).toContain("5 active, 2 disabled");
     expect(out).toContain("01-alpha");
     expect(out).toContain("running");
     expect(out).toContain("01-beta");
@@ -187,18 +189,25 @@ describe("cmdFleetRename", () => {
     expect(text(h.logs)).toContain("tmux: 23-discord-admin → 23-discord");
   });
 
-  test("refuses to rename when another fleet sync_peers references the old name unless forced", async () => {
+  test("migrates sync_peers and budded_from references in other fleet configs", async () => {
     const target = entry("23-discord-admin.json", 23, "discord-admin", session("23-discord-admin"));
-    const peer = entry("24-helper.json", 24, "helper", { ...session("24-helper"), sync_peers: ["23-discord-admin"] });
+    const peer = entry("24-helper.json", 24, "helper", {
+      ...session("24-helper"),
+      sync_peers: ["23-discord-admin", "discord-admin", "kept"],
+      budded_from: "discord-admin",
+    });
     const h = makeDeps([target, peer], { exists: path => !path.endsWith("23-discord.json") });
 
-    await expect(cmdFleetRename({ oldName: "23-discord-admin", newName: "23-discord" }, h.deps))
-      .rejects.toThrow(/sync_peers/);
-    expect(h.writes).toEqual([]);
+    await cmdFleetRename({ oldName: "23-discord-admin", newName: "23-discord" }, h.deps);
 
-    await cmdFleetRename({ oldName: "23-discord-admin", newName: "23-discord", force: true }, h.deps);
-    expect(h.writes).toHaveLength(1);
-    expect(text(h.logs)).toContain("leaving sync_peers references");
+    expect(h.writes).toHaveLength(2);
+    expect(JSON.parse(h.writes[1].contents)).toMatchObject({
+      name: "24-helper",
+      sync_peers: ["23-discord", "23-discord", "kept"],
+      budded_from: "23-discord",
+    });
+    expect(h.renames).toContainEqual({ from: "/fleet/.tmp-24-helper.json", to: "/fleet/24-helper.json" });
+    expect(text(h.logs)).toContain("updating fleet references in 24-helper.json");
   });
 
   test("refuses to rename to an existing fleet and supports dry-run with no side effects", async () => {
@@ -210,6 +219,12 @@ describe("cmdFleetRename", () => {
 
     await expect(cmdFleetRename({ oldName: "23-discord-admin", newName: "23-discord" }, h.deps))
       .rejects.toThrow(/already exists/);
+    try {
+      await cmdFleetRename({ oldName: "23-discord-admin", newName: "23-discord" }, h.deps);
+      throw new Error("expected duplicate fleet rename to throw");
+    } catch (err) {
+      expect(isUserError(err)).toBe(true);
+    }
 
     const dry = makeDeps([entries[0]], {
       exists: path => !path.endsWith("23-discord.json"),
@@ -248,8 +263,8 @@ describe("cmdFleetRenumber", () => {
       entry("02-alpha.json", 2, "alpha", session("02-alpha")),
       entry("02-charlie.json", 2, "charlie", session("02-charlie")),
     ], {
-      running: ["02-alpha", "99-charlie"],
-      tmuxThrowsFor: new Set(["99-charlie"]),
+      running: ["02-alpha", "02-charlie"],
+      tmuxThrowsFor: new Set(["02-charlie"]),
     });
 
     await cmdFleetRenumber(h.deps);
@@ -272,7 +287,7 @@ describe("cmdFleetRenumber", () => {
     ]);
     expect(h.tmuxRuns).toEqual([
       ["rename-session", "-t", "02-alpha", "01-alpha"],
-      ["rename-session", "-t", "99-charlie", "03-charlie"],
+      ["rename-session", "-t", "02-charlie", "03-charlie"],
     ]);
 
     const out = text(h.logs);
@@ -281,11 +296,57 @@ describe("cmdFleetRenumber", () => {
     expect(out).toContain("tmux: 02-alpha → 01-alpha");
     expect(out).toContain("02-bravo.json");
     expect(out).toContain("(unchanged)");
-    expect(out).toContain("tmux rename failed: 99-charlie");
+    expect(out).toContain("tmux rename failed: 02-charlie");
     expect(out).toContain("02-delta.json");
     expect(out).toContain("Done.");
     expect(out).toContain("4 configs renumbered");
     expect(out).not.toContain("99-overview.json");
+  });
+
+  test("refuses to renumber when the same fleet name is already running under another number", async () => {
+    const h = makeDeps([
+      entry("02-mawjs.json", 2, "mawjs", session("02-mawjs")),
+      entry("02-other.json", 2, "other", session("02-other")),
+    ], {
+      running: ["89-mawjs"],
+    });
+
+    await expect(cmdFleetRenumber(h.deps))
+      .rejects.toThrow("fleet 'mawjs' already running as 89-mawjs");
+    try {
+      await cmdFleetRenumber(h.deps);
+      throw new Error("expected running fleet conflict to throw");
+    } catch (err) {
+      expect(isUserError(err)).toBe(true);
+    }
+
+    expect(h.writes).toEqual([]);
+    expect(h.renames).toEqual([]);
+    expect(h.unlinks).toEqual([]);
+    expect(h.tmuxRuns).toEqual([]);
+  });
+
+  test("refuses duplicate fleet-name configs because renumber cannot merge them safely", async () => {
+    const h = makeDeps([
+      entry("89-mawjs.json", 89, "mawjs", session("89-mawjs")),
+      entry("150-mawjs.json", 150, "mawjs", session("150-mawjs")),
+    ], {
+      running: ["89-mawjs"],
+    });
+
+    await expect(cmdFleetRenumber(h.deps))
+      .rejects.toThrow("duplicate fleet name(s): mawjs (89-mawjs.json, 150-mawjs.json)");
+    try {
+      await cmdFleetRenumber(h.deps);
+      throw new Error("expected duplicate fleet names to throw");
+    } catch (err) {
+      expect(isUserError(err)).toBe(true);
+    }
+
+    expect(h.writes).toEqual([]);
+    expect(h.renames).toEqual([]);
+    expect(h.unlinks).toEqual([]);
+    expect(h.tmuxRuns).toEqual([]);
   });
 
   test("does not unlink a missing old config while still writing the replacement", async () => {

@@ -254,6 +254,21 @@ interface AnnotatedPane {
   sessionActivity?: number;
   source?: string;
   cwd?: string;
+  top?: number;
+  left?: number;
+  w?: number;
+  h?: number;
+  paneIdx?: number;
+  winIdx?: number;
+  winName?: string;
+  active?: boolean;
+  window?: {
+    w?: number;
+    h?: number;
+    active?: boolean;
+  };
+  attached?: boolean;
+  attachedClients?: number;
 }
 
 export function classifyLsPaneActivity(status: PaneStatus): PaneActivity {
@@ -507,12 +522,15 @@ async function sessionActivityTimes(): Promise<Map<string, number>> {
   return parseSessionActivityList(raw);
 }
 
-/**
- * List tmux panes with fleet + team annotations. Supersedes `maw panes`
- * with smarter labeling — if a pane is a fleet oracle or a team agent,
- * say so explicitly so operators don't need to cross-check configs.
- */
-export async function cmdTmuxLs(opts: TmuxLsOpts = {}): Promise<void> {
+interface TmuxLsState {
+  scope: AnnotatedPane[];
+  visibleTeams: ClaudeTeamSummary[];
+  currentSession: string;
+  activeThresholdSec: number;
+  nowEpoch: number;
+}
+
+async function collectTmuxLsState(opts: TmuxLsOpts = {}): Promise<TmuxLsState> {
   const allPanes = await tmux.listPanes();
   const currentSession = process.env.TMUX
     ? (await hostExec("tmux display-message -p '#{session_name}'").catch(() => "")).trim()
@@ -568,6 +586,17 @@ export async function cmdTmuxLs(opts: TmuxLsOpts = {}): Promise<void> {
       sessionActivity: activityBySession.get(session),
       source: (p as { source?: string; node?: string }).source ?? (p as { node?: string }).node,
       cwd: p.cwd,
+      top: p.top,
+      left: p.left,
+      w: p.w,
+      h: p.h,
+      paneIdx: p.paneIdx,
+      winIdx: p.winIdx,
+      winName: p.winName,
+      active: p.active,
+      window: p.window,
+      attached: p.attached,
+      ...(p.attachedClients !== undefined ? { attachedClients: p.attachedClients } : {}),
     };
   });
 
@@ -627,23 +656,42 @@ export async function cmdTmuxLs(opts: TmuxLsOpts = {}): Promise<void> {
 
   await markContextLimitedPanes(scope);
 
+  return { scope, visibleTeams, currentSession, activeThresholdSec, nowEpoch };
+}
+
+async function tmuxLsJsonRowsFromState({ scope, visibleTeams }: Pick<TmuxLsState, "scope" | "visibleTeams">): Promise<unknown[]> {
+  const paneRows = await panesForJson(scope);
+  const teamRows = visibleTeams.map(team => ({
+    kind: "team",
+    id: `team:${team.name}`,
+    target: `team:${team.name}`,
+    session: team.name,
+    command: "team",
+    title: `L2 team (${team.memberCount} member${team.memberCount === 1 ? "" : "s"})`,
+    annotation: `team: ${team.memberCount} member${team.memberCount === 1 ? "" : "s"}`,
+    status: "unknown",
+    lastActivitySec: 0,
+    source: "l2-team",
+    members: team.memberCount,
+    configPath: team.configPath,
+  }));
+  return [...paneRows, ...teamRows];
+}
+
+export async function tmuxLsJsonRows(opts: TmuxLsOpts = {}): Promise<unknown[]> {
+  return tmuxLsJsonRowsFromState(await collectTmuxLsState(opts));
+}
+
+/**
+ * List tmux panes with fleet + team annotations. Supersedes `maw panes`
+ * with smarter labeling — if a pane is a fleet oracle or a team agent,
+ * say so explicitly so operators don't need to cross-check configs.
+ */
+export async function cmdTmuxLs(opts: TmuxLsOpts = {}): Promise<void> {
+  const { scope, visibleTeams, currentSession, activeThresholdSec, nowEpoch } = await collectTmuxLsState(opts);
+
   if (opts.json) {
-    const paneRows = await panesForJson(scope);
-    const teamRows = visibleTeams.map(team => ({
-      kind: "team",
-      id: `team:${team.name}`,
-      target: `team:${team.name}`,
-      session: team.name,
-      command: "team",
-      title: `L2 team (${team.memberCount} member${team.memberCount === 1 ? "" : "s"})`,
-      annotation: `team: ${team.memberCount} member${team.memberCount === 1 ? "" : "s"}`,
-      status: "unknown",
-      lastActivitySec: 0,
-      source: "l2-team",
-      members: team.memberCount,
-      configPath: team.configPath,
-    }));
-    console.log(JSON.stringify([...paneRows, ...teamRows], null, 2));
+    console.log(JSON.stringify(await tmuxLsJsonRowsFromState({ scope, visibleTeams }), null, 2));
     return;
   }
 
@@ -935,16 +983,16 @@ export async function cmdTmuxSplit(target: string, opts: TmuxSplitOpts = {}): Pr
 }
 
 export interface TmuxKillOpts {
-  /** Bypass fleet/view session refusal. Required to kill a live oracle pane/session. */
+  /** Bypass fleet/view session refusal. Required to kill a live oracle session. */
   force?: boolean;
-  /** Kill the entire session (not just the pane). */
+  /** Kill the entire session (not just the pane/window target). */
   session?: boolean;
 }
 
 /**
  * Kill a target pane or session. Wraps `tmux kill-pane -t` or
- * `tmux kill-session -t`. Refuses fleet/view sessions by default
- * (Bug F class — never accidentally kill live oracles).
+ * `tmux kill-session -t`. Refuses whole fleet/view session kills by default
+ * (Bug F class — never accidentally kill all live oracle windows).
  */
 export async function cmdTmuxKill(target: string, opts: TmuxKillOpts = {}): Promise<void> {
   const hit = resolveTmuxTarget(target);
@@ -979,8 +1027,8 @@ export async function cmdTmuxKill(target: string, opts: TmuxKillOpts = {}): Prom
     }
   } catch { /* no fleet dir */ }
 
-  if (isFleetOrViewSession(session, fleetSessions) && !opts.force) {
-    throw new Error(`refusing to kill: session '${session}' is fleet or view.\n  killing would terminate a live oracle (or its mirror).\n  pass --force to override (you really want to kill a fleet session)`);
+  if (opts.session && isFleetOrViewSession(session, fleetSessions) && !opts.force) {
+    throw new Error(`refusing to kill: session '${session}' is fleet or view.\n  killing the whole session would terminate live oracle windows (or a mirror).\n  pass --force to override (you really want to kill a fleet session)`);
   }
 
   const tmuxCmd = opts.session

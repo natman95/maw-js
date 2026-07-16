@@ -47,3 +47,6 @@ psi/
 # Test coverage artifacts
 coverage/
 maw.config.json.bak-*
+
+# Rust gateway build artifacts
+packages/maw-gateway/target/

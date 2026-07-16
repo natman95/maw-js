@@ -1,4 +1,4 @@
-import { basename, dirname, join } from "path";
+import { basename, join } from "path";
 import { parseWorktreePath } from "../../core/fleet/worktree-layout";
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { homedir } from "os";
@@ -6,12 +6,16 @@ import { listSessions, hostExec, tmux, takeSnapshot } from "../../sdk";
 import { getGhqRoot } from "../../config/ghq-root";
 import { normalizeTarget } from "../../core/matcher/normalize-target";
 import { mawDataPath } from "../../core/xdg";
+import { pruneJsonlFile } from "../../vendor/mpr-plugins/messages/retention";
 import { fleetDirForWrite, fleetDirsForRead, uniqueDirs } from "../../core/fleet/paths";
+import { inferRetrospectiveCommand } from "../../vendor/mpr-plugins/done/retrospective-command";
 
 export interface DoneOpts {
   force?: boolean;
   dryRun?: boolean;
   cleanBranch?: boolean;
+  /** Skip all branch cleanup — keep the branch even when merged (#2073 --keep-branch). */
+  keepBranch?: boolean;
   cwd?: string;
 }
 
@@ -31,6 +35,7 @@ export interface DoneDeps {
   listSessions?: () => Promise<SessionInfo[]>;
   hostExec?: (command: string) => Promise<string>;
   tmux?: {
+    run?: (subcommand: string, ...args: (string | number)[]) => Promise<string>;
     killWindow?: (target: string) => Promise<unknown>;
     sendText?: (target: string, text: string) => Promise<unknown>;
   };
@@ -53,6 +58,7 @@ function doneDeps(deps: DoneDeps = {}) {
     listSessions: deps.listSessions ?? (listSessions as () => Promise<SessionInfo[]>),
     hostExec: deps.hostExec ?? hostExec,
     tmux: {
+      run: deps.tmux?.run ?? tmux.run.bind(tmux),
       killWindow: deps.tmux?.killWindow ?? tmux.killWindow,
       sendText: deps.tmux?.sendText ?? tmux.sendText,
     },
@@ -82,15 +88,11 @@ function shellArg(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
-function isNotWorkingTreeError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /not a working tree/i.test(message);
-}
-
-function archivePathFor(wtPath: string, d: ResolvedDoneDeps): string {
-  const stamp = d.now().toISOString().replace(/[^0-9A-Za-z_.-]/g, "-");
-  const safeBase = basename(wtPath).replace(/[^0-9A-Za-z_.-]/g, "-");
-  return `/tmp/maw-done-orphan-worktrees/${safeBase}-${stamp}`;
+class DirtyWorktreeRemovalError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DirtyWorktreeRemovalError";
+  }
 }
 
 async function dirExists(path: string, d: ResolvedDoneDeps): Promise<boolean> {
@@ -102,17 +104,48 @@ async function dirExists(path: string, d: ResolvedDoneDeps): Promise<boolean> {
   }
 }
 
-async function movePrunedWorktreeDir(wtPath: string, mainPath: string, d: ResolvedDoneDeps): Promise<boolean> {
+async function removeFailedWorktreeDir(
+  wtPath: string,
+  mainPath: string,
+  originalError: unknown,
+  opts: DoneOpts,
+  d: ResolvedDoneDeps,
+): Promise<boolean> {
   if (!(await dirExists(wtPath, d))) return false;
-  const archived = archivePathFor(wtPath, d);
+
+  let status = "";
+  let statusKnown = false;
   try {
-    await d.hostExec(`mkdir -p ${shellArg(dirname(archived))}`);
-    await d.hostExec(`mv ${shellArg(wtPath)} ${shellArg(archived)}`);
+    status = await d.hostExec(`git -C ${shellArg(wtPath)} status --porcelain --untracked-files=all`);
+    statusKnown = true;
+  } catch (e: any) {
+    if (!opts.force) {
+      throw new DirtyWorktreeRemovalError(
+        `worktree remove failed and ${wtPath} could not be checked for local changes (${e?.message || e}); rerun with --force to delete it`,
+      );
+    }
+    d.logger.log(`  \x1b[33m⚠\x1b[0m deleting ${basename(wtPath)} with --force after status check failed: ${e?.message || e}`);
+  }
+
+  const dirty = status.trim().length > 0;
+  if (dirty && !opts.force) {
+    throw new DirtyWorktreeRemovalError(
+      `worktree remove failed and ${wtPath} has uncommitted changes; rerun maw done --force to delete it`,
+    );
+  }
+
+  try {
+    await d.hostExec(`rm -rf ${shellArg(wtPath)}`);
     await d.hostExec(`git -C ${shellArg(mainPath)} worktree prune`);
-    d.logger.log(`  \x1b[32m✓\x1b[0m moved orphan directory ${basename(wtPath)} to ${archived}`);
+    const suffix = dirty
+      ? " with --force despite uncommitted changes"
+      : statusKnown
+        ? " after verifying it was clean"
+        : " with --force after status check failed";
+    d.logger.log(`  \x1b[32m✓\x1b[0m removed orphan directory ${basename(wtPath)}${suffix}`);
     return true;
   } catch (e: any) {
-    d.logger.log(`  \x1b[33m⚠\x1b[0m orphan directory move failed: ${e?.message || e}`);
+    d.logger.log(`  \x1b[33m⚠\x1b[0m orphan directory removal failed after worktree remove failed (${e?.message || e}); original error: ${originalError instanceof Error ? originalError.message : originalError}`);
     return false;
   }
 }
@@ -175,6 +208,10 @@ export async function cleanupDoneBranch(
   deps: DoneDeps = {},
 ): Promise<void> {
   const d = doneDeps(deps);
+  if (opts.keepBranch) {
+    if (branch) d.logger.log(`  \x1b[36m⬡\x1b[0m kept branch ${branch} (--keep-branch)`);
+    return;
+  }
   const cleanBranch = Boolean(opts.cleanBranch);
   const baseBranch = branchBaseFor(mainPath, d);
   if (!branch || isProtectedBranch(branch, baseBranch)) return;
@@ -229,6 +266,42 @@ function failMissingDoneTarget(windowName: string, d: ResolvedDoneDeps): never {
   throw new Error(message);
 }
 
+function leadWindow(session: SessionInfo): SessionInfo["windows"][number] | null {
+  if (session.windows.length === 0) return null;
+  const leadIndex = Math.min(...session.windows.map(w => w.index));
+  return session.windows.find(w => w.index === leadIndex) ?? null;
+}
+
+async function currentTmuxIdentity(d: ResolvedDoneDeps): Promise<{ sessionName: string; windowIndex: number } | null> {
+  try {
+    const raw = (await d.tmux.run("display-message", "-p", "#{session_name}\t#{window_index}")).trim();
+    const [sessionName, indexRaw] = raw.split("\t");
+    const windowIndex = Number(indexRaw);
+    if (sessionName && Number.isInteger(windowIndex)) return { sessionName, windowIndex };
+  } catch {
+    // Outside tmux or tmux unavailable. Treat as non-lead for the guard.
+  }
+  return null;
+}
+
+async function assertDoneMayTargetWindow(
+  session: SessionInfo,
+  windowIndex: number,
+  windowName: string,
+  d: ResolvedDoneDeps,
+): Promise<void> {
+  const lead = leadWindow(session);
+  if (!lead || lead.index !== windowIndex) return;
+
+  const current = await currentTmuxIdentity(d);
+  if (current?.sessionName === session.name && current.windowIndex === lead.index) return;
+
+  const message = `refusing to done lead window '${windowName}' in session '${session.name}' from a non-lead context`;
+  d.logger.error(`  \x1b[31m✗\x1b[0m ${message}`);
+  d.logger.error(`  \x1b[90m  run from the lead window, or target a non-lead agent window\x1b[0m`);
+  throw new Error(message);
+}
+
 function activeFleetConfigFiles(d: ResolvedDoneDeps): Array<{ file: string; path: string }> {
   const filesByName = new Map<string, { file: string; path: string }>();
   const dirs = uniqueDirs(d.fleetDirs?.length ? d.fleetDirs : [d.fleetDir]);
@@ -262,10 +335,15 @@ export async function cmdDone(windowName_: string, opts: DoneOpts = {}, deps: Do
 
   const windowNameLower = windowName.toLowerCase();
   let sessionName: string | null = null;
+  let matchedSession: SessionInfo | null = null;
   let windowIndex: number | null = null;
   for (const s of sessions) {
     const w = s.windows.find(w => w.name.toLowerCase() === windowNameLower);
-    if (w) { sessionName = s.name; windowIndex = w.index; windowName = w.name; break; }
+    if (w) { sessionName = s.name; matchedSession = s; windowIndex = w.index; windowName = w.name; break; }
+  }
+
+  if (matchedSession && windowIndex !== null) {
+    await assertDoneMayTargetWindow(matchedSession, windowIndex, windowName, d);
   }
 
   if (sessionName) {
@@ -334,7 +412,9 @@ export function signalParentInbox(
     JSON.stringify({ ts: d.now().toISOString(), from, type: "done", msg: `worktree ${windowName} completed`, thread: null }) + "\n";
   try {
     d.fs.mkdirSync(inboxDir, { recursive: true });
-    d.fs.appendFileSync(join(inboxDir, `${parentTarget}.jsonl`), signal);
+    const signalPath = join(inboxDir, `${parentTarget}.jsonl`);
+    d.fs.appendFileSync(signalPath, signal);
+    pruneJsonlFile(signalPath);
   } catch (e) {
     d.logger.error(`  \x1b[33m⚠\x1b[0m inbox signal failed: ${e}`);
   }
@@ -350,12 +430,22 @@ export async function autoSave(
   const target = `${sessionName}:${windowName}`;
 
   let paneCwd = "";
+  let paneCurrentCommand = "";
   try {
-    paneCwd = (await d.hostExec(`tmux display-message -t '${target}' -p '#{pane_current_path}'`)).trim();
+    const paneInfo = await d.hostExec(`tmux display-message -t '${target}' -p '#{pane_current_command}\t#{pane_current_path}'`);
+    const [rawPaneCommand, rawPanePath] = paneInfo.split("\t");
+    paneCurrentCommand = (rawPaneCommand ?? "").trim();
+    paneCwd = (rawPanePath ?? "").trim();
   } catch { /* pane may not exist */ }
 
+  const retrospectiveCommand = inferRetrospectiveCommand(paneCurrentCommand);
+
   if (opts.dryRun) {
-    d.logger.log(`  \x1b[36m⬡\x1b[0m [dry-run] would send /rrr to ${target} and wait 10s`);
+    if (retrospectiveCommand) {
+      d.logger.log(`  \x1b[36m⬡\x1b[0m [dry-run] would send ${retrospectiveCommand} to ${target} and wait 10s`);
+    } else {
+      d.logger.log(`  \x1b[36m⬡\x1b[0m [dry-run] would skip retro (no retrospective command for this engine)`);
+    }
     if (paneCwd) {
       d.logger.log(`  \x1b[36m⬡\x1b[0m [dry-run] would git add + commit + push in ${paneCwd}`);
     }
@@ -365,13 +455,17 @@ export async function autoSave(
     return;
   }
 
-  d.logger.log(`  \x1b[36m⏳\x1b[0m sending /rrr to ${target}...`);
-  try {
-    await d.tmux.sendText(target, "/rrr");
-    await d.sleep(10_000);
-    d.logger.log(`  \x1b[32m✓\x1b[0m /rrr sent (waited 10s)`);
-  } catch {
-    d.logger.log(`  \x1b[33m⚠\x1b[0m could not send /rrr (agent may not be running)`);
+  if (retrospectiveCommand) {
+    d.logger.log(`  \x1b[36m⏳\x1b[0m sending ${retrospectiveCommand} to ${target}...`);
+    try {
+      await d.tmux.sendText(target, retrospectiveCommand);
+      await d.sleep(10_000);
+      d.logger.log(`  \x1b[32m✓\x1b[0m ${retrospectiveCommand} sent (waited 10s)`);
+    } catch {
+      d.logger.log(`  \x1b[33m⚠\x1b[0m could not send ${retrospectiveCommand} (agent may not be running)`);
+    }
+  } else {
+    d.logger.log(`  \x1b[90m○\x1b[0m no retrospective command for this engine — skipping retro`);
   }
 
   if (paneCwd) {
@@ -425,8 +519,11 @@ export async function removeWorktreeViaConfig(
         }
         let branch = "";
         try { branch = (await d.hostExec(`git -C '${fullPath}' rev-parse --abbrev-ref HEAD`)).trim(); } catch { /* expected */ }
-        // #1968: force removes ignored engine scratch (for example .omx/) left in finished worktrees.
-        await d.hostExec(`git -C ${shellArg(mainPath)} worktree remove ${shellArg(fullPath)} --force`);
+        if (opts.force) {
+          await d.hostExec(`git -C ${shellArg(mainPath)} worktree remove ${shellArg(fullPath)} --force`);
+        } else {
+          await d.hostExec(`git -C ${shellArg(mainPath)} worktree remove ${shellArg(fullPath)}`);
+        }
         await d.hostExec(`git -C ${shellArg(mainPath)} worktree prune`);
         d.logger.log(`  \x1b[32m✓\x1b[0m removed worktree ${win.repo}`);
         if (branch && branch !== "main" && branch !== "HEAD") {
@@ -434,14 +531,17 @@ export async function removeWorktreeViaConfig(
         }
         return true;
       } catch (e: any) {
-        if (isNotWorkingTreeError(e) && await movePrunedWorktreeDir(fullPath, mainPath, d)) {
+        if (await removeFailedWorktreeDir(fullPath, mainPath, e, opts, d)) {
           return true;
         }
         d.logger.log(`  \x1b[33m⚠\x1b[0m worktree remove failed: ${e.message || e}`);
       }
       break;
     }
-  } catch (e) { d.logger.error(`  \x1b[33m⚠\x1b[0m fleet scan failed: ${e}`); }
+  } catch (e) {
+    if (e instanceof DirtyWorktreeRemovalError) throw e;
+    d.logger.error(`  \x1b[33m⚠\x1b[0m fleet scan failed: ${e}`);
+  }
   return false;
 }
 
@@ -486,8 +586,11 @@ export async function removeWorktreeByGhqScan(
         }
         let branch = "";
         try { branch = (await d.hostExec(`git -C '${wtPath}' rev-parse --abbrev-ref HEAD`)).trim(); } catch { /* expected */ }
-        // #1968: force removes ignored engine scratch (for example .omx/) left in finished worktrees.
-        await d.hostExec(`git -C ${shellArg(mainPath)} worktree remove ${shellArg(wtPath)} --force`);
+        if (opts.force) {
+          await d.hostExec(`git -C ${shellArg(mainPath)} worktree remove ${shellArg(wtPath)} --force`);
+        } else {
+          await d.hostExec(`git -C ${shellArg(mainPath)} worktree remove ${shellArg(wtPath)}`);
+        }
         await d.hostExec(`git -C ${shellArg(mainPath)} worktree prune`);
         d.logger.log(`  \x1b[32m✓\x1b[0m removed worktree ${base}`);
         removed = true;
@@ -495,14 +598,17 @@ export async function removeWorktreeByGhqScan(
           await cleanupDoneBranch(mainPath, branch, opts, deps);
         }
       } catch (e) {
-        if (isNotWorkingTreeError(e) && await movePrunedWorktreeDir(wtPath, mainPath, d)) {
+        if (await removeFailedWorktreeDir(wtPath, mainPath, e, opts, d)) {
           removed = true;
           continue;
         }
         d.logger.error(`  \x1b[33m⚠\x1b[0m worktree remove failed: ${e}`);
       }
     }
-  } catch (e) { d.logger.error(`  \x1b[33m⚠\x1b[0m worktree scan failed: ${e}`); }
+  } catch (e) {
+    if (e instanceof DirtyWorktreeRemovalError) throw e;
+    d.logger.error(`  \x1b[33m⚠\x1b[0m worktree scan failed: ${e}`);
+  }
   return removed;
 }
 

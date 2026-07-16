@@ -1,11 +1,18 @@
-import { loadConfig } from "maw-js/config";
-import { listSessions, sendKeys, getPaneCommand, resolveTarget, curlFetch } from "maw-js/sdk";
-import { runHook } from "maw-js/sdk";
-import { resolveOraclePane } from "maw-js/commands/shared/comm-send";
+import {
+  checkBusyGuard,
+  curlFetch,
+  getPaneCommand,
+  listSessions,
+  loadConfig,
+  mawMessageLogPath,
+  resolveOraclePane,
+  resolveTarget,
+  runHook,
+  sendKeys,
+} from "maw-js/sdk";
 import { appendFile, mkdir } from "fs/promises";
 import { hostname } from "os";
 import { dirname } from "path";
-import { mawMessageLogPath } from "../../../core/xdg";
 
 const ORACLE_URL = () => process.env.ORACLE_URL || loadConfig().oracleUrl;
 
@@ -199,6 +206,18 @@ export async function cmdTalkTo(target: string, message: string, force = false) 
       }
       return;
     }
+  }
+
+  // Phase 2 busy guard — skip pane injection if target is busy
+  const guard = await checkBusyGuard(target);
+  if (guard.busy) {
+    if (threadResult) {
+      console.log(`\x1b[32m✓\x1b[0m thread #${threadResult.thread_id} updated`);
+      console.log(`\x1b[33mqueued\x1b[0m target '${guard.oracle}' is busy — message saved to thread only`);
+    } else {
+      console.log(`\x1b[33mqueued\x1b[0m target '${guard.oracle}' is busy — message will be delivered when idle`);
+    }
+    return;
   }
 
   await sendKeys(tmuxTarget, notification);

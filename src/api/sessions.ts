@@ -15,11 +15,14 @@ import { Tmux } from "../core/transport/tmux";
 import { pushFeedEvent } from "./feed";
 import { buildMessageLifecycleFeedEvent, type MessageLifecycleInput } from "../lib/message-events";
 import { defaultReceiverInboxWriter, type ReceiverInboxResult, type ReceiverInboxWriter } from "../commands/shared/receiver-inbox";
+import { notifyLiveInboxReceiver, type LiveInboxNotifyDeps } from "../commands/shared/live-inbox-notify";
+export { formatInboxNotification, resolveLiveInboxNotificationTarget } from "../commands/shared/live-inbox-notify";
+import { checkBusyGuard, queueForDispatch } from "../core/agent-status-guard";
 import type { Session } from "../core/transport/ssh";
 
 type Config = ReturnType<typeof loadConfig>;
 type IdleCheck = Awaited<ReturnType<typeof checkPaneIdle>>;
-type TmuxLike = Pick<Tmux, "sendKeysLiteral" | "sendKeys">;
+type TmuxLike = Pick<Tmux, "sendKeysLiteral" | "sendKeys" | "listPanes" | "capture" | "run">;
 
 type AutoWakeDecision = Awaited<ReturnType<typeof defaultShouldAutoWake>>;
 type AutoWakeOpts = Parameters<typeof defaultShouldAutoWake>[1];
@@ -49,6 +52,7 @@ export interface SessionsApiDeps {
   shouldAutoWake?: (target: string, opts: AutoWakeOpts) => AutoWakeDecision | Promise<AutoWakeDecision>;
   cmdWake?: (target: string, opts: { noAttach: boolean; task?: string }) => Promise<unknown>;
   cmdSleepOne?: (target: string) => Promise<unknown>;
+  countUnreadInbox?: LiveInboxNotifyDeps["countUnread"];
 }
 
 function defaults(deps: SessionsApiDeps) {
@@ -236,6 +240,25 @@ export function createSessionsApi(deps: SessionsApiDeps = {}) {
     }),
   });
 
+  api.get("/captures", async ({ set }) => {
+    try {
+      const tmux = d.createTmux();
+      const panes = await tmux.listPanes();
+      const entries = await Promise.all(panes.map(async pane => {
+        try {
+          return [pane.id, await tmux.capture(pane.id, 200)] as const;
+        } catch {
+          // Pane may close between list-panes and capture-pane; keep response total.
+          return [pane.id, ""] as const;
+        }
+      }));
+      return { captures: Object.fromEntries(entries) };
+    } catch (error) {
+      set.status = 503;
+      return sessionsUnavailablePayload(error);
+    }
+  });
+
   api.get("/capture", async ({ query, set }) => {
     const target = query.target;
     if (!target) { set.status = 400; return { error: "target required" }; }
@@ -357,9 +380,33 @@ export function createSessionsApi(deps: SessionsApiDeps = {}) {
           receipt: queuedReceipt(reason),
         };
       };
+      const notifyQueuedInboxReceiver = async (inbox: ReceiverInboxResult, tmuxTarget: string, reason: string) => {
+        const notify = await notifyLiveInboxReceiver(inbox, messageFrom, {
+          listSessions: d.listSessions,
+          tmux: d.createTmux(),
+          countUnread: deps.countUnreadInbox,
+        });
+        if (notify.status !== "sent") {
+          const detail = notify.reason || "unknown notify failure";
+          console.warn(`warn: inbox pane notify skipped for ${inbox.ok ? inbox.oracle : tmuxTarget}: ${detail}`);
+          emitLifecycle({
+            direction: "inbound",
+            state: "queued",
+            channel: "api-send",
+            route: "inbox-notify",
+            from: messageFrom,
+            to: inbox.ok ? `${config.node ?? "local"}:${inbox.oracle}` : messageTo,
+            target: notify.target || tmuxTarget,
+            text: message,
+            lastLine: `${reason}; notify skipped: ${detail}`,
+            signed: messageSigned,
+          });
+        }
+      };
       const queueOrFail = async (tmuxTarget: string, reason: string, status = 502) => {
         const inbox = await writeInboundInbox(tmuxTarget);
         const queued = inbox ? queuedInboxResponse(inbox, tmuxTarget, reason) : null;
+        if (inbox?.ok) await notifyQueuedInboxReceiver(inbox, tmuxTarget, reason);
         if (queued) return queued;
         set.status = status;
         emitLifecycle({
@@ -405,6 +452,12 @@ export function createSessionsApi(deps: SessionsApiDeps = {}) {
       if (resolved?.type === "local" || resolved?.type === "self-node") {
         const live = await verifyDeliverableTarget(resolved.target);
         if (!live.ok) return queueOrFail(resolved.target, live.reason);
+        // Phase 2 busy guard — queue for auto-delivery if target is actively working
+        const guard = await checkBusyGuard(target);
+        if (guard.busy && !inboxOnly) {
+          queueForDispatch({ from: messageFrom, to: target, target: resolved.target, message });
+          return queueOrFail(resolved.target, `target '${guard.oracle}' is busy; queued for auto-delivery`);
+        }
         try {
           if (inboxOnly) return queueOrFail(resolved.target, "--inbox requested; pane injection skipped");
           await d.sendKeys(resolved.target, message);
@@ -599,8 +652,10 @@ export function createSessionsApi(deps: SessionsApiDeps = {}) {
       }
 
       const errDetail = resolved?.type === "error" ? { reason: resolved.reason, detail: resolved.detail, hint: resolved.hint } : {};
+      const reason = errDetail.detail || "target not live; persisted for receiver inbox polling";
       const inbox = await writeInboundInbox(target);
-      const queued = inbox ? queuedInboxResponse(inbox, target, errDetail.detail || "target not live; persisted for receiver inbox polling") : null;
+      const queued = inbox ? queuedInboxResponse(inbox, target, reason) : null;
+      if (inbox?.ok) await notifyQueuedInboxReceiver(inbox, target, reason);
       if (queued) return queued;
       emitLifecycle({
         direction: "inbound",

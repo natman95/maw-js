@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "fs";
 import { homedir } from "os";
-import { join } from "path";
+import { dirname, isAbsolute, join } from "path";
 import { CONFIG_FILE, CONFIG_WEIGHTED_FILE, discoverConfigs, type DiscoveredConfig } from "../core/paths";
 import { refreshContext } from "../lib/context";
 import { verbose, info } from "../cli/verbosity";
@@ -28,12 +28,11 @@ import {
 // a filesystem path go through `getGhqRoot()` (src/config/ghq-root.ts), which
 // shells out to `ghq root` on demand. `config.ghqRoot` survives as a legacy
 // override; loadConfig() surfaces a one-shot deprecation warning below.
-const DEFAULTS: MawConfig = {
+const DEFAULTS: Pick<MawConfig, "host" | "port" | "oracleUrl" | "env" | "sessions"> = {
   host: "local",
   port: 3456,
   oracleUrl: "http://localhost:47779",
   env: {},
-  commands: { default: "claude" },
   sessions: {},
 };
 
@@ -71,6 +70,7 @@ const RESTRICTED_PROJECT_KEYS = new Set([
 
 /** Bind-address values that should never appear as an outbound target (#713). */
 const BIND_ADDRESSES = new Set(["0.0.0.0", "::", "", "127.0.0.1", "localhost"]);
+const CONFIG_FILE_REGEX = /^maw\.config\.(\d+)(\.local)?\.json$/;
 
 /**
  * #820 — sentinel: the real homedir config path. Both `saveConfig` and the
@@ -78,6 +78,30 @@ const BIND_ADDRESSES = new Set(["0.0.0.0", "::", "", "127.0.0.1", "localhost"]);
  * harness forgot to set MAW_HOME / MAW_CONFIG_DIR.
  */
 const REAL_HOME_CONFIG = join(homedir(), ".config", "maw", "maw.config.json");
+
+function generateTmpPath(filePath: string): string {
+  return `${filePath}.tmp.${Date.now()}.${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function writeFileAtomic(filePath: string, body: string): void {
+  const tmpPath = generateTmpPath(filePath);
+  try {
+    writeFileSync(tmpPath, body, "utf-8");
+    renameSync(tmpPath, filePath);
+  } catch (e) {
+    try {
+      rmSync(tmpPath, { force: true });
+    } catch {
+      // ignore cleanup errors
+    }
+    throw e;
+  }
+}
+
+function persistConfigFile(filePath: string, body: string): void {
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeFileAtomic(filePath, body);
+}
 
 function canPersistConfigMigration(): boolean {
   return !(process.env.MAW_TEST_MODE === "1" && CONFIG_FILE === REAL_HOME_CONFIG);
@@ -89,7 +113,7 @@ function maybeMigrateLegacyConfigFile(): void {
   if (!existsSync(CONFIG_FILE) || existsSync(CONFIG_WEIGHTED_FILE)) return;
   try {
     const body = readFileSync(CONFIG_FILE, "utf-8");
-    writeFileSync(CONFIG_WEIGHTED_FILE, body.endsWith("\n") ? body : `${body}\n`, "utf-8");
+    persistConfigFile(CONFIG_WEIGHTED_FILE, body.endsWith("\n") ? body : `${body}\n`);
     process.stderr.write(
       `[maw] migrating ${CONFIG_FILE} → ${CONFIG_WEIGHTED_FILE} ` +
       `(legacy file kept for compatibility)\n`,
@@ -106,8 +130,8 @@ function persistLoadedConfig(label: string): void {
   if (!canPersistConfigMigration()) return;
   try {
     const body = JSON.stringify(cached, null, 2) + "\n";
-    writeFileSync(CONFIG_FILE, body, "utf-8");
-    if (existsSync(CONFIG_WEIGHTED_FILE)) writeFileSync(CONFIG_WEIGHTED_FILE, body, "utf-8");
+    persistConfigFile(CONFIG_FILE, body);
+    if (existsSync(CONFIG_WEIGHTED_FILE)) persistConfigFile(CONFIG_WEIGHTED_FILE, body);
   } catch (e) {
     process.stderr.write(
       `[maw] ${label}: in-memory heal applied but disk persist failed: ` +
@@ -122,6 +146,79 @@ function configCacheKey(sources: DiscoveredConfig[], cwd: string): string {
     configFile: CONFIG_FILE,
     sources: sources.map((source) => [source.path, source.weight, source.scopeRank, source.isLocal, source.mtimeMs]),
   });
+}
+
+function xdgConfigBase(): string {
+  const env = process.env.XDG_CONFIG_HOME;
+  return env && isAbsolute(env) ? env : join(homedir(), ".config");
+}
+
+function singletonConfigDir(): string {
+  return join(xdgConfigBase(), "maw");
+}
+
+function scanSingletonConfigDir(dir: string): DiscoveredConfig[] {
+  if (!existsSync(dir)) return [];
+  try {
+    return readdirSync(dir)
+      .map((name) => {
+        const match = name.match(CONFIG_FILE_REGEX);
+        if (!match) return null;
+        const path = join(dir, name);
+        return {
+          path,
+          weight: Number.parseInt(match[1]!, 10),
+          isLocal: Boolean(match[2]),
+          scope: "user",
+          scopeRank: 10,
+          depth: 0,
+          mtimeMs: statSync(path).mtimeMs,
+        } satisfies DiscoveredConfig;
+      })
+      .filter((item): item is DiscoveredConfig => item !== null);
+  } catch {
+    return [];
+  }
+}
+
+function discoverInheritedSingletonConfigs(): DiscoveredConfig[] {
+  const dir = singletonConfigDir();
+  if (dir === dirname(CONFIG_FILE)) return [];
+  const weighted = scanSingletonConfigDir(dir);
+  if (weighted.length > 0) return weighted;
+  const legacyPath = join(dir, "maw.config.json");
+  if (!existsSync(legacyPath)) return [];
+  try {
+    return [{
+      path: legacyPath,
+      weight: 50,
+      isLocal: false,
+      scope: "legacy",
+      scopeRank: 10,
+      depth: 0,
+      mtimeMs: statSync(legacyPath).mtimeMs,
+    }];
+  } catch {
+    return [];
+  }
+}
+
+function inheritSingletonConfigsForMawHome(sources: DiscoveredConfig[]): DiscoveredConfig[] {
+  // #2616 — MAW_HOME isolates runtime state for per-agent sessions, but team/wake
+  // commands still need operator-level limits from the singleton XDG config.
+  // Preserve test-mode isolation and explicit MAW_CONFIG_DIR overrides.
+  if (process.env.MAW_TEST_MODE === "1") return sources;
+  if (!process.env.MAW_HOME || process.env.MAW_CONFIG_DIR) return sources;
+  const inherited = discoverInheritedSingletonConfigs();
+  if (inherited.length === 0) return sources;
+  const seen = new Set(sources.map((source) => source.path));
+  const merged = [...inherited.filter((source) => !seen.has(source.path)), ...sources];
+  return merged.sort((a, b) =>
+    a.weight - b.weight ||
+    a.scopeRank - b.scopeRank ||
+    Number(a.isLocal) - Number(b.isLocal) ||
+    a.path.localeCompare(b.path)
+  );
 }
 
 function readConfigLayer(source: DiscoveredConfig): Partial<MawConfig> | null {
@@ -150,6 +247,7 @@ function buildLoadedConfig(opts: LoadConfigOptions = {}): LoadedConfigWithProven
   }
   maybeMigrateLegacyConfigFile();
   let sources = discoverConfigs(cwd);
+  sources = inheritSingletonConfigsForMawHome(sources);
   if (sources.length === 0) {
     sources = [{
       path: CONFIG_FILE,
@@ -196,7 +294,7 @@ function buildLoadedConfig(opts: LoadConfigOptions = {}): LoadedConfigWithProven
     }
   }
 
-  cached = { ...DEFAULTS, ...(merged as Partial<MawConfig>) };
+  cached = { ...DEFAULTS, ...(merged as Partial<MawConfig>) } as MawConfig;
   cachedKey = key;
   cachedSources = sources;
   cachedProvenance = provenance;
@@ -348,7 +446,7 @@ function maybeMigrateViewStandardPlugin(config: MawConfig): void {
 export function loadConfig(opts: LoadConfigOptions = {}): MawConfig {
   const hadDefaultCache = cached !== null && !opts.cwd;
   buildLoadedConfig(opts);
-  if (!cached) cached = { ...DEFAULTS };
+  if (!cached) cached = { ...DEFAULTS } as MawConfig;
   for (const warning of cachedWarnings) process.stderr.write(`${warning}\n`);
   if (hadDefaultCache) return cached;
   // #713 — migrate bind-address values out of `host` into `bind`.
@@ -441,6 +539,9 @@ export function loadConfig(opts: LoadConfigOptions = {}): MawConfig {
   }
   // One-shot startup summary — fires unless --quiet/--silent (verbose-by-default).
   verbose(() => {
+    const BANNER_KEY = Symbol.for("maw:loadedConfigPrinted");
+    if ((process as any)[BANNER_KEY]) return;
+    (process as any)[BANNER_KEY] = true;
     const nT = cached!.triggers?.length ?? 0;
     const nP = cached!.pluginSources?.length ?? 0;
     const nPeers = (cached!.peers?.length ?? 0) + (cached!.namedPeers?.length ?? 0);
@@ -452,7 +553,7 @@ export function loadConfig(opts: LoadConfigOptions = {}): MawConfig {
 export function loadConfigWithProvenance(opts: LoadConfigOptions = {}): LoadedConfigWithProvenance {
   loadConfig(opts);
   return {
-    config: cached ?? { ...DEFAULTS },
+    config: cached ?? ({ ...DEFAULTS } as MawConfig),
     sources: cachedSources,
     provenance: cachedProvenance,
     warnings: cachedWarnings,
@@ -469,6 +570,7 @@ export function resetConfig() {
   warnedGhqRoot = false;
   warnedHostMigrated = false;
   warnedHostNodeConflated = false;
+  delete (process as any)[Symbol.for("maw:loadedConfigPrinted")];
 }
 
 /**
@@ -504,7 +606,7 @@ export function saveConfig(update: Partial<MawConfig>) {
     current = {};
   }
   const merged = { ...current, ...update };
-  writeFileSync(target, JSON.stringify(merged, null, 2) + "\n", "utf-8");
+  persistConfigFile(target, JSON.stringify(merged, null, 2) + "\n");
   resetConfig(); // clear cache so next loadConfig() reads fresh
   refreshContext(); // clear DI cache so middleware picks up new config
   return loadConfig();

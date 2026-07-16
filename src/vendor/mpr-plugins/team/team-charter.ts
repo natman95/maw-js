@@ -13,19 +13,37 @@ export interface TeamCharterMember {
   prompt?: string;
   engine?: string;
   worktree?: boolean | string;
+  branch?: string;
   queue?: string[];
   node?: string;
   channels?: boolean;
+  /** New-style per-member channel override (`false` disables top-level `discord`). */
+  discord?: false;
 }
+
+export type TeamCharterFlags = Record<string, unknown[]>;
+export type TeamCharterEngines = Record<string, unknown>;
 
 export interface TeamCharter {
   name: string;
   description?: string;
   goal?: string;
   session?: string;
+  /** Optional top-level project slug for generated wake targets (`owner/repo`). */
+  project?: string;
+  /** Optional top-level discord bridge toggle. `false` disables, string enables. */
+  discord?: string | false;
+  defaults?: Partial<TeamCharterMember>;
   members: TeamCharterMember[];
+  /** Reusable argv fragments, including YAML-anchor-expanded arrays. */
+  flags?: TeamCharterFlags;
+  /** Charter-local engine command map; arrays are flattened at launch resolution. */
+  engines?: TeamCharterEngines;
+  /** New-style agent map (`agents: { codex: { engine: omx, ... } }`). */
+  agents?: Record<string, Record<string, unknown>>;
   lifecycle?: Record<string, unknown>;
   governance?: Record<string, unknown>;
+  warnings?: string[];
 }
 
 export interface TeamCharterPlan {
@@ -113,8 +131,178 @@ function readBlock(lines: string[], start: number, parentIndent: number): { valu
   };
 }
 
+
+function cloneYamlValue<T>(value: T): T {
+  if (Array.isArray(value)) return value.map((item) => cloneYamlValue(item)) as T;
+  if (value && typeof value === "object") return { ...(value as Record<string, unknown>) } as T;
+  return value;
+}
+
+function splitInlineArray(value: string): string[] {
+  const inner = value.trim().slice(1, -1);
+  const out: string[] = [];
+  let quote: string | null = null;
+  let current = "";
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i]!;
+    if ((ch === '"' || ch === "'") && inner[i - 1] !== "\\") {
+      quote = quote === ch ? null : quote || ch;
+      current += ch;
+      continue;
+    }
+    if (ch === "," && !quote) {
+      out.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) out.push(current.trim());
+  return out;
+}
+
+function parseYamlValue(raw: string, anchors: Map<string, unknown>): unknown {
+  const trimmed = raw.trim();
+  const alias = trimmed.match(/^\*([A-Za-z_][\w-]*)$/);
+  if (alias) {
+    if (!anchors.has(alias[1]!)) throw new Error(`unknown YAML anchor reference: *${alias[1]}`);
+    return cloneYamlValue(anchors.get(alias[1]));
+  }
+  if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+    return splitInlineArray(trimmed).map((item) => parseYamlValue(item, anchors));
+  }
+  return scalar(trimmed);
+}
+
+function parseListBlock(lines: string[], start: number, parentIndent: number, anchors: Map<string, unknown>): { value: unknown[]; next: number } {
+  const items: unknown[] = [];
+  let i = start;
+  for (; i < lines.length; i++) {
+    const itemLine = lines[i]!;
+    if (!itemLine.trim()) continue;
+    if (lineIndent(itemLine) <= parentIndent) break;
+    const item = itemLine.match(new RegExp(`^ {${parentIndent + 2}}-\\s*(.*)$`));
+    if (!item) throw new Error(`unsupported list item near line ${i + 1}: ${itemLine.trim()}`);
+    items.push(parseYamlValue(item[1] ?? "", anchors));
+  }
+  return { value: items, next: i };
+}
+
+function parseAnchorPrefix(raw: string): { anchor?: string; rest: string } {
+  const match = raw.trim().match(/^&([A-Za-z_][\w-]*)(?:\s+(.*))?$/);
+  return match ? { anchor: match[1], rest: match[2] ?? "" } : { rest: raw };
+}
+
+function parseYamlValueMapBlock(lines: string[], start: number, parentIndent: number, anchors: Map<string, unknown>): { value: Record<string, unknown>; next: number } {
+  const out: Record<string, unknown> = {};
+  let i = start;
+  for (; i < lines.length; i++) {
+    const raw = lines[i]!;
+    if (!raw.trim()) continue;
+    const indent = lineIndent(raw);
+    if (indent <= parentIndent) break;
+
+    const header = raw.match(new RegExp(`^ {${parentIndent + 2}}([A-Za-z_][\\w.-]*):(?:\\s*(.*))?$`));
+    if (!header) throw new Error(`unsupported value map entry near line ${i + 1}: ${raw.trim()}`);
+    const key = header[1]!;
+    const keyValue = header[2] ?? "";
+    const { anchor, rest } = parseAnchorPrefix(keyValue);
+    let value: unknown;
+    if (rest.trim()) {
+      value = parseYamlValue(rest, anchors);
+      i++;
+    } else if (keyValue.trim() && !anchor) {
+      value = parseYamlValue(keyValue, anchors);
+      i++;
+    } else {
+      const list = parseListBlock(lines, i + 1, parentIndent + 2, anchors);
+      value = list.value;
+      i = list.next;
+    }
+    if (anchor) anchors.set(anchor, cloneYamlValue(value));
+    out[key] = value;
+    i--;
+  }
+  return { value: out, next: i };
+}
+
+function parseYamlMapBlock(lines: string[], start: number, parentIndent: number, anchors: Map<string, unknown>): { value: Record<string, Record<string, unknown>>; next: number } {
+  const out: Record<string, Record<string, unknown>> = {};
+  let i = start;
+  for (; i < lines.length; i++) {
+    const raw = lines[i]!;
+    if (!raw.trim()) continue;
+    const indent = lineIndent(raw);
+    if (indent <= parentIndent) break;
+
+    const header = raw.match(/^ {2}([A-Za-z_][\w.-]*):(?:\s*(.*))?$/);
+    if (!header) throw new Error(`unsupported map entry near line ${i + 1}: ${raw.trim()}`);
+    const key = header[1]!;
+    const keyValue = header[2] ?? "";
+    if (keyValue.trim()) throw new Error(`unsupported map value near line ${i + 1}: ${raw.trim()}`);
+
+    const record: Record<string, unknown> = {};
+    i++;
+    while (i < lines.length) {
+      const child = lines[i]!;
+      if (!child.trim()) {
+        i++;
+        continue;
+      }
+      if (lineIndent(child) <= 2) break;
+      const field = child.match(/^ {4}([A-Za-z_][\w.-]*):(?:\s*(.*))?$/);
+      if (!field) throw new Error(`unsupported map field near line ${i + 1}: ${child.trim()}`);
+      const fieldKey = field[1]!;
+      const fieldRaw = field[2] ?? "";
+      if (fieldRaw === "|") {
+        const block = readBlock(lines, i + 1, 4);
+        record[fieldKey] = block.value;
+        i = block.next;
+      } else if (fieldRaw === "") {
+        const items: unknown[] = [];
+        let j = i + 1;
+        while (j < lines.length) {
+          const itemLine = lines[j]!;
+          if (!itemLine.trim()) {
+            j++;
+            continue;
+          }
+          if (lineIndent(itemLine) <= 4) break;
+          const item = itemLine.match(/^ {6}-\s*(.*)$/);
+          if (!item) throw new Error(`unsupported map field near line ${j + 1}: ${itemLine.trim()}`);
+          items.push(parseYamlValue(item[1] ?? "", anchors));
+          j++;
+        }
+        record[fieldKey] = items;
+        i = j;
+      } else {
+        record[fieldKey] = parseYamlValue(fieldRaw, anchors);
+        i++;
+      }
+    }
+    out[key] = record;
+    if (i < lines.length && lines[i]?.trim() && lineIndent(lines[i]!) > parentIndent) i--;
+  }
+  return { value: out, next: i };
+}
+
+function parseFlatScalarMapBlock(lines: string[], start: number, parentIndent: number, label: string, anchors: Map<string, unknown>): { value: Record<string, unknown>; next: number } {
+  const map: Record<string, unknown> = {};
+  let i = start;
+  for (; i < lines.length; i++) {
+    const child = lines[i]!;
+    if (!child.trim()) continue;
+    if (lineIndent(child) <= parentIndent) break;
+    const field = child.match(/^ {2}([A-Za-z_][\w.-]*):\s*(.*)$/);
+    if (!field) throw new Error(`unsupported ${label} field near line ${i + 1}: ${child.trim()}`);
+    map[field[1]!] = parseYamlValue(field[2] ?? "", anchors);
+  }
+  return { value: map, next: i };
+}
+
 function parseYamlSubset(text: string): TeamCharter {
   const lines = text.split(/\r?\n/).map(stripComment);
+  const anchors = new Map<string, unknown>();
   const root: Record<string, unknown> = { members: [] };
   let i = 0;
   while (i < lines.length) {
@@ -123,7 +311,7 @@ function parseYamlSubset(text: string): TeamCharter {
       i++;
       continue;
     }
-    const top = line.match(/^([A-Za-z_][\w-]*):(?:\s*(.*))?$/);
+    const top = line.match(/^([A-Za-z_][\w.-]*):(?:\s*(.*))?$/);
     if (!top) throw new Error(`unsupported team charter YAML near line ${i + 1}: ${line.trim()}`);
     const key = top[1]!;
     const raw = top[2] ?? "";
@@ -145,7 +333,7 @@ function parseYamlSubset(text: string): TeamCharter {
         if (lineIndent(memberLine) === 0) break;
         const first = memberLine.match(/^ {2}-\s+([A-Za-z_][\w-]*):\s*(.*)$/);
         if (!first) throw new Error(`unsupported member entry near line ${i + 1}: ${memberLine.trim()}`);
-        const member: Record<string, unknown> = { [first[1]!]: scalar(first[2] ?? "") };
+        const member: Record<string, unknown> = { [first[1]!]: parseYamlValue(first[2] ?? "", anchors) };
         i++;
         while (i < lines.length) {
           const child = lines[i]!;
@@ -154,7 +342,7 @@ function parseYamlSubset(text: string): TeamCharter {
             continue;
           }
           if (lineIndent(child) <= 2) break;
-          const field = child.match(/^ {4}([A-Za-z_][\w-]*):(?:\s*(.*))?$/);
+          const field = child.match(/^ {4}([A-Za-z_][\w.-]*):(?:\s*(.*))?$/);
           if (!field) throw new Error(`unsupported member field near line ${i + 1}: ${child.trim()}`);
           const fieldKey = field[1]!;
           const fieldRaw = field[2] ?? "";
@@ -174,13 +362,13 @@ function parseYamlSubset(text: string): TeamCharter {
               if (lineIndent(itemLine) <= 4) break;
               const item = itemLine.match(/^ {6}-\s*(.*)$/);
               if (!item) throw new Error(`unsupported member field near line ${j + 1}: ${itemLine.trim()}`);
-              items.push(scalar(item[1] ?? ""));
+              items.push(parseYamlValue(item[1] ?? "", anchors));
               j++;
             }
             member[fieldKey] = items;
             i = j;
           } else {
-            member[fieldKey] = scalar(fieldRaw);
+            member[fieldKey] = parseYamlValue(fieldRaw, anchors);
             i++;
           }
         }
@@ -189,61 +377,120 @@ function parseYamlSubset(text: string): TeamCharter {
       root.members = members;
       continue;
     }
-    if ((key === "lifecycle" || key === "governance") && raw === "") {
-      const map: Record<string, unknown> = {};
-      i++;
-      while (i < lines.length) {
-        const child = lines[i]!;
-        if (!child.trim()) {
-          i++;
-          continue;
-        }
-        if (lineIndent(child) === 0) break;
-        const field = child.match(/^ {2}([A-Za-z_][\w-]*):\s*(.*)$/);
-        if (!field) throw new Error(`unsupported ${key} field near line ${i + 1}: ${child.trim()}`);
-        map[field[1]!] = scalar(field[2] ?? "");
-        i++;
-      }
-      root[key] = map;
+    if ((key === "flags" || key === "engines") && raw === "") {
+      const block = parseYamlValueMapBlock(lines, i + 1, 0, anchors);
+      i = block.next;
+      root[key] = block.value;
       continue;
     }
-    root[key] = raw === "" ? "" : scalar(raw);
+    if (key === "agents" && raw === "") {
+      const block = parseYamlMapBlock(lines, i + 1, 0, anchors);
+      i = block.next;
+      root.agents = block.value;
+      continue;
+    }
+    if ((key === "defaults" || key === "lifecycle" || key === "governance") && raw === "") {
+      const block = parseFlatScalarMapBlock(lines, i + 1, 0, key, anchors);
+      root[key] = block.value;
+      i = block.next;
+      continue;
+    }
+    root[key] = raw === "" ? "" : parseYamlValue(raw, anchors);
     i++;
   }
   return normalizeCharter(root);
 }
 
+const KNOWN_TOP_LEVEL_KEYS = new Set(["name", "description", "goal", "session", "project", "discord", "defaults", "flags", "engines", "members", "agents", "lifecycle", "governance"]);
+const KNOWN_MEMBER_KEYS = new Set(["role", "name", "target", "model", "cwd", "prompt", "engine", "worktree", "branch", "queue", "node", "channels", "discord"]);
+
+function normalizeTeamMember(roleRaw: string, m: Record<string, unknown>): TeamCharterMember {
+  const role = roleRaw.trim();
+  if (!role) throw new Error("agent key must be non-empty");
+  return {
+    role,
+    ...(typeof m.name === "string" && m.name.trim() ? { name: m.name.trim() } : {}),
+    ...(typeof m.target === "string" && m.target.trim() ? { target: m.target.trim() } : {}),
+    ...(typeof m.model === "string" && m.model.trim() ? { model: m.model.trim() } : {}),
+    ...(typeof m.cwd === "string" && m.cwd.trim() ? { cwd: m.cwd.trim() } : {}),
+    ...(typeof m.prompt === "string" && m.prompt.trim() ? { prompt: m.prompt.trim() } : {}),
+    ...(typeof m.engine === "string" && m.engine.trim() ? { engine: m.engine.trim() } : {}),
+    ...(typeof m.worktree === "boolean" ? { worktree: m.worktree } : {}),
+    ...(typeof m.worktree === "string" && m.worktree.trim() ? { worktree: m.worktree.trim() } : {}),
+    ...(typeof m.branch === "string" && m.branch.trim() ? { branch: m.branch.trim() } : {}),
+    ...(Array.isArray(m.queue) ? { queue: m.queue.filter((item): item is string => typeof item === "string" && item.trim()).map((item) => item.trim()) } : {}),
+    ...(typeof m.queue === "string" && m.queue.trim() ? { queue: [m.queue.trim()] } : {}),
+    ...(typeof m.node === "string" && m.node.trim() ? { node: m.node.trim() } : {}),
+    ...(typeof m.channels === "boolean" ? { channels: m.channels } : {}),
+    ...(typeof m.discord === "boolean" && m.discord === false ? { discord: false } : {}),
+  };
+}
+
+function normalizeTeamMemberDefaults(defaults: Record<string, unknown>): Partial<TeamCharterMember> {
+  const memberDefaults: Partial<TeamCharterMember> = { ...normalizeTeamMember("defaults", defaults) };
+  delete memberDefaults.role;
+  return memberDefaults;
+}
+
 function normalizeCharter(value: unknown): TeamCharter {
   if (!value || typeof value !== "object") throw new Error("team charter must be an object");
   const raw = value as Record<string, unknown>;
+  const warnings: string[] = [];
+
+  for (const [key] of Object.entries(raw)) {
+    if (!KNOWN_TOP_LEVEL_KEYS.has(key)) {
+      warnings.push(`team charter has unsupported top-level key: ${key}`);
+    }
+  }
+
+  const defaults = (raw.defaults && typeof raw.defaults === "object" && !Array.isArray(raw.defaults))
+    ? raw.defaults as Record<string, unknown>
+    : {};
+  for (const [key] of Object.entries(defaults)) {
+    if (!KNOWN_MEMBER_KEYS.has(key)) warnings.push(`defaults has unsupported key: ${key}`);
+  }
+
   if (typeof raw.name !== "string" || !raw.name.trim()) throw new Error("team charter requires name");
-  if (!Array.isArray(raw.members) || raw.members.length === 0) throw new Error("team charter requires at least one member");
-  const members = raw.members.map((member, idx) => {
+  const membersFromList = Array.isArray(raw.members) ? raw.members.map((member, idx) => {
     if (!member || typeof member !== "object") throw new Error(`member ${idx + 1} must be an object`);
     const m = member as Record<string, unknown>;
+    for (const [key] of Object.entries(m)) {
+      if (!KNOWN_MEMBER_KEYS.has(key)) {
+        const memberRole = typeof m.role === "string" && m.role.trim() ? m.role.trim() : `#${idx + 1}`;
+        warnings.push(`member '${memberRole}' has unsupported key: ${key}`);
+      }
+    }
     if (typeof m.role !== "string" || !m.role.trim()) throw new Error(`member ${idx + 1} requires role`);
-    return {
-      role: m.role.trim(),
-      ...(typeof m.name === "string" && m.name.trim() ? { name: m.name.trim() } : {}),
-      ...(typeof m.target === "string" && m.target.trim() ? { target: m.target.trim() } : {}),
-      ...(typeof m.model === "string" && m.model.trim() ? { model: m.model.trim() } : {}),
-      ...(typeof m.cwd === "string" && m.cwd.trim() ? { cwd: m.cwd.trim() } : {}),
-      ...(typeof m.prompt === "string" && m.prompt.trim() ? { prompt: m.prompt.trim() } : {}),
-      ...(typeof m.engine === "string" && m.engine.trim() ? { engine: m.engine.trim() } : {}),
-      ...(typeof m.worktree === "boolean" ? { worktree: m.worktree } : {}),
-      ...(typeof m.worktree === "string" && m.worktree.trim() ? { worktree: m.worktree.trim() } : {}),
-      ...(Array.isArray(m.queue) ? { queue: m.queue.filter((item): item is string => typeof item === "string" && item.trim()).map((item) => item.trim()) } : {}),
-      ...(typeof m.queue === "string" && m.queue.trim() ? { queue: [m.queue.trim()] } : {}),
-      ...(typeof m.node === "string" && m.node.trim() ? { node: m.node.trim() } : {}),
-      ...(typeof m.channels === "boolean" ? { channels: m.channels } : {}),
-    };
-  });
+
+    return normalizeTeamMember(m.role.trim(), { ...defaults, ...m });
+  }) : [];
+  const membersFromAgents = (raw.agents && typeof raw.agents === "object" && !Array.isArray(raw.agents))
+    ? Object.entries(raw.agents).map(([agentKey, agentValue], idx) => {
+      if (!agentValue || typeof agentValue !== "object" || Array.isArray(agentValue)) {
+        throw new Error(`agent ${idx + 1} ('${agentKey}') must be a map`);
+      }
+      const m = agentValue as Record<string, unknown>;
+      for (const [key] of Object.entries(m)) {
+        if (!KNOWN_MEMBER_KEYS.has(key)) warnings.push(`member '${agentKey}' has unsupported key: ${key}`);
+      }
+      return normalizeTeamMember(agentKey, { ...defaults, ...m });
+    })
+    : [];
+  const members = [...membersFromList, ...membersFromAgents];
+  if (members.length === 0) throw new Error("team charter requires at least one member");
   return {
     name: raw.name.trim(),
     ...(typeof raw.description === "string" && raw.description.trim() ? { description: raw.description.trim() } : {}),
     ...(typeof raw.goal === "string" && raw.goal.trim() ? { goal: raw.goal.trim() } : {}),
+    ...(typeof raw.project === "string" && raw.project.trim() ? { project: raw.project.trim() } : {}),
+    ...(raw.discord === false ? { discord: false } : typeof raw.discord === "string" ? { discord: raw.discord.trim() } : {}),
     ...(typeof raw.session === "string" && raw.session.trim() ? { session: raw.session.trim() } : {}),
+    ...(Object.keys(defaults).length ? { defaults: normalizeTeamMemberDefaults(defaults) } : {}),
     members,
+    ...(raw.flags && typeof raw.flags === "object" && !Array.isArray(raw.flags) ? { flags: raw.flags as TeamCharterFlags } : {}),
+    ...(raw.engines && typeof raw.engines === "object" && !Array.isArray(raw.engines) ? { engines: raw.engines as TeamCharterEngines } : {}),
+    ...(raw.agents && typeof raw.agents === "object" && !Array.isArray(raw.agents) ? { agents: raw.agents as Record<string, Record<string, unknown>> } : {}),
+    ...(warnings.length ? { warnings } : {}),
     ...(raw.lifecycle && typeof raw.lifecycle === "object" && !Array.isArray(raw.lifecycle) ? { lifecycle: raw.lifecycle as Record<string, unknown> } : {}),
     ...(raw.governance && typeof raw.governance === "object" && !Array.isArray(raw.governance) ? { governance: raw.governance as Record<string, unknown> } : {}),
   };
@@ -304,6 +551,7 @@ export function formatTeamCharterPlan(plan: TeamCharterPlan): string {
       if (member.cwd) bits.push(`cwd=${member.cwd}`);
       if (member.engine) bits.push(`engine=${member.engine}`);
       if (member.worktree) bits.push(`worktree=${member.worktree}`);
+      if (member.branch) bits.push(`branch=${member.branch}`);
       return `  - ${member.role} (${bits.join(", ")})`;
     }),
     "",
@@ -315,6 +563,9 @@ export function formatTeamCharterPlan(plan: TeamCharterPlan): string {
   ].filter((line): line is string => line !== undefined);
   if (plan.warnings.length) {
     lines.push("", "warnings:", ...plan.warnings.map((warning) => `  - ${warning}`));
+  }
+  if (charter.warnings?.length) {
+    lines.push("", "parser warnings:", ...charter.warnings.map((warning) => `  - ${warning}`));
   }
   return lines.join("\n");
 }
@@ -360,6 +611,7 @@ export function loadTeamCharter(charter: TeamCharter, opts: { noSpawn?: boolean;
     members: charter.members.map((member) => member.role),
     source: "team-charter",
     charter: {
+      ...(charter.defaults ? { defaults: charter.defaults } : {}),
       members: charter.members,
       ...(charter.lifecycle ? { lifecycle: charter.lifecycle } : {}),
       ...(charter.governance ? { governance: charter.governance } : {}),
@@ -416,6 +668,11 @@ function addPreflightCheck(
 
 export function preflightTeamCharter(charter: TeamCharter): TeamCharterPreflightResult {
   const checks: TeamCharterPreflightCheck[] = [];
+
+  for (const warning of charter.warnings ?? []) {
+    addPreflightCheck(checks, "warn", "parser", warning);
+  }
+
   try {
     assertValidOracleName(charter.name);
     addPreflightCheck(checks, "ok", "team name", `'${charter.name}' is accepted`);

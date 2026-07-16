@@ -10,6 +10,7 @@ import type { Session } from "../core/transport/ssh";
 import type { TransportRouter } from "../core/transport/transport";
 import { startIntervals, stopIntervals, sendInitialSessions, type EngineIntervalState } from "./engine-intervals";
 import { handleCrashedAgents } from "./engine-crash";
+import { agentStatusStore } from "../core/agent-status";
 
 type SessionInfo = { name: string; windows: { index: number; name: string; active: boolean }[] };
 
@@ -33,15 +34,18 @@ export class MawEngine {
   private lastTeamsJson = { value: "" };
   private feedUnsub: (() => void) | null = null;
   private transportRouter: TransportRouter | null = null;
+  private intervalsEnabled = true;
 
   private feedBuffer: FeedEvent[];
   private feedListeners: Set<(event: FeedEvent) => void>;
 
-  constructor({ feedBuffer, feedListeners }: { feedBuffer: FeedEvent[]; feedListeners: Set<(event: FeedEvent) => void> }) {
+  constructor({ feedBuffer, feedListeners, intervals = true }: { feedBuffer: FeedEvent[]; feedListeners: Set<(event: FeedEvent) => void>; intervals?: boolean }) {
     this.feedBuffer = feedBuffer;
     this.feedListeners = feedListeners;
+    this.intervalsEnabled = intervals;
     registerBuiltinHandlers(this);
-    this.initSessionCache();
+    this.feedListeners.add((event) => agentStatusStore.handleFeedEvent(event));
+    if (intervals) this.initSessionCache();
   }
 
   private async initSessionCache() {
@@ -85,7 +89,7 @@ export class MawEngine {
 
   handleOpen(ws: MawWS) {
     this.clients.add(ws);
-    this.startIntervals();
+    if (this.intervalsEnabled) this.startIntervals();
     sendInitialSessions(ws, this.getIntervalState()).catch(() => {});
     ws.send(JSON.stringify({ type: "feed-history", events: this.feedBuffer.slice(-cfgLimit("feedHistory")) }));
   }
@@ -104,7 +108,7 @@ export class MawEngine {
     this.clients.delete(ws);
     this.lastContent.delete(ws);
     this.lastPreviews.delete(ws);
-    this.stopIntervals();
+    if (this.intervalsEnabled) this.stopIntervals();
   }
 
   // --- Public (handlers use these) ---
