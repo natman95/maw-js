@@ -653,7 +653,19 @@ export async function cmdInboxMarkRead(id: string) {
   if (!msg) { console.error(`\x1b[31merror\x1b[0m: message not found: ${id}`); return; }
   if (msg.frontmatter.read) { console.log(`\x1b[90malready read:\x1b[0m ${msg.filename}`); return; }
   const content = readFileSync(msg.path, "utf-8");
-  writeFileSync(msg.path, content.replace(/^read: false$/m, "read: true"));
+  let updated = content.replace(/^read: false$/m, "read: true");
+  if (updated === content && /^---\r?\n/.test(content)) {
+    // Rich-frontmatter message (git-dispatch family style) with no `read:` key —
+    // the replace above silently no-ops, which used to false-positive "✓ marked
+    // read" while the message stayed unread forever. Inject the key instead.
+    updated = content.replace(/^---\r?\n/, "---\nread: true\n");
+  }
+  if (updated === content) {
+    console.error(`\x1b[31merror\x1b[0m: could not mark read (no frontmatter to carry read-state): ${msg.filename}`);
+    process.exitCode = 1;
+    return;
+  }
+  writeFileSync(msg.path, updated);
   console.log(`\x1b[32m✓\x1b[0m marked read: ${msg.filename}`);
 }
 
