@@ -189,7 +189,12 @@ async function fetchPeerSessions(url: string): Promise<Session[]> {
  * Merge local sessions with peer sessions, tagging each with source
  */
 export async function getAggregatedSessions(localSessions: Session[]): Promise<(Session & { source?: string })[]> {
-  const peers = getPeers();
+  // Peers flagged hideSessions stay routable (hey/send via name prefix) but
+  // their sessions never enter the aggregate — tenant isolation for the UI.
+  const hiddenUrls = new Set(
+    (loadConfig().namedPeers ?? []).filter(p => p.hideSessions).map(p => p.url),
+  );
+  const peers = getPeers().filter(url => !hiddenUrls.has(url));
   if (peers.length === 0) {
     return localSessions;
   }

@@ -46,3 +46,4 @@ psi/
 
 # Test coverage artifacts
 coverage/
+maw.config.json.bak-*
