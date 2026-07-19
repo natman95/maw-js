@@ -273,6 +273,23 @@ function validateExtFields(
   if ("nanoclaw" in raw && raw.nanoclaw && typeof raw.nanoclaw === "object") {
     result.nanoclaw = raw.nanoclaw;
   }
+
+  // psiMailRoots (F1 psi-mail, 2026-07-19): validateConfig is allowlist-copy, so the
+  // 8f230f86 patch's config key was silently stripped and psymail always fell back to
+  // the white-box DEFAULT_ROOTS (found on srv1809016 where roots differ — volt/arc/morse).
+  // Shape check only ("oracle:/abs/dir" string or {oracle,dir}); deep validation stays
+  // in psymail.ts normalizeRoot which drops malformed entries.
+  if ("psiMailRoots" in raw) {
+    if (Array.isArray(raw.psiMailRoots)) {
+      result.psiMailRoots = raw.psiMailRoots.filter((e) =>
+        (typeof e === "string" && e.indexOf(":") > 0) ||
+        (!!e && typeof e === "object" &&
+          typeof (e as { oracle?: unknown }).oracle === "string" &&
+          typeof (e as { dir?: unknown }).dir === "string"));
+    } else {
+      warn("psiMailRoots", "must be an array");
+    }
+  }
 }
 
 /** Validate config values, warn on invalid fields, return sanitized config */
