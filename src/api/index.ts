@@ -13,6 +13,7 @@ import { uiStateApi } from "./ui-state";
 import { dispatchApi } from "./dispatch";
 import { deprecatedApi } from "./deprecated";
 import { costsApi } from "./costs";
+import { psymailApi } from "./psymail";
 import { triggersApi } from "./triggers";
 import { avengersApi } from "./avengers";
 import { transportApi } from "./transport";
@@ -61,6 +62,7 @@ export const api = new Elysia({ prefix: "/api" })
   .use(dispatchApi)
   .use(deprecatedApi)
   .use(costsApi)
+  .use(psymailApi)
   .use(triggersApi)
   .use(avengersApi)
   .use(transportApi)

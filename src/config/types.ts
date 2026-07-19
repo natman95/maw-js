@@ -126,6 +126,14 @@ export interface MawConfig {
   sessions: Record<string, string>;
   tmuxSocket?: string;
   peers?: string[];
+  /**
+   * ψ-Mail inbox roots (feature F1, 2026-07-19). Each entry is either the
+   * operator-friendly string `"<oracle>:<abs-dir>"` or `{ oracle, dir }`. When
+   * absent, the psi-mail API falls back to the 5 default white-box sibling
+   * inboxes. Lets another box (e.g. Volt's srv1809016 — volt/arc/morse) reuse
+   * the same fork patch with its own inbox layout, no code edit.
+   */
+  psiMailRoots?: Array<string | { oracle: string; dir: string }>;
   idleTimeoutMinutes?: number;
   federationToken?: string;
   /**
