@@ -136,6 +136,64 @@ describe("psi-mail API default-suite coverage", () => {
     expect(res.status).toBe(404);
   });
 
+  test("mark-read-all: manifest-honest counts, fail-closed per file, no-frontmatter left unchanged", async () => {
+    const { app, files } = fixture();
+    const before = files[`${ROOT}/2026-07-17_1612_from-morse_gamma-nofm.md`];
+    const res = await app.handle(new Request("http://local/psi-mail/mark-read-all", {
+      method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+    }));
+    expect(res.status).toBe(200);
+    const body = await json(res);
+    // fixture: richUnread → marked, richRead → already, noFrontmatter → skipped
+    expect(body).toMatchObject({ ok: true, marked: 1, already: 1, skipped: 1, failed: 0, read: "2026-07-19T20:00:00Z" });
+    // the unread one is now stamped on disk…
+    expect(files[`${ROOT}/2026-07-19_1000_from-labubu_alpha-msg.md`]).toMatch(/^read: 2026-07-19T20:00:00Z$/m);
+    // …the no-frontmatter one is untouched (fail-closed)…
+    expect(files[`${ROOT}/2026-07-17_1612_from-morse_gamma-nofm.md`]).toBe(before);
+    // …and after marking, the only message left unread is that un-stampable
+    // no-frontmatter file — honest: a file we can't stamp stays unread, we don't
+    // fake it clear. (Real backlog msgs all carry frontmatter → they reach 0.)
+    const unread = await json(await app.handle(new Request("http://local/psi-mail?unread=1")));
+    expect(unread.total).toBe(1);
+    expect(unread.messages[0].from).toBe("morse");
+  });
+
+  test("mark-read-all: a frontmatter message lacking a read: key gets one appended (the pre-feature backlog case)", async () => {
+    // Realistic backlog: valid frontmatter, no `read:` key at all → should be marked, not skipped.
+    const noReadKey = `---\nfrom: nari\nto: echo\nsubject: legacy no-read-key\n---\nBody.`;
+    const { app, files } = appWithFiles({ [`${ROOT}/2026-07-10_from-nari_legacy.md`]: noReadKey });
+    const body = await json(await app.handle(new Request("http://local/psi-mail/mark-read-all", {
+      method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+    })));
+    expect(body).toMatchObject({ marked: 1, skipped: 0, already: 0, failed: 0 });
+    expect(files[`${ROOT}/2026-07-10_from-nari_legacy.md`]).toMatch(/^read: 2026-07-19T20:00:00Z$/m);
+  });
+
+  test("mark-read-all: a write error is counted failed, not thrown; batch continues", async () => {
+    // A file whose write throws → failed++, the rest of the batch still marks.
+    const files: Record<string, string> = {
+      [`${ROOT}/write-throws.md`]: richUnread,
+      [`${ROOT}/2026-07-19_1000_from-labubu_alpha-msg.md`]: richUnread,
+    };
+    const deps: PsyMailDeps = {
+      resolveRoots: () => [{ oracle: "test", dir: ROOT }],
+      readdirSync: ((path: string) => Object.keys(files).filter((f) => f.startsWith(`${path}/`)).map((f) => f.slice(path.length + 1))) as PsyMailDeps["readdirSync"],
+      readFileSync: ((path: string) => files[path]) as PsyMailDeps["readFileSync"],
+      writeFileSync: ((path: string, content: string) => {
+        if (path.endsWith("/write-throws.md")) throw new Error("disk full");
+        files[path] = content;
+      }) as PsyMailDeps["writeFileSync"],
+      statSync: (() => ({ mtimeMs: 0, isDirectory: () => false }) as any) as PsyMailDeps["statSync"],
+      now: () => "2026-07-19T20:00:00Z",
+    };
+    const app = new Elysia().use(createPsymailApi(deps));
+    const res = await app.handle(new Request("http://local/psi-mail/mark-read-all", {
+      method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+    }));
+    expect(res.status).toBe(200);
+    expect(await json(res)).toMatchObject({ ok: true, marked: 1, failed: 1 });
+  });
+
   test("a missing/throwing root is skipped, not fatal", async () => {
     const deps: PsyMailDeps = {
       resolveRoots: () => [{ oracle: "gone", dir: "/inbox/dir-throws" }, { oracle: "test", dir: ROOT }],

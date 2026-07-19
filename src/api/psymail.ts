@@ -307,6 +307,44 @@ export function createPsymailApi(deps: PsyMailDeps = {
     { body: t.Object({ id: t.String() }) },
   );
 
+  // Mark ALL messages read across the allowlisted roots. Fail-closed PER FILE:
+  // a file with no editable frontmatter (skipped) or an I/O error (failed) is
+  // counted and the batch continues — one bad file never errors the whole run.
+  // Already-read files are a no-op. Manifest-honest: the four outcomes are
+  // separate counts, never folded into one "done" number.
+  api.post("/psi-mail/mark-read-all", () => {
+    const iso = deps.now();
+    let marked = 0;
+    let skipped = 0;
+    let failed = 0;
+    let already = 0;
+    for (const m of scanAll()) {
+      if (m.read) {
+        already++;
+        continue;
+      }
+      let content = "";
+      try {
+        content = String(deps.readFileSync(m.path, "utf-8"));
+      } catch {
+        failed++;
+        continue;
+      }
+      const updated = injectRead(content, iso);
+      if (updated === content) {
+        skipped++; // no editable frontmatter → fail-closed, do not write
+        continue;
+      }
+      try {
+        deps.writeFileSync(m.path, updated);
+        marked++;
+      } catch {
+        failed++;
+      }
+    }
+    return { ok: true, marked, skipped, failed, already, read: iso };
+  });
+
   return api;
 }
 
