@@ -104,7 +104,7 @@ describe("psi-mail API default-suite coverage", () => {
     expect(bad.status).toBe(404);
   });
 
-  test("mark-read injects read:<ISO>, replacing read:false on disk", async () => {
+  test("mark-read stamps read:true + readAt:<ISO> (CLI-compatible), replacing read:false on disk", async () => {
     const { app, files } = fixture();
     const list = await json(await app.handle(new Request("http://local/psi-mail")));
     const alphaId = list.messages[0].id;
@@ -113,7 +113,26 @@ describe("psi-mail API default-suite coverage", () => {
     }));
     expect(res.status).toBe(200);
     expect((await json(res)).read).toBe("2026-07-19T20:00:00Z");
-    expect(files[`${ROOT}/2026-07-19_1000_from-labubu_alpha-msg.md`]).toMatch(/^read: 2026-07-19T20:00:00Z$/m);
+    const written = files[`${ROOT}/2026-07-19_1000_from-labubu_alpha-msg.md`];
+    // strict `read: true` so the maw CLI (impl.ts:138 `v === "true"`) sees it read…
+    expect(written).toMatch(/^read: true$/m);
+    expect(written).not.toMatch(/^read: false$/m);
+    // …and the timestamp is preserved in readAt (Nothing is Deleted).
+    expect(written).toMatch(/^readAt: 2026-07-19T20:00:00Z$/m);
+  });
+
+  test("interop: a psymail-stamped file parses as READ under the maw CLI's strict `v === \"true\"` rule", async () => {
+    // Regression for the Volt-found interop bug: the CLI (impl.ts:138) does a
+    // strict string compare, so `read: <ISO>` read as unread forever. Simulate
+    // that exact parse over what psymail writes now.
+    const { app, files } = fixture();
+    const list = await json(await app.handle(new Request("http://local/psi-mail")));
+    await app.handle(new Request("http://local/psi-mail/mark-read", {
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: list.messages[0].id }),
+    }));
+    const written = files[`${ROOT}/2026-07-19_1000_from-labubu_alpha-msg.md`];
+    const readVal = written.match(/^read:\s*(.*)$/m)?.[1].trim();
+    expect(readVal === "true").toBe(true); // the CLI's exact predicate → read
   });
 
   test("mark-read is fail-closed: no editable frontmatter → 422, file NOT written", async () => {
@@ -146,8 +165,9 @@ describe("psi-mail API default-suite coverage", () => {
     const body = await json(res);
     // fixture: richUnread → marked, richRead → already, noFrontmatter → skipped
     expect(body).toMatchObject({ ok: true, marked: 1, already: 1, skipped: 1, failed: 0, read: "2026-07-19T20:00:00Z" });
-    // the unread one is now stamped on disk…
-    expect(files[`${ROOT}/2026-07-19_1000_from-labubu_alpha-msg.md`]).toMatch(/^read: 2026-07-19T20:00:00Z$/m);
+    // the unread one is now stamped read:true + readAt on disk…
+    expect(files[`${ROOT}/2026-07-19_1000_from-labubu_alpha-msg.md`]).toMatch(/^read: true$/m);
+    expect(files[`${ROOT}/2026-07-19_1000_from-labubu_alpha-msg.md`]).toMatch(/^readAt: 2026-07-19T20:00:00Z$/m);
     // …the no-frontmatter one is untouched (fail-closed)…
     expect(files[`${ROOT}/2026-07-17_1612_from-morse_gamma-nofm.md`]).toBe(before);
     // …and after marking, the only message left unread is that un-stampable
@@ -166,7 +186,8 @@ describe("psi-mail API default-suite coverage", () => {
       method: "POST", headers: { "content-type": "application/json" }, body: "{}",
     })));
     expect(body).toMatchObject({ marked: 1, skipped: 0, already: 0, failed: 0 });
-    expect(files[`${ROOT}/2026-07-10_from-nari_legacy.md`]).toMatch(/^read: 2026-07-19T20:00:00Z$/m);
+    expect(files[`${ROOT}/2026-07-10_from-nari_legacy.md`]).toMatch(/^read: true$/m);
+    expect(files[`${ROOT}/2026-07-10_from-nari_legacy.md`]).toMatch(/^readAt: 2026-07-19T20:00:00Z$/m);
   });
 
   test("mark-read-all: a write error is counted failed, not thrown; batch continues", async () => {

@@ -217,12 +217,15 @@ export function createPsymailApi(deps: PsyMailDeps = {
     return item;
   }
 
-  // Inject/replace `read: <ISO>` in the frontmatter. Fail-closed discipline
-  // (per commit 8742bebc's markInboxFrontmatterRead — confirmed against source
-  // 2026-07-19; that util is CLI-scoped to one inbox with a read:true+readAt
-  // shape, so the *discipline* is reused here, not the function): if there is no
-  // valid frontmatter to edit, return the content UNCHANGED so the caller can
-  // detect the no-op and refuse to write (never silently succeed).
+  // Stamp the frontmatter read, in the maw-CLI-compatible shape `read: true` +
+  // `readAt: <ISO>`. The CLI inbox parser is a STRICT `v === "true"` compare
+  // (vendor/mpr-plugins/inbox/impl.ts:138), so a bare `read: <ISO>` reads as
+  // unread there forever — the interop bug Volt hit. This mirrors the CLI's own
+  // markInboxFrontmatterRead (impl.ts:673): read→true always, readAt append-if-
+  // absent (preserves the first-read time — Nothing is Deleted). It's a superset
+  // of both conventions and our own parser (isRead) tolerates it.
+  // Fail-closed discipline: if there is no valid frontmatter to edit, return the
+  // content UNCHANGED so the caller detects the no-op and refuses to write.
   function injectRead(content: string, iso: string): string {
     if (!content.startsWith("---\n")) return content;
     const end = content.indexOf("\n---", 3);
@@ -230,9 +233,12 @@ export function createPsymailApi(deps: PsyMailDeps = {
     let header = content.slice(0, end);
     const footer = content.slice(end);
     if (/^read:.*$/m.test(header)) {
-      header = header.replace(/^read:.*$/m, `read: ${iso}`);
+      header = header.replace(/^read:.*$/m, "read: true");
     } else {
-      header = `${header}\nread: ${iso}`;
+      header = `${header}\nread: true`;
+    }
+    if (!/^readAt:.*$/m.test(header)) {
+      header = `${header}\nreadAt: ${iso}`;
     }
     return header + footer;
   }
@@ -273,7 +279,7 @@ export function createPsymailApi(deps: PsyMailDeps = {
     { query: t.Object({ id: t.String() }) },
   );
 
-  // Mark one message read (inject `read: <ISO>`). Fail-closed on a no-op write.
+  // Mark one message read (stamp `read: true` + `readAt: <ISO>`). Fail-closed on a no-op write.
   api.post(
     "/psi-mail/mark-read",
     ({ body, set }) => {
