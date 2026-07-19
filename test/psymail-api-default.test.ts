@@ -166,3 +166,17 @@ describe("psi-mail API default-suite coverage", () => {
     expect(normalizeRoot({ oracle: "x", dir: "relative" } as any)).toBeNull();
   });
 });
+
+// srv1809016 (volt) 19.07: validateConfig เป็น allowlist-copy — psiMailRoots เคยถูก strip เงียบ
+// ทำให้ config-driven roots ไม่เคยถึง psymail (fallback DEFAULT_ROOTS ตลอด) — ด่านกัน regress
+import { validateConfig } from "../src/config/validate-ext";
+describe("validateConfig passes psiMailRoots through", () => {
+  test("string + object entries survive, malformed dropped, non-array warned away", () => {
+    const out = validateConfig({
+      psiMailRoots: ["volt:/root/x/ψ/inbox", { oracle: "arc", dir: "/root/y" }, "no-colon-entry", 42],
+    } as never);
+    expect(out.psiMailRoots).toEqual(["volt:/root/x/ψ/inbox", { oracle: "arc", dir: "/root/y" }]);
+    expect(validateConfig({ psiMailRoots: "not-array" } as never).psiMailRoots).toBeUndefined();
+    expect(validateConfig({} as never).psiMailRoots).toBeUndefined();
+  });
+});
