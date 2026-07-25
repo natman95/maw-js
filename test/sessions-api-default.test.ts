@@ -167,7 +167,7 @@ describe("sessions, capture, and mirror routes", () => {
 
     const ok = await readJson(await h.app.handle(new Request("http://local/capture?target=neo")));
     expect(ok).toEqual({ content: "line one\nlast line" });
-    expect(h.calls[0]).toEqual(["capture", "local:neo", 1000]);
+    expect(h.calls[0]).toEqual(["capture", "local:neo", 200]);
 
     // ?lines= override, clamped to 1..2000
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=300")));
@@ -175,7 +175,7 @@ describe("sessions, capture, and mirror routes", () => {
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=99999")));
     expect(h.calls[2]).toEqual(["capture", "local:neo", 10000]);
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=bogus")));
-    expect(h.calls[3]).toEqual(["capture", "local:neo", 1000]);
+    expect(h.calls[3]).toEqual(["capture", "local:neo", 200]);
 
     const err = makeHarness({ capture: async () => { throw new Error("capture boom"); } });
     expect(await readJson(await err.app.handle(new Request("http://local/capture?target=neo")))).toEqual({ content: "", error: "capture boom" });

@@ -262,10 +262,16 @@ export function createSessionsApi(deps: SessionsApiDeps = {}) {
   api.get("/capture", async ({ query, set }) => {
     const target = query.target;
     if (!target) { set.status = 400; return { error: "target required" }; }
-    // Scrollback: default 1000 lines (was 80 — one screen of history).
-    // ?lines= overrides, clamped to 1..10000 (tmux history-limit is 10000).
+    // Scrollback: default 200 lines (was 1000 — Boss 2026-07-25). The preview
+    // surfaces that call this (MiniPreview, OverviewGrid, HoverPreviewCard,
+    // MiniMonitor, VSAgentPanel) show a few lines and auto-scroll to the tail,
+    // so 1000 lines of history was paid for on every poll and thrown away. 200
+    // matches the two sibling defaults: /captures (below) and
+    // TMUX_STREAM_CAPTURE_LINES in api/tmux-stream.ts.
+    // ?lines= overrides, clamped to 1..10000 (tmux history-limit is 10000) —
+    // a caller that genuinely needs deep history asks for it explicitly.
     const requested = Number.parseInt(query.lines ?? "", 10);
-    const lines = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 1000, 1), 10_000);
+    const lines = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 200, 1), 10_000);
     try {
       const sessions = await d.listSessions();
       const resolved = resolveCapture(target, sessions, d);
