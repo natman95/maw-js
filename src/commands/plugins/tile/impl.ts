@@ -5,7 +5,6 @@ import {
 import { hostExec } from "../../../sdk";
 import { withPaneLock } from "../../../core/transport/tmux-pane-lock";
 import { worktreePathForLayout, type WorktreeLayout } from "../../../core/fleet/worktree-layout";
-import { spawnSessionEnv } from "../../../core/fleet/parent-session";
 
 function shellArg(value: string): string {
   return `'${value.replace(/'/g, "'\\''")}'`;
@@ -117,8 +116,6 @@ export interface TileOpts {
   shell?: boolean;
   engine?: string;
   layout?: WorktreeLayout;
-  parentSessionId?: string;
-  sessionId?: string;
 }
 
 function expandHome(raw: string): string {
@@ -269,11 +266,6 @@ export async function cmdTile(count: number, opts: TileOpts = {}): Promise<void>
       MAW_TILE_INDEX: String(tileIndex),
       MAW_TILE_TOTAL: String(finalTileTotal),
       MAW_TILE_WINDOW: windowAddress,
-      ...spawnSessionEnv({
-        explicit: opts.parentSessionId,
-        sessionId: count === 1 ? opts.sessionId : undefined,
-        cwd,
-      }),
     });
 
     const launchCmd = requestedCmd || engineCmd;

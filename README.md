@@ -1,6 +1,6 @@
 # maw
 
-[![CI](https://github.com/Soul-Brews-Studio/maw-js/actions/workflows/ci.yml/badge.svg?branch=alpha)](https://github.com/Soul-Brews-Studio/maw-js/actions/workflows/ci.yml?query=branch%3Aalpha) [![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fnazt%2Fb00c729c7f40d4804f82011167bfd9d8%2Fraw%2Fmaw-js-coverage.json&cacheSeconds=300)](docs/testing/coverage-gap-analysis.md) [![License](https://img.shields.io/badge/license-BUSL--1.1-blue)](./LICENSE) [![CalVer](https://img.shields.io/github/v/release/Soul-Brews-Studio/maw-js?include_prereleases&label=calver)](https://github.com/Soul-Brews-Studio/maw-js/releases) [![Bun](https://img.shields.io/badge/runtime-Bun%201.3%2B-f9f1e1)](https://bun.sh) [![Test files](https://img.shields.io/badge/test_files-750%2B-brightgreen)](./test)
+[![CI](https://github.com/Soul-Brews-Studio/maw-js/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Soul-Brews-Studio/maw-js/actions/workflows/ci.yml?query=branch%3Amain) [![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fnazt%2Fb00c729c7f40d4804f82011167bfd9d8%2Fraw%2Fmaw-js-coverage.json&cacheSeconds=300)](docs/testing/coverage-gap-analysis.md) [![License](https://img.shields.io/badge/license-BUSL--1.1-blue)](./LICENSE) [![CalVer](https://img.shields.io/github/v/release/Soul-Brews-Studio/maw-js?label=calver)](https://github.com/Soul-Brews-Studio/maw-js/releases) [![Bun](https://img.shields.io/badge/runtime-Bun%201.3%2B-f9f1e1)](https://bun.sh) [![Test files](https://img.shields.io/badge/test_files-750%2B-brightgreen)](./test)
 
 > Multi-Agent Workflow — wake agents, talk across machines, see the mesh.
 
@@ -261,7 +261,7 @@ Apr 2026   v2.0.0-alpha.66        Plugin OS foundation, Bun runtime,
                                    federation API + maw-ui split
 May 2026   v26.5.20-alpha.2203    Plugin engine, lifecycle hooks,
                                    team workspaces, 89 plugins,
-                                   750+ test files, near-100% coverage,
+                                   750+ test files, 100% line/function coverage,
                                    portable Rust spec fixtures
 ```
 

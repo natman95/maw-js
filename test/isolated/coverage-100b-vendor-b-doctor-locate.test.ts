@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import * as realFs from "fs";
 import * as realChildProcess from "child_process";
-import { join } from "path";
-import { tmpdir } from "os";
 
 let execMode: "pm2" | "bad-json" | "throw" = "pm2";
 let ghqPath: string | null = "/repo/oracle";
@@ -12,9 +10,6 @@ let config: any = { node: "fleet-node", agents: {} };
 let existsPaths = new Set<string>();
 let logs: string[] = [];
 let errors: string[] = [];
-let originalPeersFile: string | undefined;
-const peersFile = join(tmpdir(), `maw-coverage-100b-peers-${process.pid}.json`);
-const originalExistsSync = realFs.existsSync.bind(realFs);
 
 mock.module("child_process", () => ({
   ...realChildProcess,
@@ -29,7 +24,7 @@ mock.module("child_process", () => ({
 }));
 mock.module("fs", () => ({
   ...realFs,
-  existsSync: (path: string) => existsPaths.has(path) || originalExistsSync(path),
+  existsSync: (path: string) => existsPaths.has(path) || realFs.existsSync(path),
 }));
 mock.module("maw-js/core/ghq", () => ({ ghqFind: async () => ghqPath }));
 mock.module("maw-js/sdk", () => ({
@@ -63,14 +58,11 @@ beforeEach(() => {
   sessions = [];
   fleetEntries = [];
   config = { node: "fleet-node", agents: {} };
-  existsPaths = new Set(["/repo/oracle/ψ", peersFile]);
+  existsPaths = new Set(["/repo/oracle/ψ"]);
   logs = [];
   errors = [];
   console.log = (...parts: unknown[]) => logs.push(parts.map(String).join(" "));
   console.error = (...parts: unknown[]) => errors.push(parts.map(String).join(" "));
-  originalPeersFile = process.env.PEERS_FILE;
-  process.env.PEERS_FILE = peersFile;
-  realFs.writeFileSync(peersFile, JSON.stringify({ peers: {} }), "utf-8");
   globalThis.fetch = (async () => { throw new Error("boom"); }) as typeof fetch;
 });
 
@@ -78,9 +70,6 @@ afterEach(() => {
   console.log = originalLog;
   console.error = originalError;
   globalThis.fetch = originalFetch;
-  realFs.rmSync(peersFile, { force: true });
-  if (originalPeersFile === undefined) delete process.env.PEERS_FILE;
-  else process.env.PEERS_FILE = originalPeersFile;
 });
 
 describe("coverage-100b vendor-b doctor and locate gaps", () => {

@@ -10,18 +10,12 @@
     "aliases": [
       "peer"
     ],
-    "help": "maw peers <add|list|info|remove> [...] — federation peer aliases; add supports --node --ssh --user; list supports --discovered --all --json --limit N",
+    "help": "maw peers <add|list|info|remove> [...] — federation peer aliases; list supports --discovered --all --json --limit N",
     "flags": {
       "--discovered": "boolean",
       "--all": "boolean",
       "--json": "boolean",
-      "--limit": "number",
-      "--node": "string",
-      "--ssh": "string",
-      "--user": "string",
-      "--allow-unreachable": "boolean",
-      "--timeout": "number",
-      "--alias": "string"
+      "--limit": "number"
     }
   },
   "weight": 30,

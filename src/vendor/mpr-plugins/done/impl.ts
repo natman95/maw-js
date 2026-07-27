@@ -5,13 +5,11 @@ import { takeSnapshot } from "maw-js/sdk";
 import { tmux } from "maw-js/sdk";
 import { normalizeTarget } from "maw-js/core/matcher/normalize-target";
 import { signalParentInbox, autoSave } from "./done-autosave";
-import { removeWorktreeViaConfig, removeWorktreeByGhqScan, removeFromFleetConfig, warnRemainingWorktrees } from "./done-worktree";
+import { removeWorktreeViaConfig, removeWorktreeByGhqScan, removeFromFleetConfig } from "./done-worktree";
 
 export interface DoneOpts {
   force?: boolean;
   dryRun?: boolean;
-  cleanBranch?: boolean;
-  cwd?: string;
   /** Restrict window-name lookup to a specific tmux session. Used by done --all. */
   sessionName?: string;
 }
@@ -46,19 +44,8 @@ function nonLeadWindows(session: DoneSession): DoneWindow[] {
     .sort((a, b) => a.index - b.index);
 }
 
-function missingDoneTargetMessage(windowName: string): string {
-  const hint = windowName.toLowerCase() === "all" ? "\n  did you mean `maw done --all`?" : "";
-  return `no done target matched '${windowName}'${hint}`;
-}
-
-function failMissingDoneTarget(windowName: string): never {
-  const message = missingDoneTargetMessage(windowName);
-  console.error(`  \x1b[31m✗\x1b[0m ${message}`);
-  throw new Error(message);
-}
-
 /**
- * maw done <window-name> [--force] [--dry-run] [--clean-branch]
+ * maw done <window-name> [--force] [--dry-run]
  *
  * Clean up a finished worktree window:
  * 0. Send /rrr to agent + git auto-save (unless --force)
@@ -109,22 +96,12 @@ export async function cmdDone(windowName_: string, opts: DoneOpts = {}) {
   }
 
   // 2. Remove git worktree
-  let removedWorktree = await removeWorktreeViaConfig(windowNameLower, reposRoot, opts);
+  let removedWorktree = await removeWorktreeViaConfig(windowNameLower, reposRoot);
   if (!removedWorktree) {
-    removedWorktree = await removeWorktreeByGhqScan(windowName, reposRoot, opts);
+    removedWorktree = await removeWorktreeByGhqScan(windowName, reposRoot);
   }
   if (!removedWorktree) {
     console.log(`  \x1b[90m○\x1b[0m no worktree to remove (may be a main window)`);
-  } else if (!opts.dryRun && opts.cwd) {
-    await warnRemainingWorktrees(windowName, reposRoot);
-  }
-
-  const matchedWindow = sessionName !== null && windowIndex !== null;
-  if (opts.dryRun) {
-    if (!matchedWindow && !removedWorktree) failMissingDoneTarget(windowName);
-    console.log(`  \x1b[36m⬡\x1b[0m [dry-run] would remove '${windowNameLower}' from fleet config if present`);
-    console.log();
-    return;
   }
 
   // 3. Remove from fleet config
@@ -132,7 +109,6 @@ export async function cmdDone(windowName_: string, opts: DoneOpts = {}) {
   if (!removedFromConfig) {
     console.log(`  \x1b[90m○\x1b[0m not in any fleet config`);
   }
-  if (!matchedWindow && !removedWorktree && !removedFromConfig) failMissingDoneTarget(windowName);
 
   // Snapshot after done
   takeSnapshot("done").catch(() => {});

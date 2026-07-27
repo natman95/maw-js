@@ -180,7 +180,7 @@ describe("tmux impl plugin second-pass isolated coverage", () => {
     expect(compact.logs).toContain("maw ls -v");
   });
 
-  test("annotatePane precedence favors team over fleet, then view, then claude-like orphan panes", () => {
+  test("annotatePane precedence favors team over fleet, then view, orphan, and empty", () => {
     const fleet = new Set(["101-fleet"]);
     const teams = new Map([["%1", "pilot @ ops"]]);
 

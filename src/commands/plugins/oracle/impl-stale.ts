@@ -171,11 +171,8 @@ export async function runStaleScan(
   return opts.all ? sorted : sorted.filter((e) => e.tier === "STALE" || e.tier === "DEAD");
 }
 
-export async function cmdOracleScanStale(
-  opts: StaleScanOpts = {},
-  deps: StaleScanDeps = {},
-): Promise<void> {
-  const results = await runStaleScan(opts, deps);
+export async function cmdOracleScanStale(opts: StaleScanOpts = {}): Promise<void> {
+  const results = await runStaleScan(opts);
 
   if (opts.json) {
     console.log(JSON.stringify({ schema: 1, count: results.length, oracles: results }, null, 2));

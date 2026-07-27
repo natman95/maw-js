@@ -121,7 +121,6 @@ mock.module(join(srcRoot, "src/lib/oracle-members"), () => ({
 }));
 
 mock.module(join(srcRoot, "src/lib/oracle-manifest"), () => ({
-  loadManifestCached: () => [],
   findOracle: () => findOracleResult,
 }));
 

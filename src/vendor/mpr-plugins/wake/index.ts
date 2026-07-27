@@ -57,9 +57,6 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
         "--split": Boolean,
         "--all-local": Boolean,
         "--peer": String,
-        "--parent": String,
-        "--parent-session-id": String,
-        "--session-id": String,
       }, 1);
 
       if (flags["--peer"]) {
@@ -73,7 +70,6 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
         split?: boolean; urlRepoName?: string; allLocal?: boolean;
         fromSnapshot?: boolean; snapshotId?: string;
         layout?: "nested" | "legacy";
-        parentSessionId?: string; sessionId?: string;
       } = {};
       let issueNum: number | null = flags["--issue"] ?? null;
       let repo: string | undefined = flags["--repo"];
@@ -111,10 +107,6 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
       if (flags["--main"]) wakeOpts.noRehydrate = true;
       if (flags["--split"]) wakeOpts.split = true;
       if (flags["--all-local"]) wakeOpts.allLocal = true;
-      if (flags["--parent-session-id"] || flags["--parent"]) {
-        wakeOpts.parentSessionId = (flags["--parent-session-id"] as string | undefined) || (flags["--parent"] as string | undefined);
-      }
-      if (flags["--session-id"]) wakeOpts.sessionId = flags["--session-id"];
 
       const positionals = flags._;
       if (positionals.length > 0) wakeOpts.task = positionals[0];
@@ -148,7 +140,6 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
       fresh?: boolean; pick?: boolean; name?: string; attach?: boolean; dryRun?: boolean; noRehydrate?: boolean;
       fromSnapshot?: boolean; snapshotId?: string;
       layout?: "nested" | "legacy";
-      parentSessionId?: string; sessionId?: string;
     } = {};
     if (body.task) wakeOpts.task = body.task as string;
     if (body.wt) wakeOpts.wt = body.wt as string;
@@ -174,9 +165,6 @@ export default async function handler(ctx: InvokeContext): Promise<InvokeResult>
       wakeOpts.snapshotId = body.snapshot;
       wakeOpts.fromSnapshot = true;
     }
-    if (typeof body.parentSessionId === "string") wakeOpts.parentSessionId = body.parentSessionId;
-    if (typeof body.parent === "string") wakeOpts.parentSessionId = body.parent;
-    if (typeof body.sessionId === "string") wakeOpts.sessionId = body.sessionId;
 
     await cmdWake(oracle, wakeOpts);
     return { ok: true, output: logs.join("\n") || undefined };

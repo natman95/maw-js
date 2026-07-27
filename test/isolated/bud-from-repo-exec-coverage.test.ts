@@ -256,11 +256,7 @@ describe("bud wake finalization", () => {
     ]);
     expect(JSON.parse(readFileSync(parentFleetFile, "utf-8")).sync_peers).toEqual(["existing", "sprout"]);
     expect(shouldAutoWakeCalls).toEqual([{ name: "sprout", opts: { site: "bud" } }]);
-    // #1912 — resolveIssueRepoForBud now looks up the parent oracle's repo
-    // (fleet first, git-remote fallback, then {org}/{parent}-oracle). With
-    // parentName="parent" and no fleet/local clone in this harness, falls
-    // through to the {org}/{parent}-oracle fallback.
-    expect(issuePromptCalls).toEqual([{ issue: 42, repo: "Soul-Brews-Studio/parent-oracle" }]);
+    expect(issuePromptCalls).toEqual([{ issue: 42, repo: "Soul-Brews-Studio/child-repo" }]);
     expect(ensureClonedCalls).toEqual(["owner/project"]);
     expect(wakeCalls).toEqual([
       {
@@ -268,7 +264,7 @@ describe("bud wake finalization", () => {
         opts: {
           noAttach: true,
           repoPath: ctx.budRepoPath,
-          prompt: "issue 42 from Soul-Brews-Studio/parent-oracle",
+          prompt: "issue 42 from Soul-Brews-Studio/child-repo",
           task: "issue-42",
         },
       },

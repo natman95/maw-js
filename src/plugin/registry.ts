@@ -159,8 +159,6 @@ export function discoverPackages(deps: DiscoverPackagesDeps = {}): LoadedPlugin[
   // invariant (#343), but the right grain is SUMMARY, not per-entry.
   const modeCounts = { symlink: 0, artifact: 0, unbuilt: 0, legacy: 0 };
 
-  const seenPluginNames = new Set<string>();
-
   for (const baseDir of pluginDirs) {
     if (!existsSync(baseDir)) continue;
     let entries: string[];
@@ -184,7 +182,6 @@ export function discoverPackages(deps: DiscoverPackagesDeps = {}): LoadedPlugin[
       if (!loaded) continue;
 
       const m = loaded.manifest;
-      if (seenPluginNames.has(m.name)) continue;
 
       // Gate 1: SDK semver. Mismatch → refuse with actionable error.
       if (!satisfies(runtimeVer, m.sdk)) {
@@ -227,8 +224,6 @@ export function discoverPackages(deps: DiscoverPackagesDeps = {}): LoadedPlugin[
         // warn(); --verbose exposes the per-plugin mode line below.
         legacyCount++;
       }
-
-      seenPluginNames.add(m.name);
 
       if (disabled.includes(m.name)) {
         loaded.disabled = true;

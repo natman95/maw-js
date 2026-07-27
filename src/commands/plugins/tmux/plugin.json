@@ -14,7 +14,6 @@
       "--compact": "boolean",
       "--verbose": "boolean",
       "--roster": "boolean",
-      "--fleet-only": "boolean",
       "--recent": "boolean",
       "-r": "boolean",
       "--readonly": "boolean",
@@ -23,10 +22,7 @@
       "--output": "boolean",
       "--no-output": "boolean",
       "--only-if-closed": "boolean",
-      "-o": "boolean",
-      "--force": "boolean",
-      "--session": "boolean",
-      "-s": "boolean"
+      "-o": "boolean"
     }
   },
   "weight": 10,

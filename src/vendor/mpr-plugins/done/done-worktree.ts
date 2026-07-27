@@ -1,15 +1,8 @@
 import { hostExec } from "maw-js/sdk";
 import { readdirSync, readFileSync, writeFileSync } from "fs";
-import { basename, dirname, join } from "path";
+import { join } from "path";
 import { fleetDirsForRead } from "maw-js/commands/shared/fleet-load";
 import { parseWorktreePath } from "maw-js/core/fleet/worktree-layout";
-
-export interface DoneBranchCleanupOpts {
-  cleanBranch?: boolean;
-  branchBase?: string;
-  dryRun?: boolean;
-  cwd?: string;
-}
 
 function activeFleetConfigFiles(): Array<{ file: string; path: string }> {
   const filesByName = new Map<string, { file: string; path: string }>();
@@ -27,139 +20,6 @@ function activeFleetConfigFiles(): Array<{ file: string; path: string }> {
   return [...filesByName.values()].sort((a, b) => a.file.localeCompare(b.file));
 }
 
-function shellArg(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
-}
-
-function isNotWorkingTreeError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /not a working tree/i.test(message);
-}
-
-function archivePathFor(wtPath: string): string {
-  const stamp = new Date().toISOString().replace(/[^0-9A-Za-z_.-]/g, "-");
-  const safeBase = basename(wtPath).replace(/[^0-9A-Za-z_.-]/g, "-");
-  return `/tmp/maw-done-orphan-worktrees/${safeBase}-${stamp}`;
-}
-
-async function dirExists(path: string): Promise<boolean> {
-  try {
-    await hostExec(`test -d ${shellArg(path)}`);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function movePrunedWorktreeDir(wtPath: string, mainPath: string): Promise<boolean> {
-  if (!(await dirExists(wtPath))) return false;
-  const archived = archivePathFor(wtPath);
-  try {
-    await hostExec(`mkdir -p ${shellArg(dirname(archived))}`);
-    await hostExec(`mv ${shellArg(wtPath)} ${shellArg(archived)}`);
-    await hostExec(`git -C ${shellArg(mainPath)} worktree prune`);
-    console.log(`  \x1b[32m✓\x1b[0m moved orphan directory ${basename(wtPath)} to ${archived}`);
-    return true;
-  } catch (e: any) {
-    console.log(`  \x1b[33m⚠\x1b[0m orphan directory move failed: ${e?.message || e}`);
-    return false;
-  }
-}
-
-async function findMatchingWorktreePaths(windowName: string, reposRoot: string): Promise<string[]> {
-  const suffix = windowName.replace(/^[^-]+-/, "");
-  const ghqOut = await hostExec(`find ${shellArg(reposRoot)} -maxdepth 4 -type d \\( -name '*.wt-*' -o -path '*/agents/*' \\) 2>/dev/null`);
-  const allWtPaths = ghqOut.trim().split("\n").filter(Boolean);
-  return allWtPaths.filter(p => {
-    const parsed = parseWorktreePath(p, reposRoot);
-    if (!parsed) return false;
-    const wtSuffix = parsed.wtName.replace(/^\d+-/, "");
-    return wtSuffix.toLowerCase() === suffix.toLowerCase();
-  });
-}
-
-async function cwdMainPath(cwd: string | undefined, reposRoot: string): Promise<string | null> {
-  if (!cwd) return null;
-  try {
-    const top = (await hostExec(`git -C ${shellArg(cwd)} rev-parse --show-toplevel`)).trim();
-    if (!top) return null;
-    const parsed = parseWorktreePath(top, reposRoot);
-    return parsed?.mainPath ?? top;
-  } catch {
-    return null;
-  }
-}
-
-function branchBaseFor(mainPath: string, opts: DoneBranchCleanupOpts = {}): string {
-  if (opts.branchBase) return opts.branchBase;
-  const normalized = mainPath.split("\\").join("/");
-  if (normalized.endsWith("/Soul-Brews-Studio/maw-js") || normalized.includes("/github.com/Soul-Brews-Studio/maw-js")) {
-    return "alpha";
-  }
-  return "main";
-}
-
-function isProtectedBranch(branch: string, baseBranch: string): boolean {
-  return branch === "HEAD" || branch === "main" || branch === "master" || branch === "alpha" || branch === baseBranch;
-}
-
-async function ghMergedPrExists(branch: string): Promise<"yes" | "no" | "unavailable"> {
-  try {
-    const out = await hostExec(`gh pr list --head ${shellArg(branch)} --state merged --json number --limit 1`);
-    const parsed = JSON.parse(out || "[]");
-    return Array.isArray(parsed) && parsed.length > 0 ? "yes" : "no";
-  } catch {
-    return "unavailable";
-  }
-}
-
-export async function cleanupDoneBranch(
-  mainPath: string,
-  branch: string,
-  opts: DoneBranchCleanupOpts = {},
-): Promise<void> {
-  const baseBranch = branchBaseFor(mainPath, opts);
-  if (!branch || isProtectedBranch(branch, baseBranch)) return;
-
-  const quotedMain = shellArg(mainPath);
-  const quotedBranch = shellArg(branch);
-  if (opts.cleanBranch) {
-    try {
-      await hostExec(`git -C ${quotedMain} branch -D ${quotedBranch}`);
-      console.log(`  \x1b[32m✓\x1b[0m force-deleted branch ${branch}`);
-    } catch (e: any) {
-      console.log(`  \x1b[33m⚠\x1b[0m branch retained (${branch}): force delete failed: ${e?.message || e}`);
-    }
-    return;
-  }
-
-  try {
-    await hostExec(`git -C ${quotedMain} merge-base --is-ancestor ${quotedBranch} ${shellArg(baseBranch)}`);
-    await hostExec(`git -C ${quotedMain} branch -d ${quotedBranch}`);
-    console.log(`  \x1b[32m✓\x1b[0m deleted branch ${branch} (merged into ${baseBranch})`);
-    return;
-  } catch {
-    // Not an ancestor of the configured base, or local refs are unavailable.
-  }
-
-  const prState = await ghMergedPrExists(branch);
-  if (prState === "yes") {
-    try {
-      await hostExec(`git -C ${quotedMain} branch -D ${quotedBranch}`);
-      console.log(`  \x1b[32m✓\x1b[0m deleted branch ${branch} (merged PR)`);
-    } catch (e: any) {
-      console.log(`  \x1b[33m⚠\x1b[0m branch retained (${branch}): delete failed after merged PR proof: ${e?.message || e}`);
-    }
-    return;
-  }
-
-  if (prState === "unavailable") {
-    console.log(`  \x1b[33m⚠\x1b[0m branch retained (${branch}): gh unavailable and not merged into ${baseBranch}`);
-  } else {
-    console.log(`  \x1b[90m○\x1b[0m branch retained (${branch}): not merged into ${baseBranch} and no merged PR found`);
-  }
-}
-
 /**
  * Remove a git worktree via fleet config lookup.
  * Returns true if a worktree was removed.
@@ -167,7 +27,6 @@ export async function cleanupDoneBranch(
 export async function removeWorktreeViaConfig(
   windowNameLower: string,
   reposRoot: string,
-  opts: DoneBranchCleanupOpts = {},
 ): Promise<boolean> {
   try {
     for (const { file, path } of activeFleetConfigFiles()) {
@@ -184,22 +43,16 @@ export async function removeWorktreeViaConfig(
       const mainPath = parsed.mainPath;
 
       try {
-        if (opts.dryRun) {
-          console.log(`  \x1b[36m⬡\x1b[0m [dry-run] would remove worktree ${win.repo}`);
-          return true;
-        }
         let branch = "";
         try { branch = (await hostExec(`git -C '${fullPath}' rev-parse --abbrev-ref HEAD`)).trim(); } catch { /* expected */ }
-        // #1968: force removes ignored engine scratch (for example .omx/) left in finished worktrees.
-        await hostExec(`git -C ${shellArg(mainPath)} worktree remove ${shellArg(fullPath)} --force`);
-        await hostExec(`git -C ${shellArg(mainPath)} worktree prune`);
+        await hostExec(`git -C '${mainPath}' worktree remove '${fullPath}' --force`);
+        await hostExec(`git -C '${mainPath}' worktree prune`);
         console.log(`  \x1b[32m✓\x1b[0m removed worktree ${win.repo}`);
-        await cleanupDoneBranch(mainPath, branch, opts);
+        if (branch && branch !== "main" && branch !== "HEAD") {
+          try { await hostExec(`git -C '${mainPath}' branch -d '${branch}'`); console.log(`  \x1b[32m✓\x1b[0m deleted branch ${branch}`); } catch { /* expected */ }
+        }
         return true;
       } catch (e: any) {
-        if (isNotWorkingTreeError(e) && await movePrunedWorktreeDir(fullPath, mainPath)) {
-          return true;
-        }
         console.log(`  \x1b[33m⚠\x1b[0m worktree remove failed: ${e.message || e}`);
       }
       break;
@@ -216,74 +69,44 @@ export async function removeWorktreeViaConfig(
 export async function removeWorktreeByGhqScan(
   windowName: string,
   reposRoot: string,
-  opts: DoneBranchCleanupOpts = {},
 ): Promise<boolean> {
   let removed = false;
   try {
     const suffix = windowName.replace(/^[^-]+-/, ""); // e.g. "mother-schedule" → "schedule"
-    const exactMatch = await findMatchingWorktreePaths(windowName, reposRoot);
-    let matches = exactMatch;
-    if (matches.length > 1) {
-      const mainPath = await cwdMainPath(opts.cwd, reposRoot);
-      if (mainPath) {
-        const scoped = matches.filter((p) => parseWorktreePath(p, reposRoot)?.mainPath === mainPath);
-        if (scoped.length === 1) {
-          matches = scoped;
-          console.log(`  \x1b[36m⬡\x1b[0m scoped ambiguous worktree '${suffix}' to cwd repo ${mainPath}`);
-        }
-      }
-    }
-    if (matches.length > 1) {
-      console.error(`  \x1b[31m✗\x1b[0m refusing to remove worktree '${suffix}' — matches ${matches.length} repos:`);
-      for (const wtPath of matches) console.error(`  \x1b[90m    • ${wtPath}\x1b[0m`);
+    const safeRoot = reposRoot.replace(/'/g, "'\''");
+    const ghqOut = await hostExec(`find '${safeRoot}' -maxdepth 4 -type d \\( -name '*.wt-*' -o -path '*/agents/*' \\) 2>/dev/null`);
+    const allWtPaths = ghqOut.trim().split("\n").filter(Boolean);
+    const exactMatch = allWtPaths.filter(p => {
+      const parsed = parseWorktreePath(p, reposRoot);
+      if (!parsed) return false;
+      const wtSuffix = parsed.wtName.replace(/^\d+-/, "");
+      return wtSuffix.toLowerCase() === suffix.toLowerCase();
+    });
+    if (exactMatch.length > 1) {
+      console.error(`  \x1b[31m✗\x1b[0m refusing to remove worktree '${suffix}' — matches ${exactMatch.length} repos:`);
+      for (const wtPath of exactMatch) console.error(`  \x1b[90m    • ${wtPath}\x1b[0m`);
       console.error(`  \x1b[90m  use fleet config or remove the exact worktree manually\x1b[0m`);
       return false;
     }
-    for (const wtPath of matches) {
+    for (const wtPath of exactMatch) {
       const parsed = parseWorktreePath(wtPath, reposRoot);
       if (!parsed) continue;
       const base = parsed.dirName;
       const mainPath = parsed.mainPath;
       try {
-        if (opts.dryRun) {
-          console.log(`  \x1b[36m⬡\x1b[0m [dry-run] would remove worktree ${base}`);
-          removed = true;
-          continue;
-        }
         let branch = "";
         try { branch = (await hostExec(`git -C '${wtPath}' rev-parse --abbrev-ref HEAD`)).trim(); } catch { /* expected */ }
-        // #1968: force removes ignored engine scratch (for example .omx/) left in finished worktrees.
-        await hostExec(`git -C ${shellArg(mainPath)} worktree remove ${shellArg(wtPath)} --force`);
-        await hostExec(`git -C ${shellArg(mainPath)} worktree prune`);
+        await hostExec(`git -C '${mainPath}' worktree remove '${wtPath}' --force`);
+        await hostExec(`git -C '${mainPath}' worktree prune`);
         console.log(`  \x1b[32m✓\x1b[0m removed worktree ${base}`);
         removed = true;
-        await cleanupDoneBranch(mainPath, branch, opts);
-      } catch (e) {
-        if (isNotWorkingTreeError(e) && await movePrunedWorktreeDir(wtPath, mainPath)) {
-          removed = true;
-          continue;
+        if (branch && branch !== "main" && branch !== "HEAD") {
+          try { await hostExec(`git -C '${mainPath}' branch -d '${branch}'`); console.log(`  \x1b[32m✓\x1b[0m deleted branch ${branch}`); } catch { /* expected */ }
         }
-        console.error(`  \x1b[33m⚠\x1b[0m worktree remove failed: ${e}`);
-      }
+      } catch (e) { console.error(`  \x1b[33m⚠\x1b[0m worktree remove failed: ${e}`); }
     }
   } catch (e) { console.error(`  \x1b[33m⚠\x1b[0m worktree scan failed: ${e}`); }
   return removed;
-}
-
-export async function warnRemainingWorktrees(windowName: string, reposRoot: string): Promise<string[]> {
-  let matches: string[] = [];
-  try {
-    matches = await findMatchingWorktreePaths(windowName, reposRoot);
-  } catch (e: any) {
-    console.log(`  \x1b[33m⚠\x1b[0m cross-repo worktree scan failed: ${e?.message || e}`);
-    return [];
-  }
-  if (matches.length === 0) return [];
-
-  console.log(`  \x1b[33m⚠\x1b[0m ${matches.length} same-member worktree(s) still exist in other repo(s):`);
-  for (const match of matches) console.log(`  \x1b[90m    • ${match}\x1b[0m`);
-  console.log(`  \x1b[90m  inspect them or run maw cleanup --worktrees before respawning\x1b[0m`);
-  return matches;
 }
 
 /** Remove a window entry from all fleet config JSON files. Returns true if any file was updated. */

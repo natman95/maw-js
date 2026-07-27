@@ -9,7 +9,6 @@
  *  - prefix match with word boundary (e.g. `restart` != `rest`)
  */
 import { describe, test, expect } from "bun:test";
-import { readFileSync } from "node:fs";
 import { resolvePluginMatch, validatePluginCliFlags } from "../../src/cli/dispatch-match";
 import { ALIAS_DESCRIPTIONS, parseBringArgs, parseLsAliasOpts, resolveTopAlias } from "../../src/cli/top-aliases";
 import type { LoadedPlugin } from "../../src/plugin/types";
@@ -283,20 +282,6 @@ describe("validatePluginCliFlags — manifest-declared flags", () => {
 
     expect(validatePluginCliFlags(p, ["--name", "world", "--", "--not-a-flag"])).toEqual({ ok: true });
   });
-
-  test("tmux manifest allows kill alias subcommand flags (#1954)", () => {
-    const manifest = JSON.parse(readFileSync("src/commands/plugins/tmux/plugin.json", "utf8"));
-    const tmux: LoadedPlugin = {
-      manifest,
-      dir: "src/commands/plugins/tmux",
-      wasmPath: "",
-      kind: "ts",
-    };
-
-    expect(validatePluginCliFlags(tmux, ["kill", "77-mawjs:mawjs-oracle.1", "--force"])).toEqual({ ok: true });
-    expect(validatePluginCliFlags(tmux, ["kill", "77-mawjs", "--session"])).toEqual({ ok: true });
-    expect(validatePluginCliFlags(tmux, ["kill", "77-mawjs", "-s"])).toEqual({ ok: true });
-  });
 });
 
 describe("resolveTopAlias — RFC #954 verb aliases", () => {
@@ -337,6 +322,7 @@ describe("resolveTopAlias — RFC #954 verb aliases", () => {
       verbose: false,
       roster: false,
       json: false,
+      oracleOnly: true,
     });
     expect(parseLsAliasOpts(["-c"])).toEqual({
       all: true,
@@ -344,6 +330,7 @@ describe("resolveTopAlias — RFC #954 verb aliases", () => {
       verbose: false,
       roster: false,
       json: false,
+      oracleOnly: true,
     });
   });
 
@@ -371,17 +358,7 @@ describe("resolveTopAlias — RFC #954 verb aliases", () => {
       verbose: false,
       roster: false,
       json: false,
-    });
-  });
-
-  test("#1890 parse ls opts: --fleet-only restores the legacy compact filter", () => {
-    expect(parseLsAliasOpts(["--fleet-only"])).toEqual({
-      all: true,
-      compact: true,
-      verbose: false,
-      roster: false,
-      json: false,
-      fleetOnly: true,
+      oracleOnly: true,
     });
   });
 
@@ -403,6 +380,7 @@ describe("resolveTopAlias — RFC #954 verb aliases", () => {
       verbose: false,
       roster: false,
       json: false,
+      oracleOnly: true,
       recent: true,
     });
     expect(parseLsAliasOpts(["--recent", "5", "-v"])).toEqual({
@@ -420,6 +398,7 @@ describe("resolveTopAlias — RFC #954 verb aliases", () => {
       verbose: false,
       roster: false,
       json: false,
+      oracleOnly: true,
       recent: true,
       recentLimit: 5,
       active: true,

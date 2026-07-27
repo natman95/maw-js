@@ -47,18 +47,12 @@ let defaultInboxResult: ReceiverInboxResult | null;
 let childExecValue = "08-mawjs\n";
 let childExecThrows = false;
 
-const childProcessMock = {
+mock.module("child_process", () => ({
   execSync: () => {
     if (childExecThrows) throw new Error("tmux missing");
     return childExecValue;
   },
-  execFileSync: () => {
-    if (childExecThrows) throw new Error("tmux missing");
-    return childExecValue;
-  },
-};
-mock.module("child_process", () => childProcessMock);
-mock.module("node:child_process", () => childProcessMock);
+}));
 
 mock.module(join(srcRoot, "src/core/transport/tmux"), () => {
   class MockTmux {

@@ -10,33 +10,6 @@ import { buildCommandInDir } from "maw-js/config";
  *
  * The window's worktree/cwd stays the same. Only the tmux home changes.
  */
-
-function stripTmuxDisplaySuffix(window: string): string | null {
-  if (!window.endsWith("-") || window.length <= 1) return null;
-  return window.slice(0, -1);
-}
-
-function defaultSplitTargetName(window: string): string {
-  return stripTmuxDisplaySuffix(window) ?? window;
-}
-
-function resolveSourceWindow(
-  windows: Array<{ index: number; name: string }>,
-  requested: string,
-): { index: number; name: string } | undefined {
-  const exact = windows.find(w =>
-    w.name.toLowerCase() === requested.toLowerCase() || String(w.index) === requested
-  );
-  if (exact) return exact;
-
-  const canonical = stripTmuxDisplaySuffix(requested);
-  if (!canonical) return undefined;
-
-  return windows.find(w =>
-    w.name.toLowerCase() === canonical.toLowerCase() || String(w.index) === canonical
-  );
-}
-
 export async function cmdTake(source: string, targetSession?: string) {
   // Parse source — "neo:skills-cli" or "neo:3"
   const [srcSession, srcWindow] = source.includes(":") ? source.split(":", 2) : [source, ""];
@@ -53,7 +26,7 @@ export async function cmdTake(source: string, targetSession?: string) {
 
   if (split) {
     // Create a new session named after the window
-    target = defaultSplitTargetName(srcWindow);
+    target = srcWindow;
     try {
       await hostExec(`tmux new-session -d -s '${target}'`);
     } catch (e: any) {
@@ -75,7 +48,9 @@ export async function cmdTake(source: string, targetSession?: string) {
     throw new Error(`session '${srcSession}' not found`);
   }
 
-  const srcWin = resolveSourceWindow(srcSess.windows, srcWindow);
+  const srcWin = srcSess.windows.find(w =>
+    w.name.toLowerCase() === srcWindow.toLowerCase() || String(w.index) === srcWindow
+  );
   if (!srcWin) {
     throw new Error(`window '${srcWindow}' not found in session '${srcSession}'`);
   }

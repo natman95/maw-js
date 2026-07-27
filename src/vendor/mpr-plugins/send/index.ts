@@ -3,7 +3,7 @@ import { cmdSend, parseSendArgs } from "./impl";
 
 export const command = {
   name: "send",
-  description: "Alias of maw hey (federation-aware pane inject with signed envelope). For raw text, use maw send-text. (#1915)",
+  description: "Type raw text into a tmux pane (no Enter, composable).",
 };
 
 export default async function handler(ctx: InvokeContext): Promise<InvokeResult> {

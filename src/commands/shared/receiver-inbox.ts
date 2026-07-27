@@ -175,20 +175,6 @@ function buildInboxBody(from: string, to: string, timestamp: string, message: st
   ].join("\n");
 }
 
-function filenameWithCollisionSuffix(base: string, attempt: number): string {
-  if (attempt <= 1) return base;
-  return base.replace(/\.md$/, `-${attempt}.md`);
-}
-
-function isExistingFileError(error: unknown): boolean {
-  return Boolean(
-    error &&
-    typeof error === "object" &&
-    "code" in error &&
-    (error as { code?: string }).code === "EEXIST",
-  );
-}
-
 export function persistReceiverInbox(input: ReceiverInboxInput, deps: ReceiverInboxDeps = {}): ReceiverInboxResult {
   const existsSync = deps.existsSync ?? fsExistsSync;
   const mkdirSync = deps.mkdirSync ?? fsMkdirSync;
@@ -211,28 +197,14 @@ export function persistReceiverInbox(input: ReceiverInboxInput, deps: ReceiverIn
   const timestamp = now.toISOString();
   const datePart = timestamp.slice(0, 10);
   const timePart = timestamp.slice(11, 16).replace(":", "-");
-  const baseFilename = `${datePart}_${timePart}_${safeSegment(input.from)}_${slugifyBody(input.message)}.md`;
+  const filename = `${datePart}_${timePart}_${safeSegment(input.from)}_${slugifyBody(input.message)}.md`;
   const inboxDir = join(repoPath, "ψ", "inbox");
-  const body = buildInboxBody(input.from, oracle, timestamp, input.message);
+  const path = join(inboxDir, filename);
 
   try {
     mkdirSync(inboxDir, { recursive: true });
-    for (let attempt = 1; attempt <= 1000; attempt += 1) {
-      const filename = filenameWithCollisionSuffix(baseFilename, attempt);
-      const path = join(inboxDir, filename);
-      try {
-        writeFileSync(path, body, { flag: "wx" });
-        return { ok: true, oracle, inboxDir, path, filename };
-      } catch (error) {
-        if (isExistingFileError(error)) continue;
-        throw error;
-      }
-    }
-    return {
-      ok: false,
-      oracle,
-      reason: `receiver inbox filename collision limit reached for ${baseFilename}`,
-    };
+    writeFileSync(path, buildInboxBody(input.from, oracle, timestamp, input.message));
+    return { ok: true, oracle, inboxDir, path, filename };
   } catch (error) {
     return {
       ok: false,

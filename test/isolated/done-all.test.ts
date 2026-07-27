@@ -72,7 +72,6 @@ mock.module(join(import.meta.dir, "../../src/vendor/mpr-plugins/done/done-worktr
     removedFleetEntries.push(windowNameLower);
     return false;
   },
-  warnRemainingWorktrees: async () => [],
 }));
 
 const { cmdDoneAll } = await import("../../src/vendor/mpr-plugins/done/impl");
@@ -208,7 +207,7 @@ describe("cmdDoneAll", () => {
     expect(tmuxCommands).toContain("kill work:alpha");
 
     const { cmdDone } = await import("../../src/vendor/mpr-plugins/done/impl");
-    await expect(cmdDone("missing-window", { dryRun: true })).rejects.toThrow("no done target matched 'missing-window'");
+    await cmdDone("missing-window", { dryRun: true });
     expect(autoSaveCalls.map(c => c.windowName)).not.toContain("missing-window");
   });
 

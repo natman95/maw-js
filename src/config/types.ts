@@ -80,13 +80,6 @@ export interface MawConfig {
   oracleUrl: string;
   env: Record<string, string>;
   commands: Record<string, string>;
-  /**
-   * Generic engine definitions (#1960 P1).
-   *
-   * Additive/dormant until later phases route command rendering through the
-   * engine registry. Legacy `commands` remains the active launch surface today.
-   */
-  engines?: Record<string, import("./engine-def").EngineDef>;
   sessions: Record<string, string>;
   tmuxSocket?: string;
   peers?: string[];
@@ -171,14 +164,6 @@ export interface MawConfig {
       keyPrefix?: string;
     };
   };
-  /**
-   * Legacy Scout LAN discovery toggle (#1903).
-   *
-   * `false` disables the UDP scout transport without changing Zenoh scout or
-   * explicit federation peers. Also reachable per-process via
-   * `MAW_NO_SCOUT=1` / `maw serve --no-scout`.
-   */
-  scout?: boolean;
   /** Discovery provider selection for peer presence candidates. */
   discovery?: {
     transport?: "scout" | "zenoh" | "both" | "off";
@@ -203,8 +188,8 @@ export interface MawConfig {
 
 /** Typed defaults for intervals, timeouts, limits (#172) */
 export const D = {
-  intervals: { capture: 50, sessions: 5000, status: 3000, teams: 3000, preview: 2000, peerFetch: 10000, crashCheck: 30000, peerRetryBackoff: 300, ptySweep: 300000 } as const,
+  intervals: { capture: 50, sessions: 5000, status: 3000, teams: 3000, preview: 2000, peerFetch: 10000, crashCheck: 30000, ptySweep: 300000 } as const,
   timeouts: { http: 5000, health: 3000, ping: 5000, pty: 5000, workspace: 5000, shellInit: 3000, wakeRetry: 500, wakeVerify: 3000 } as const,
-  limits: { feedMax: 500, feedDefault: 50, feedHistory: 50, logsMax: 500, logsDefault: 50, logsTruncate: 500, messageTruncate: 100, ptyCols: 500, ptyRows: 200, maxConcurrentAgents: 0, peerProbeRetries: 2 } as const,
+  limits: { feedMax: 500, feedDefault: 50, feedHistory: 50, logsMax: 500, logsDefault: 50, logsTruncate: 500, messageTruncate: 100, ptyCols: 500, ptyRows: 200, maxConcurrentAgents: 0 } as const,
   hmacWindowSeconds: 300,
 } as const;

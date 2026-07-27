@@ -18,7 +18,6 @@ describe("validateBasicFields", () => {
       oracleUrl: "http://localhost:47779",
       env: { A: "B" },
       commands: { default: "claude", codex: "codex" },
-      engines: { codex: { cmd: "codex", label: "Codex CLI" } },
       sessions: { mawjs: "54-mawjs" },
       tmuxSocket: "maw",
     });
@@ -32,7 +31,6 @@ describe("validateBasicFields", () => {
       oracleUrl: "http://localhost:47779",
       env: { A: "B" },
       commands: { default: "claude", codex: "codex" },
-      engines: { codex: { name: "codex", cmd: "codex", label: "Codex CLI" } },
       sessions: { mawjs: "54-mawjs" },
       tmuxSocket: "maw",
     });
@@ -65,9 +63,6 @@ describe("validateBasicFields", () => {
       [{ commands: [] }, "commands: must be an object"],
       [{ commands: { codex: "codex" } }, "commands: must include a 'default' string entry"],
       [{ commands: { default: 123 } }, "commands: must include a 'default' string entry"],
-      [{ engines: [] }, "engines: must be an object"],
-      [{ engines: { codex: false } }, "engines.codex: must be an object"],
-      [{ engines: { codex: { cmd: "" } } }, "engines.codex.cmd: must be a non-empty string"],
       [{ sessions: [] }, "sessions: must be an object"],
     ] as const;
 
@@ -96,7 +91,6 @@ describe("validateConfigShape", () => {
       federationToken: "x".repeat(16),
       env: { A: "B" },
       commands: { default: "claude" },
-      engines: { codex: { cmd: "codex" } },
       sessions: { mawjs: "54-mawjs" },
       peers: ["http://peer:3456"],
     })).toEqual([]);
@@ -126,14 +120,10 @@ describe("validateConfigShape", () => {
     expect(validateConfigShape({
       env: { GOOD: "ok", BAD: 1 },
       commands: { default: "claude", bad: false },
-      engines: { nope: false, broken: { cmd: "" }, badName: { name: 7, cmd: "tool" } },
       sessions: { ok: "54-mawjs", bad: 2 },
     })).toEqual([
       "env.BAD must be a string",
       "commands.bad must be a string",
-      "engines.nope must be an object",
-      "engines.broken.cmd must be a non-empty string",
-      "engines.badName.name must be a string",
       "sessions.bad must be a string",
     ]);
 

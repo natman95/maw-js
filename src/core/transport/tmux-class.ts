@@ -50,9 +50,7 @@ export class Tmux {
   /** Base runner — executes `tmux [-S socket] <subcommand> [args...]` via hostExec. */
   async run(subcommand: string, ...args: (string | number)[]): Promise<string> {
     const socketFlag = this.socket ? `-S ${q(this.socket)} ` : "";
-    const needsTermFallback = !process.env.TERM && process.env.MAW_TEST_MODE !== "1";
-    const termPrefix = needsTermFallback ? "TERM=xterm " : "";
-    const cmd = `${termPrefix}tmux ${socketFlag}${subcommand} ${args.map(q).join(" ")}`;
+    const cmd = `tmux ${socketFlag}${subcommand} ${args.map(q).join(" ")}`;
     return hostExec(cmd, this.host);
   }
 
@@ -330,12 +328,9 @@ export class Tmux {
     cwd?: string;
     command?: string;
     printFormat?: string;
-    direction?: "horizontal" | "vertical";
   } = {}): Promise<string> {
     const args: (string | number)[] = [];
     if (opts.printFormat) args.push("-P", "-F", opts.printFormat);
-    if (opts.direction === "horizontal") args.push("-h");
-    if (opts.direction === "vertical") args.push("-v");
     if (target) args.push("-t", target);
     if (opts.cwd) args.push("-c", opts.cwd);
     if (opts.command) args.push(opts.command);

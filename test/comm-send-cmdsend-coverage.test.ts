@@ -207,13 +207,8 @@ const origSleep = Bun.sleep.bind(Bun);
 const origExit = process.exit;
 const origErr = console.error;
 const origLog = console.log;
-const origWarn = console.warn;
 const origAgentName = process.env.CLAUDE_AGENT_NAME;
 const origTestMode = process.env.MAW_TEST_MODE;
-const origMawSender = process.env.MAW_SENDER;
-const origSshClient = process.env.SSH_CLIENT;
-const origSshConnection = process.env.SSH_CONNECTION;
-const origSshTty = process.env.SSH_TTY;
 
 (Bun as unknown as { sleep: (ms: number) => Promise<void> }).sleep = async (ms: number) => {
   if (mockActive) sleepCalls.push(ms);
@@ -225,16 +220,13 @@ const { cmdSend } = await import("../src/commands/shared/comm-send");
 let exitCode: number | undefined;
 let errs: string[];
 let logs: string[];
-let warns: string[];
 
 async function runCmd(fn: () => Promise<unknown>) {
   exitCode = undefined;
   errs = [];
   logs = [];
-  warns = [];
   console.error = (...args: unknown[]) => { errs.push(args.map(String).join(" ")); };
   console.log = (...args: unknown[]) => { logs.push(args.map(String).join(" ")); };
-  console.warn = (...args: unknown[]) => { warns.push(args.map(String).join(" ")); };
   (process as unknown as { exit: (code?: number) => never }).exit = (code?: number): never => {
     exitCode = code ?? 0;
     throw new Error(`__exit__:${exitCode}`);
@@ -247,7 +239,6 @@ async function runCmd(fn: () => Promise<unknown>) {
   } finally {
     console.error = origErr;
     console.log = origLog;
-    console.warn = origWarn;
     (process as unknown as { exit: typeof origExit }).exit = origExit;
   }
 }
@@ -289,10 +280,6 @@ beforeEach(() => {
   delete process.env.MAW_CONSENT;
   delete process.env.MAW_ACL_BYPASS;
   delete process.env.MAW_HEY_INBOX_AUTOWRITE;
-  delete process.env.MAW_SENDER;
-  delete process.env.SSH_CLIENT;
-  delete process.env.SSH_CONNECTION;
-  delete process.env.SSH_TTY;
 });
 
 afterEach(() => {
@@ -304,14 +291,6 @@ afterEach(() => {
   else process.env.CLAUDE_AGENT_NAME = origAgentName;
   if (origTestMode === undefined) delete process.env.MAW_TEST_MODE;
   else process.env.MAW_TEST_MODE = origTestMode;
-  if (origMawSender === undefined) delete process.env.MAW_SENDER;
-  else process.env.MAW_SENDER = origMawSender;
-  if (origSshClient === undefined) delete process.env.SSH_CLIENT;
-  else process.env.SSH_CLIENT = origSshClient;
-  if (origSshConnection === undefined) delete process.env.SSH_CONNECTION;
-  else process.env.SSH_CONNECTION = origSshConnection;
-  if (origSshTty === undefined) delete process.env.SSH_TTY;
-  else process.env.SSH_TTY = origSshTty;
 });
 
 afterAll(() => {
@@ -319,7 +298,6 @@ afterAll(() => {
   (Bun as unknown as { sleep: typeof origSleep }).sleep = origSleep;
   console.error = origErr;
   console.log = origLog;
-  console.warn = origWarn;
   (process as unknown as { exit: typeof origExit }).exit = origExit;
 });
 
@@ -336,37 +314,6 @@ describe("cmdSend — delivery branch coverage", () => {
     expect(emitFeedCalls[0].data.route).toBe("local");
     expect(logs.join("\n")).toContain("delivered");
     expect(logs.join("\n")).toContain("accepted");
-  });
-
-  test("explicit --from stamps visible message and feed as the relay sender", async () => {
-    captureResponses = ["accepted"];
-    await runCmd(() => cmdSend("local:session:oracle", "hello", false, { from: "alpha:volt-oracle" }));
-
-    expect(exitCode).toBeUndefined();
-    expect(sendKeysCalls).toEqual([{ target: "session:oracle.0", text: "[alpha:volt-oracle] hello" }]);
-    expect(logMessageCalls).toEqual([{ from: "volt-oracle", to: "local:session:oracle", message: "[alpha:volt-oracle] hello", route: "local" }]);
-    expect(emitFeedCalls[0].data.from).toBe("alpha:volt-oracle");
-  });
-
-  test("SSH relay without --from or MAW_SENDER refuses local impersonation", async () => {
-    process.env.SSH_CONNECTION = "10.20.0.7 12345 10.20.0.5 22";
-
-    await runCmd(() => cmdSend("local:session:oracle", "hello"));
-
-    expect(exitCode).toBe(1);
-    expect(sendKeysCalls).toEqual([]);
-    expect(errs.join("\n")).toContain("SSH-relayed");
-    expect(errs.join("\n")).toContain("--from alpha:volt-oracle");
-  });
-
-  test("MAW_SENDER allows SSH relay wrappers and signs as remote sender", async () => {
-    process.env.SSH_CLIENT = "10.20.0.7 12345 22";
-    process.env.MAW_SENDER = "alpha:volt-oracle";
-
-    await runCmd(() => cmdSend("local:session:oracle", "hello"));
-
-    expect(exitCode).toBeUndefined();
-    expect(sendKeysCalls).toEqual([{ target: "session:oracle.0", text: "[alpha:volt-oracle] hello" }]);
   });
 
   test("local delivery mirrors delivered hey messages into the receiver inbox when enabled", async () => {
@@ -499,7 +446,6 @@ describe("cmdSend — delivery branch coverage", () => {
     expect(exitCode).toBeUndefined();
     expect(curlFetchCalls).toHaveLength(1);
     expect(curlFetchCalls[0].url).toBe("http://remote:3456/api/send");
-    expect(curlFetchCalls[0].options.from).toBe("auto");
     expect(JSON.parse(curlFetchCalls[0].options.body)).toEqual({ target: "oracle", text: "[test-node:sender] ping" });
     expect(logMessageCalls[0].route).toBe("peer:remote");
     expect(emitFeedCalls[0].data.route).toBe("peer");
@@ -507,17 +453,6 @@ describe("cmdSend — delivery branch coverage", () => {
     expect(logs.join("\n")).toContain("queued");
     expect(logs.join("\n")).not.toContain("delivered");
     expect(runHookCalls[0].name).toBe("after_send");
-  });
-
-  test("peer delivery uses explicit sender override for message body and v3 from-signing", async () => {
-    resolveTargetReturn = { type: "peer", target: "oracle", node: "remote", peerUrl: "http://remote:3456" };
-
-    await runCmd(() => cmdSend("remote:session:oracle", "ping", false, { from: "alpha:volt-oracle" }));
-
-    expect(exitCode).toBeUndefined();
-    expect(curlFetchCalls[0].options.from).toBe("volt-oracle:alpha");
-    expect(JSON.parse(curlFetchCalls[0].options.body)).toEqual({ target: "oracle", text: "[alpha:volt-oracle] ping" });
-    expect(emitFeedCalls[0].data.from).toBe("alpha:volt-oracle");
   });
 
   test("peer delivery failures emit a failed lifecycle event and exit", async () => {
@@ -705,23 +640,6 @@ describe("cmdSend — bare-name, wake, and safety gates", () => {
     expect(errs.join("\n")).toContain("not found locally");
   });
 
-  test("bare peer aliases are allowed as explicit federation targets (#1940)", async () => {
-    config.namedPeers = [{
-      name: "world-mawjs",
-      url: "http://oracle-world.wg:3462",
-      node: "oracle-world",
-      identity: { oracle: "mawjs", node: "oracle-world" },
-    }];
-    resolveTargetReturn = { type: "peer", target: "mawjs", node: "oracle-world", peerUrl: "http://oracle-world.wg:3462" };
-    curlFetchHandler = () => ({ ok: true, status: 200, data: { ok: true, delivered: true, target: "mawjs" } });
-
-    await runCmd(() => cmdSend("world-mawjs", "hello"));
-
-    expect(exitCode).toBeUndefined();
-    expect(curlFetchCalls.map((c) => c.url)).toEqual(["http://oracle-world.wg:3462/api/send"]);
-    expect(JSON.parse(curlFetchCalls[0].options.body)).toMatchObject({ target: "mawjs" });
-  });
-
   test("bare target rejects ambiguous local candidates with candidate list", async () => {
     resolveTargetError = new _rFindWindow.AmbiguousMatchError("oracle", ["47-mawjs:oracle", "54-mawjs:oracle"]);
 
@@ -770,65 +688,19 @@ describe("cmdSend — bare-name, wake, and safety gates", () => {
     expect(JSON.parse(curlFetchCalls[0].options.body)).toEqual({ target: "oracle" });
   });
 
-  test("cross-node explicit oracle session sends directly without remote wake", async () => {
-    config.namedPeers = [{ name: "remote", url: "http://remote:3456" }];
-    resolveTargetReturn = { type: "peer", target: "volt-oracle", node: "remote", peerUrl: "http://remote:3456" };
-    curlFetchHandler = () => ({ ok: true, status: 200, data: { ok: true, target: "05-volt:1" } });
-
-    await runCmd(() => cmdSend("remote:volt-oracle", "hello"));
-
-    expect(exitCode).toBeUndefined();
-    expect(curlFetchCalls.map(c => c.url)).toEqual(["http://remote:3456/api/send"]);
-    expect(JSON.parse(curlFetchCalls[0].options.body)).toMatchObject({ target: "volt-oracle" });
-  });
-
-  test("cross-node explicit session window suffix sends directly with suffix preserved", async () => {
-    config.namedPeers = [{ name: "remote", url: "http://remote:3456" }];
-    resolveTargetReturn = { type: "peer", target: "volt-oracle:1", node: "remote", peerUrl: "http://remote:3456" };
-    curlFetchHandler = () => ({ ok: true, status: 200, data: { ok: true, target: "05-volt:1" } });
-
-    await runCmd(() => cmdSend("remote:volt-oracle:1", "hello"));
-
-    expect(exitCode).toBeUndefined();
-    expect(curlFetchCalls.map(c => c.url)).toEqual(["http://remote:3456/api/send"]);
-    expect(JSON.parse(curlFetchCalls[0].options.body)).toMatchObject({ target: "volt-oracle:1" });
-  });
-
-  test("#1998: cross-node wake failure warns but still attempts send (live non-wakeable target)", async () => {
-    // Repro: target is a live window/pane that isn't a wakeable oracle (repo),
-    // so remote /api/wake returns "missing oracle name" — but /api/send to the
-    // same target succeeds via the receiver's lenient pane resolution.
+  test("cross-node wake failures stop before send", async () => {
     config.namedPeers = [{ name: "remote", url: "http://remote:3456" }];
     resolveTargetReturn = { type: "peer", target: "oracle", node: "remote", peerUrl: "http://remote:3456" };
     curlFetchHandler = (url) => {
-      if (url.endsWith("/api/wake")) return { ok: false, status: 200, data: { ok: false, error: "missing oracle name" } };
-      return { ok: true, status: 200, data: { ok: true, target: "oracle.0", state: "delivered" } };
-    };
-
-    await runCmd(() => cmdSend("remote:oracle", "hello"));
-
-    // No hard exit — send was attempted and succeeded.
-    expect(exitCode).toBeUndefined();
-    expect(curlFetchCalls.map(c => c.url)).toEqual(["http://remote:3456/api/wake", "http://remote:3456/api/send"]);
-    // Wake failure is surfaced as a non-fatal warning, not a fatal error.
-    expect(warns.join("\n")).toContain("cross-node wake skipped");
-  });
-
-  test("#1998: when wake fails AND send fails, the send error surfaces and exits", async () => {
-    // Genuinely unreachable peer: wake fails, then send also fails → clean exit
-    // with the send-path "Remote fetch failed" error (#411 contract preserved).
-    config.namedPeers = [{ name: "remote", url: "http://remote:3456" }];
-    resolveTargetReturn = { type: "peer", target: "oracle", node: "remote", peerUrl: "http://remote:3456" };
-    curlFetchHandler = (url) => {
-      if (url.endsWith("/api/wake")) return { ok: false, status: 0, data: undefined };
-      return { ok: false, status: 0, data: undefined };
+      if (url.endsWith("/api/wake")) return { ok: false, status: 503, data: { error: "wake down" } };
+      return { ok: true, status: 200, data: { ok: true } };
     };
 
     await runCmd(() => cmdSend("remote:oracle", "hello"));
 
     expect(exitCode).toBe(1);
-    expect(curlFetchCalls.map(c => c.url)).toEqual(["http://remote:3456/api/wake", "http://remote:3456/api/send"]);
-    expect(errs.join("\n")).toContain("Remote fetch failed for peer");
+    expect(curlFetchCalls.map(c => c.url)).toEqual(["http://remote:3456/api/wake"]);
+    expect(errs.join("\n")).toContain("cross-node wake failed");
   });
 
   test("ACL queue stores pending peer sends instead of delivering", async () => {

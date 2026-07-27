@@ -290,24 +290,12 @@ describe("peers impl coverage slice", () => {
       nickname: "nick",
       identity: { oracle: "mawjs", node: "remote-node" },
     };
-    const result = await implModule.cmdAdd({
-      alias: "alice",
-      url: "http://127.0.0.1:1",
-      node: "override-node",
-      ssh: "white-tunnel",
-      sshUser: "sila",
-    });
+    const result = await implModule.cmdAdd({ alias: "alice", url: "http://127.0.0.1:1", node: "override-node" });
     expect(result.overwrote).toBe(false);
     expect(result.peer.node).toBe("override-node");
     expect(result.peer.nickname).toBe("nick");
     expect(result.peer.identity).toEqual({ oracle: "mawjs", node: "remote-node" });
-    expect(peers.alice).toMatchObject({
-      url: "http://127.0.0.1:1",
-      node: "override-node",
-      nickname: "nick",
-      ssh: "white-tunnel",
-      sshUser: "sila",
-    });
+    expect(peers.alice).toMatchObject({ url: "http://127.0.0.1:1", node: "override-node", nickname: "nick" });
     expect(probeCalls).toEqual(["http://127.0.0.1:1"]);
 
     peers.alice.pubkey = "p";
