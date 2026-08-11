@@ -1850,10 +1850,18 @@ describe("cmdWake main-suite coverage", () => {
     expect(result).toBe("54-mawjs:mawjs-oracle");
     expect(newWindowCalls).toEqual([]);
     expect(selectWindowCalls).toEqual(["54-mawjs:mawjs-oracle"]);
+    // 🔴 2026-08-11: this used to assert the prompt was ABSENT from sendTextCalls
+    // — it went out as a single blind `send-keys … Enter` instead. That shape
+    // silently dropped a cron one-shot's whole job (see wake-prompt-submit.test.ts).
+    // The prompt now rides the same settle+confirm path as the launch command.
     expect(sendTextCalls).toEqual([
       {
         target: "54-mawjs:mawjs-oracle",
         text: `cd ${repoPath} && codex --agent mawjs-oracle`,
+      },
+      {
+        target: "54-mawjs:mawjs-oracle",
+        text: "quote safe",
       },
     ]);
     expect(maybeSplitCalls).toEqual([
