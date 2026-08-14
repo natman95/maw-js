@@ -327,6 +327,45 @@ function ageSeconds(timestampMs: number, nowMs: number): number {
   return Math.max(0, Math.floor((nowMs - timestampMs) / 1000));
 }
 
+/**
+ * The red/green decision, pulled out of buildInboxStatus so it can be exercised without a
+ * filesystem. Every reason here answers the same question — "is mail piling up that nobody
+ * is draining" — which is why archive staleness is only evidence when there is something
+ * to drain.
+ *
+ * 🔍 Volt reported the counter-example from srv1809016 on 2026-08-14 00:20:
+ *   🔴 UNREAD 0 (oldest none, last archive 28d ago, Δ 0 last cycle) → not draining
+ * An inbox with zero unread is the cleanest state the system has, and it was being told to
+ * consider escalation. The cause is right here: `since_archive>8h` fired on its own, while
+ * its sibling branch one line below (`no_archive`) had always guarded on `unread > 0`. One
+ * of the two asked "is there anything to drain", the other did not. A badge that is red on
+ * the best possible state is worse than no badge — it goes red whether or not anyone acts,
+ * so people stop reading it, and the day something IS stuck nobody sees it.
+ */
+export function inboxRedReasons(input: {
+  unread: number;
+  oldestAgeSeconds: number | null;
+  lastArchiveAgeSeconds: number | null;
+  delta: number;
+  archiveAdvanced: boolean;
+}): string[] {
+  const { unread, oldestAgeSeconds, lastArchiveAgeSeconds, delta, archiveAdvanced } = input;
+  const reasons: string[] = [];
+  if (unread > UNREAD_RED_THRESHOLD) reasons.push("unread>50");
+  if (oldestAgeSeconds !== null && oldestAgeSeconds > OLDEST_RED_SECONDS) reasons.push("oldest>4h");
+  // `unread > 0` on BOTH archive branches, not just the second one. Stale archive with an
+  // empty inbox means "there was nothing to file", not "nobody is filing".
+  if (unread > 0) {
+    if (lastArchiveAgeSeconds !== null && lastArchiveAgeSeconds > ARCHIVE_RED_SECONDS) {
+      reasons.push("since_archive>8h");
+    } else if (lastArchiveAgeSeconds === null) {
+      reasons.push("no_archive");
+    }
+  }
+  if (delta > 0 && !archiveAdvanced) reasons.push("delta>0_no_archive_activity");
+  return reasons;
+}
+
 function buildInboxStatus(
   { oracle, inboxDir }: InboxStatusTarget,
   nowMs: number,
@@ -352,15 +391,13 @@ function buildInboxStatus(
       (previous.latestArchiveMtimeMs === null || archiveMtimeMs > previous.latestArchiveMtimeMs)
     : false;
 
-  const reasons: string[] = [];
-  if (unread > UNREAD_RED_THRESHOLD) reasons.push("unread>50");
-  if (oldestAgeSeconds !== null && oldestAgeSeconds > OLDEST_RED_SECONDS) reasons.push("oldest>4h");
-  if (lastArchiveAgeSeconds !== null && lastArchiveAgeSeconds > ARCHIVE_RED_SECONDS) {
-    reasons.push("since_archive>8h");
-  } else if (lastArchiveAgeSeconds === null && unread > 0) {
-    reasons.push("no_archive");
-  }
-  if (delta > 0 && !archiveAdvanced) reasons.push("delta>0_no_archive_activity");
+  const reasons = inboxRedReasons({
+    unread,
+    oldestAgeSeconds,
+    lastArchiveAgeSeconds,
+    delta,
+    archiveAdvanced,
+  });
 
   const status: InboxStatus = {
     oracle,
