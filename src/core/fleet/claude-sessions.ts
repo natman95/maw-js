@@ -51,6 +51,15 @@ export function decodeProjectDir(encoded: string): string {
   return encoded.replace(/^-/, "/").replace(/-/g, "/");
 }
 
+/** Encode an absolute path the way Claude Code names its project dir.
+ *  ⚠️ The encoding is LOSSY: both "/" and "-" become "-". So decodeProjectDir()
+ *  can never recover a path whose directory name contains a hyphen
+ *  ("/root/projects/volt-oracle" → "/root/projects/volt/oracle"). Match in the
+ *  ENCODE direction instead — it is exact. */
+export function encodeProjectDir(absPath: string): string {
+  return absPath.replace(/[/.]/g, "-");
+}
+
 // ── PID discovery (cached 5s) ────────────────────────────────────
 
 let pidCache: { data: PidInfo[]; ts: number } | null = null;
@@ -196,6 +205,8 @@ export async function listClaudeSessions(deps: ClaudeSessionDeps = {}): Promise<
   const claudeDir = claudeProjectsDir();
   const pids = listClaudePids(exec);
   const pidByCwd = new Map(pids.map(p => [p.cwd, p]));
+  // จับคู่ทางที่ไม่เสียข้อมูล: เข้ารหัส cwd จริงแล้วเทียบชื่อโฟลเดอร์ตรง ๆ
+  const pidByEncoded = new Map(pids.map(p => [encodeProjectDir(p.cwd), p]));
   const results: ClaudeSession[] = [];
 
   let projectDirs: string[];
@@ -203,7 +214,6 @@ export async function listClaudeSessions(deps: ClaudeSessionDeps = {}): Promise<
   catch { return []; }
 
   for (const encoded of projectDirs) {
-    const projectPath = decodeProjectDir(encoded);
     const dirPath = join(claudeDir, encoded);
     let files: string[];
     try { files = readdirSync(dirPath).filter(f => f.endsWith(".jsonl") && !f.includes("subagents")); }
@@ -219,7 +229,10 @@ export async function listClaudeSessions(deps: ClaudeSessionDeps = {}): Promise<
       const ageMs = now - mtimeMs;
       if (ageMs > 86_400_000) continue; // skip > 24h old
 
-      const pidInfo = pidByCwd.get(projectPath);
+      // encode ก่อน (แม่นเสมอ) · decode เป็น fallback ให้ของเดิมที่เคยจับคู่ได้ยังทำงาน
+      const pidInfo = pidByEncoded.get(encoded) ?? pidByCwd.get(decodeProjectDir(encoded));
+      // path ที่โชว์: ใช้ cwd จริงถ้ารู้ · ไม่รู้ค่อยเดาด้วย decode ตามเดิม
+      const projectPath = pidInfo?.cwd ?? decodeProjectDir(encoded);
       const status: ClaudeSession["status"] = pidInfo
         ? (ageMs < 120_000 ? "active" : "idle")
         : "ended";
