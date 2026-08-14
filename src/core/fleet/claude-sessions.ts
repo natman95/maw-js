@@ -52,12 +52,31 @@ export function decodeProjectDir(encoded: string): string {
 }
 
 /** Encode an absolute path the way Claude Code names its project dir.
- *  ⚠️ The encoding is LOSSY: both "/" and "-" become "-". So decodeProjectDir()
- *  can never recover a path whose directory name contains a hyphen
- *  ("/root/projects/volt-oracle" → "/root/projects/volt/oracle"). Match in the
- *  ENCODE direction instead — it is exact. */
+ *  ⚠️ The encoding is LOSSY: every non-alphanumeric character becomes "-", so
+ *  decodeProjectDir() can never recover a path whose directory name contains a
+ *  hyphen ("/root/projects/volt-oracle" → "/root/projects/volt/oracle"). Match
+ *  in the ENCODE direction instead — it is exact.
+ *
+ *  🔍 Ground truth, read out of the Claude Code binary itself (v2.1.232,
+ *  2026-08-14) rather than inferred from the directory names that happen to
+ *  exist on this box:
+ *      function _Eo(e){return e.replace(/[^a-zA-Z0-9]/g,"-")}
+ *      function xE(e){let t=_Eo(e);if(t.length<=200)return t;
+ *                     return `${t.slice(0,200)}-${wky(e)}`}
+ *      function f1(e){return join(projectsDir(), xE(e))}
+ *
+ *  ⚠️ Earlier this replaced only [/.] — which is NOT the same character class.
+ *  A path containing "_", "~", a space, or any non-ASCII character encoded to
+ *  something Claude Code never wrote, so the lookup missed and every session in
+ *  that repo was reported pid:null / "ended". No such path exists on this box
+ *  today, which is exactly why nothing caught it. (morse flagged the "_" case
+ *  as UNVERIFIED on 2026-08-14; this is that verification, and it was real.)
+ *
+ *  ⚠️ NOT replicated: the >200-character truncation, because its suffix is a
+ *  hash (wky/Ynt) we cannot reproduce. Paths that long simply fail to match, as
+ *  they already did — no regression, but do not read a miss there as "no session". */
 export function encodeProjectDir(absPath: string): string {
-  return absPath.replace(/[/.]/g, "-");
+  return absPath.replace(/[^a-zA-Z0-9]/g, "-");
 }
 
 // ── PID discovery (cached 5s) ────────────────────────────────────
