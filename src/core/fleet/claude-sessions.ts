@@ -45,10 +45,24 @@ const defaultExecSync = execSync as ExecSyncString;
 
 // ── Path encoding ────────────────────────────────────────────────
 
-/** Decode Claude Code project dir name → absolute path. */
+/** Decode Claude Code project dir name → absolute path.
+ *
+ *  LOSSY, and unfixably so: the encoding maps "/" and "." onto "-" and leaves a
+ *  real "-" alone, so `-root-projects-neo-oracle` has no way back to
+ *  `/root/projects/neo-oracle`. Kept because a dir with no "-" in any segment
+ *  still round-trips, and because it is the only answer available for a project
+ *  dir with no live process. Match on the ENCODED side instead — see
+ *  encodeProjectDir. */
 export function decodeProjectDir(encoded: string): string {
   if (!encoded.startsWith("-")) return encoded;
   return encoded.replace(/^-/, "/").replace(/-/g, "/");
+}
+
+/** Absolute path → Claude Code project dir name. The direction that IS exact:
+ *  every "/" and "." becomes "-". Encoding a known-good cwd and comparing that
+ *  to the directory name on disk avoids the lossy decode entirely. */
+export function encodeProjectDir(absPath: string): string {
+  return absPath.replace(/[/.]/g, "-");
 }
 
 // ── PID discovery (cached 5s) ────────────────────────────────────
@@ -196,6 +210,11 @@ export async function listClaudeSessions(deps: ClaudeSessionDeps = {}): Promise<
   const claudeDir = claudeProjectsDir();
   const pids = listClaudePids(exec);
   const pidByCwd = new Map(pids.map(p => [p.cwd, p]));
+  // Primary index: encode each live cwd the way Claude Code names its project
+  // dirs, so the match never depends on the lossy decode. Every house whose repo
+  // has a "-" in it (neo-oracle, echo-oracle, pulse-oracle, volt-oracle, …) read
+  // as "ended" while running because decode handed back a path nothing owns.
+  const pidByEncoded = new Map(pids.map(p => [encodeProjectDir(p.cwd), p]));
   const results: ClaudeSession[] = [];
 
   let projectDirs: string[];
@@ -203,7 +222,11 @@ export async function listClaudeSessions(deps: ClaudeSessionDeps = {}): Promise<
   catch { return []; }
 
   for (const encoded of projectDirs) {
-    const projectPath = decodeProjectDir(encoded);
+    // Encoded match first; the old decode stays as the fallback so anything that
+    // used to pair up still does. When a live process owns this dir, its real cwd
+    // is the truth — better than any reconstruction.
+    const dirPid = pidByEncoded.get(encoded) ?? pidByCwd.get(decodeProjectDir(encoded));
+    const projectPath = dirPid?.cwd ?? decodeProjectDir(encoded);
     const dirPath = join(claudeDir, encoded);
     let files: string[];
     try { files = readdirSync(dirPath).filter(f => f.endsWith(".jsonl") && !f.includes("subagents")); }
@@ -219,7 +242,7 @@ export async function listClaudeSessions(deps: ClaudeSessionDeps = {}): Promise<
       const ageMs = now - mtimeMs;
       if (ageMs > 86_400_000) continue; // skip > 24h old
 
-      const pidInfo = pidByCwd.get(projectPath);
+      const pidInfo = dirPid;
       const status: ClaudeSession["status"] = pidInfo
         ? (ageMs < 120_000 ? "active" : "idle")
         : "ended";
