@@ -30,18 +30,37 @@ import { resolveSessionTarget } from "../../core/matcher/resolve-target";
  * Worse, the duplicate window auto-wake then created IS named correctly — so
  * closing the duplicate re-armed the bug and the loop never converged.
  *
- * Session names already carry the identity (`NN-<oracle>`), and this repo
- * already owns the canonical matcher for that convention. Reuse it rather than
- * hand-rolling a second comparison: `maw view` resolves through
- * resolveSessionTarget, and this site disagreeing with that one is the same
- * split-brain class should-auto-wake.ts was written to end.
+ * Session names usually carry the identity (`NN-<oracle>`), and this repo
+ * already owns the canonical matcher for that convention — `maw view` resolves
+ * through resolveSessionTarget, and this site disagreeing with that one is the
+ * same split-brain class should-auto-wake.ts was written to end. So consult it
+ * FIRST: that alone fixes `01-arc`, whose session name carries the identity the
+ * renamed window lost.
+ *
+ * But the window check stays, as a union rather than a replacement. Identity
+ * does not always live in the session name — a session called `session` holding
+ * a window called `live-oracle` is a real shape in this codebase, and there the
+ * window is the ONLY place the oracle name appears. Replacing the window check
+ * instead of adding to it would not delete the false negative, it would move it
+ * onto that shape: exactly the failure this function exists to prevent, just
+ * relocated. (Caught in review by labubu, 2026-08-15, on the first version of
+ * this patch — which did replace it.)
+ *
+ * Union is safe in the direction that matters. Every input the old rule called
+ * live, this one still calls live, so no house that used to be reachable can
+ * start being declared dead — and being declared dead is the failure that
+ * spawns a duplicate. The added session-name path only ever converts a false
+ * "dead" into a correct "live".
  */
 export function isOracleLiveLocally(
   bareAgent: string,
-  sessions: readonly { name: string }[],
+  sessions: readonly { name: string; windows?: readonly { name: string }[] }[],
 ): boolean {
-  const r = resolveSessionTarget(bareAgent, sessions);
-  return r.kind === "exact" || r.kind === "fuzzy";
+  const bySessionName = resolveSessionTarget(bareAgent, sessions);
+  if (bySessionName.kind === "exact" || bySessionName.kind === "fuzzy") return true;
+  return sessions.some(s =>
+    (s.windows ?? []).some(w => w.name === `${bareAgent}-oracle` || w.name === bareAgent),
+  );
 }
 import { detectWindowMismatch } from "../../core/routing";
 import { loadConfig, cfgLimit } from "../../config";

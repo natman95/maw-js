@@ -46,7 +46,9 @@ describe("local liveness does not depend on the tmux window name", () => {
     }
   });
 
-  test("window names alone cannot carry liveness — strip them and nothing changes", () => {
+  test("rename every window to `claude` and all three houses still resolve", () => {
+    // The whole box in the state tmux would leave it: not one usable window
+    // name anywhere. Session names must carry it alone.
     const nameless = BOX.map(s => ({ name: s.name, windows: [{ name: "claude" }] }));
     for (const agent of ["arc", "morse", "volt"]) {
       expect(isOracleLiveLocally(agent, nameless)).toBe(true);
@@ -59,11 +61,26 @@ describe("local liveness does not depend on the tmux window name", () => {
     expect(isOracleLiveLocally("arc", [])).toBe(false);
   });
 
-  test("a window named after the agent does not resurrect a house whose session is gone", () => {
-    // Guards the inverse of the old rule: a stray window called `arc-oracle`
-    // inside somebody else's session must not count as arc being alive.
-    const strayWindowOnly = [{ name: "99-unrelated", windows: [{ name: "arc-oracle" }] }];
-    expect(isOracleLiveLocally("arc", strayWindowOnly)).toBe(false);
+  test("identity carried ONLY by the window still counts as live", () => {
+    // The half this fix must not break, and the first version of it did.
+    // `session` says nothing about who lives there; `live-oracle` is the only
+    // place the oracle name appears. Resolving by session name alone would
+    // call this house dead — moving the false negative rather than deleting
+    // it, onto a shape that exists in this codebase today.
+    const identityInWindow = [{ name: "session", windows: [{ name: "live-oracle" }] }];
+    expect(isOracleLiveLocally("live", identityInWindow)).toBe(true);
+  });
+
+  test("the session-name path only ever adds liveness — it never takes it away", () => {
+    // Union invariant: anything the old window-name rule called live must
+    // still be live. Being wrongly called dead is what spawns a duplicate, so
+    // regressions in that direction are the dangerous ones.
+    const oldRuleSaidLive = [
+      { name: "whatever", windows: [{ name: "nari-oracle" }] },
+      { name: "another", windows: [{ name: "pulse" }] },
+    ];
+    expect(isOracleLiveLocally("nari", oldRuleSaidLive)).toBe(true);
+    expect(isOracleLiveLocally("pulse", oldRuleSaidLive)).toBe(true);
   });
 
   test("an empty agent name never matches everything", () => {
