@@ -145,6 +145,36 @@ export class Tmux {
     }
   }
 
+  /**
+   * Apply the scrollback ceiling for panes created **after** this call.
+   *
+   * Must run BEFORE `new-session`/`new-window` — tmux reads `history-limit`
+   * only when a pane is born. Three traps this deliberately avoids:
+   *   1. `set -p history-limit N` → exits 0, prints nothing, changes nothing.
+   *      tmux *does* reject unknown option names (rc=1 "invalid option"), so it
+   *      is silent for exactly one shape: right name, wrong scope. That is the
+   *      shape humans type most often (📎 morse, verified 2026-08-15).
+   *   2. `set -t <session> history-limit N` → works, but a stale session-level
+   *      value then outranks the global one forever and shadows this call.
+   *   3. Setting it *after* `new-session` → `show-options` reports the new
+   *      value while the pane that already exists keeps the old one.
+   */
+  async applyHistoryLimit(limit: number = cfgLimit("tmuxHistoryLimit")): Promise<void> {
+    if (!Number.isFinite(limit) || limit <= 0) return;
+    await this.tryRun("set-option", "-g", "history-limit", String(Math.floor(limit)));
+  }
+
+  /**
+   * The ceiling a pane actually got. `show-options` answers "what is set",
+   * which is a different question and disagrees whenever a narrower scope wins.
+   */
+  async historyLimitOf(target: string): Promise<number | undefined> {
+    const raw = await this.tryRun("list-panes", "-t", target, "-F", "#{history_limit}");
+    const first = raw.split("\n").map(line => line.trim()).find(Boolean);
+    const n = first === undefined ? NaN : Number(first);
+    return Number.isFinite(n) ? n : undefined;
+  }
+
   async newSession(name: string, opts: {
     window?: string;
     cwd?: string;
@@ -159,9 +189,30 @@ export class Tmux {
     if (opts.window) args.push("-n", opts.window);
     if (opts.cwd) args.push("-c", opts.cwd);
     if (opts.command) args.push(opts.command);
+    await this.applyHistoryLimit();
     const out = await this.run("new-session", ...args);
     await this.setOption(name, "renumber-windows", "on");
+    await this.warnOnHistoryLimitMismatch(name);
     return out;
+  }
+
+  /**
+   * Read back what the newborn pane actually got. A mismatch means something
+   * narrower than the global option won — in practice a leftover
+   * `set -t <session> history-limit` from a human. We cannot fix that from
+   * here without stomping on a deliberate choice, so we say so loudly instead
+   * of letting the fleet quietly run on a ceiling nobody chose.
+   */
+  private async warnOnHistoryLimitMismatch(target: string, session = target): Promise<void> {
+    const want = cfgLimit("tmuxHistoryLimit");
+    if (!Number.isFinite(want) || want <= 0) return;
+    const got = await this.historyLimitOf(target);
+    if (got === undefined || got === Math.floor(want)) return;
+    console.warn(
+      `⚠️  tmux history-limit: asked for ${Math.floor(want)} but pane in '${target}' was born with ${got}. ` +
+      `A session-scoped option outranks the global one — check \`tmux show-options -t ${session} | grep history-limit\` ` +
+      `and clear it with \`tmux set-option -u -t ${session} history-limit\`.`,
+    );
   }
 
   async firstPaneId(target: string): Promise<string | undefined> {
@@ -211,7 +262,13 @@ export class Tmux {
     // and tmux tries to create AT that index → "index 1 in use" error.
     const args: (string | number)[] = ["-t", `${session}:`, "-n", name];
     if (opts.cwd) args.push("-c", opts.cwd);
+    // A new window is a new pane — same birth rule as newSession().
+    // Verified live 2026-08-15: with `set -t <session> history-limit 1234` in
+    // place, this path really does hand the new window 1234 instead of the
+    // global value, so it needs the same read-back as newSession().
+    await this.applyHistoryLimit();
     await this.run("new-window", ...args);
+    await this.warnOnHistoryLimitMismatch(`${session}:${name}`, session);
   }
 
   async selectWindow(target: string): Promise<void> {

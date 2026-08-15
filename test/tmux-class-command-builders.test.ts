@@ -120,12 +120,18 @@ describe("Tmux command wrapper coverage", () => {
 
     expect(t.callStrings()).toEqual([
       "has-session -t oracle",
+      // history-limit ต้องมาก่อน new-session — tmux อ่านค่านี้ตอน pane เกิดเท่านั้น
+      "set-option -g history-limit 50000",
       "new-session -s oracle -n main -c /repo",
       "set-option -t oracle renumber-windows on",
+      // อ่านกลับว่า pane เกิดมาด้วยค่าอะไรจริง (สโคปที่แคบกว่าอาจชนะเงียบ ๆ)
+      "list-panes -t oracle -F #{history_limit}",
       "new-session -d -t oracle -s maw-pty-1 -x 120 -y 40",
       "set-option -t maw-pty-1 window-size manual",
       "select-window -t maw-pty-1:work",
+      "set-option -g history-limit 50000",
       "new-window -t oracle: -n child -c /repo/child",
+      "list-panes -t oracle:child -F #{history_limit}",
       "select-window -t oracle:child",
       "switch-client -t oracle",
       "display-message -p #{client_readonly}",
