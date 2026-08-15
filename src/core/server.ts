@@ -498,7 +498,17 @@ export async function startBunGatewayServer(
       return serveWs.handlers.close(ws, code, reason);
     },
   };
-  const wsConfig = { ...wsHandlers, idleTimeout: cfgTimeout("wsIdleSec"), sendPings: true };
+  // perMessageDeflate: Bun ปิดไว้เป็นค่าเริ่มต้น (🔍 bun-types serve.d.ts — "By default, compression
+  // is disabled") ⇒ ทุก frame ที่เราส่งเป็นข้อความดิบ ทั้งที่เนื้อหลักคือ capture ของเทอร์มินัล
+  // ซึ่งซ้ำสูงมากโดยธรรมชาติ
+  // 🔍 วัดจริง 16.08 (gzip เป็นตัวแทนอัตราบีบ): pane บน srv1809016 = 80–92% · pane บนกล่อง labubu = 70–79%
+  // ⚠️ อัตราบีบของกล่องหนึ่ง **เอาไปทำนายอีกกล่องไม่ได้** (pane ที่เนื้อแน่นบีบได้น้อยกว่า) — วัดของตัวเองเสมอ
+  const wsConfig = {
+    ...wsHandlers,
+    idleTimeout: cfgTimeout("wsIdleSec"),
+    sendPings: true,
+    perMessageDeflate: true,
+  };
 
   log.debug(`[serve:debug] running serve lifecycle hooks`);
   await runServeLifecycleHooks({

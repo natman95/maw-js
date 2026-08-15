@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { connect as netConnect } from "node:net";
 
 const original = {
   cwd: process.cwd(),
@@ -17,6 +18,33 @@ const original = {
 let root = "";
 
 type BunServerLike = { port: number; stop: (force?: boolean) => void };
+
+/** ยิง HTTP upgrade ดิบ ๆ แล้วคืน "ส่วนหัวของคำตอบ" ทั้งก้อน เพื่ออ่าน header ที่เจรจาได้จริง */
+function rawUpgradeHeaders(port: number, path: string, extensions: string, timeoutMs = 5_000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const sock = netConnect(port, "127.0.0.1", () => {
+      sock.write(
+        `GET ${path} HTTP/1.1\r\n` +
+        `Host: 127.0.0.1:${port}\r\n` +
+        "Upgrade: websocket\r\n" +
+        "Connection: Upgrade\r\n" +
+        "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n" +
+        "Sec-WebSocket-Version: 13\r\n" +
+        (extensions ? `Sec-WebSocket-Extensions: ${extensions}\r\n` : "") +
+        "\r\n",
+      );
+    });
+    let buf = "";
+    const done = (fn: () => void) => { clearTimeout(timer); sock.destroy(); fn(); };
+    const timer = setTimeout(() => done(() => reject(new Error(`handshake timeout after ${timeoutMs}ms`))), timeoutMs);
+    sock.on("data", (chunk) => {
+      buf += chunk.toString("latin1");
+      const end = buf.indexOf("\r\n\r\n");
+      if (end >= 0) done(() => resolve(buf.slice(0, end)));
+    });
+    sock.on("error", (e) => done(() => reject(e)));
+  });
+}
 
 function restoreEnv(key: keyof typeof original, envName: keyof NodeJS.ProcessEnv): void {
   const value = original[key];
@@ -126,6 +154,29 @@ describe("startServer real Bun.serve smoke (#2749)", () => {
       expect(frame).toMatchObject({ type: "feed-history", events: expect.any(Array) });
     } finally {
       if (ws && ws.readyState < WebSocket.CLOSING) ws.close();
+      server?.stop(true);
+    }
+  }, 10_000);
+
+  // อ่าน "สิ่งที่เซิร์ฟเวอร์ตอบกลับใน handshake" ไม่ใช่ "จอยังขึ้นอยู่ไหม" (📎 Labubu 16.08)
+  // ท่าเดียวที่พิสูจน์ได้ว่าการบีบอัดถูกเจรจาสำเร็จจริง คือ header ที่ตอบกลับมา
+  test("handshake ตอบรับ permessage-deflate เมื่อ client ขอ (และไม่ยัดให้เมื่อไม่ขอ)", async () => {
+    const { startServer } = await import("../../src/core/server.ts?ws-deflate-handshake");
+    let server: BunServerLike | undefined;
+    try {
+      server = await startServer(0, {
+        transports: [], intervals: false, views: false, apiRouters: [],
+      }, { verbosity: 0, gateway: "bun" }) as BunServerLike;
+
+      const asked = await rawUpgradeHeaders(server.port, "/ws", "permessage-deflate");
+      expect(asked).toContain("101");
+      expect(asked.toLowerCase()).toContain("sec-websocket-extensions: permessage-deflate");
+
+      // negative control: ไม่ขอ ⇒ ต้องไม่มีในคำตอบ — กันเทสต์ที่ผ่านเพราะ assert หลวม
+      const notAsked = await rawUpgradeHeaders(server.port, "/ws", "");
+      expect(notAsked).toContain("101");
+      expect(notAsked.toLowerCase()).not.toContain("sec-websocket-extensions: permessage-deflate");
+    } finally {
       server?.stop(true);
     }
   }, 10_000);
