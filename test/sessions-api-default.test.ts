@@ -167,7 +167,7 @@ describe("sessions, capture, and mirror routes", () => {
 
     const ok = await readJson(await h.app.handle(new Request("http://local/capture?target=neo")));
     expect(ok).toEqual({ content: "line one\nlast line" });
-    expect(h.calls[0]).toEqual(["capture", "local:neo", 1000]);
+    expect(h.calls[0]).toEqual(["capture", "local:neo", 200]);
 
     // ?lines= override, clamped to 1..50000 (📎 Boss 2026-08-15 — ชั้นที่ 3 ของเพดาน 4 ชั้น)
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=300")));
@@ -175,7 +175,8 @@ describe("sessions, capture, and mirror routes", () => {
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=99999")));
     expect(h.calls[2]).toEqual(["capture", "local:neo", 50000]);
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=bogus")));
-    expect(h.calls[3]).toEqual(["capture", "local:neo", 1000]);
+    // ค่า default (bogus → ไม่ระบุ) = 200 📎 Boss 2026-07-25 — คนละคำสั่งกับเพดาน
+    expect(h.calls[3]).toEqual(["capture", "local:neo", 200]);
     // ค่าที่อยู่ "ระหว่างเพดานเก่ากับเพดานใหม่" ต้องผ่านไปเต็ม ๆ ไม่ถูกหั่นกลับเป็น 10000
     // (ถ้าใครถอย clamp กลับ ข้อนี้จะแดง — ข้อ 99999 ข้างบนอย่างเดียวจับไม่ได้ว่าหั่นที่เท่าไร)
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=20000")));

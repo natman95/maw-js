@@ -12,28 +12,11 @@ module.exports = {
         MAW_PORT: '3456',
       },
     },
-    {
-      name: 'maw-boot',
-      // Launcher shim: PM2 wraps spawned processes with require-in-the-middle,
-      // which sync-require()s the entry file. src/cli.ts is an ESM async module
-      // (top-level await) → require() throws on Windows and some Linux setups:
-      //
-      //   TypeError: require() async module "...src/cli.ts" is unsupported.
-      //   use "await import()" instead.
-      //
-      // The .cjs shim is require-safe and spawns bun via child_process,
-      // bypassing the PM2 require hook entirely.
-      // See scripts/maw-boot.launcher.cjs.
-      script: 'scripts/maw-boot.launcher.cjs',
-      // #1811 — `wake all --resume` is deprecated; `fleet restore --all`
-      // reads the latest snapshot and re-wakes every oracle in it.
-      args: ['fleet', 'restore', '--all'],
-      interpreter: 'node',
-      // One-shot: spawn fleet after server starts, don't restart
-      autorestart: false,
-      // Give maw server time to come up
-      restart_delay: 5000,
-    },
+    // maw-boot migrated PM2 → systemd 2026-04-26 (maw-boot.service, Type=oneshot
+    // RemainAfterExit=yes). Removed from PM2 here because PM2 autorestart flipped the
+    // successful oneshot to 'waiting restart' → false "pm2-persistence degraded" alert
+    // (held 2977min, Pulse drift-audit 2026-07-26). Launcher shim preserved at
+    // scripts/maw-boot.launcher.cjs (Nothing-is-Deleted). Do NOT `pm2 start maw-boot`.
     // maw-dev moved to Soul-Brews-Studio/maw-ui (bun run dev)
     // maw-broker removed — MQTT layer deleted in 3b71daa (WebSocket handles broadcast)
   ],

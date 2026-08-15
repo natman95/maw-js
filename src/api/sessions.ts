@@ -262,13 +262,23 @@ export function createSessionsApi(deps: SessionsApiDeps = {}) {
   api.get("/capture", async ({ query, set }) => {
     const target = query.target;
     if (!target) { set.status = 400; return { error: "target required" }; }
-    // Scrollback: default 1000 lines (was 80 — one screen of history).
+    // Scrollback: default 200 lines (was 1000 — Boss 2026-07-25). The preview
+    // surfaces that call this (MiniPreview, OverviewGrid, HoverPreviewCard,
+    // MiniMonitor, VSAgentPanel) show a few lines and auto-scroll to the tail,
+    // so 1000 lines of history was paid for on every poll and thrown away. 200
+    // matches the two sibling defaults: /captures (below) and
+    // TMUX_STREAM_CAPTURE_LINES in api/tmux-stream.ts.
+    //
     // ชั้นที่ 3 ของเพดาน scrollback 4 ชั้น — ?lines= overrides, clamped to 1..50000
     // 📎 Boss เคาะ 2026-08-15 (เดิม 10000) · ให้เท่ากับเพดาน tmux เพราะ /capture คือช่อง
     // "ขอลึกสุดเท่าที่มี" — ไม่ใช่ช่องที่วิ่งเข้าจอมือถือทุกครั้งเหมือน replay ชั้น 2
     // ⚠️ อ่าน history_limit ของจริงด้วย `tmux list-panes -a -F '#{history_limit}'` เท่านั้น
+    //
+    // ⚠️ สองเลขนี้มาจากคำสั่ง Boss คนละครั้ง และคุมคนละเรื่อง — ห้ามรวบเป็นเลขเดียว:
+    //   default 200  = จ่ายเท่าไรตอนไม่มีใครขอ (25.07)
+    //   ceiling 50000 = ขอลึกสุดได้เท่าไรตอนขอจริง (15.08)
     const requested = Number.parseInt(query.lines ?? "", 10);
-    const lines = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 1000, 1), 50_000);
+    const lines = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 200, 1), 50_000);
     try {
       const sessions = await d.listSessions();
       const resolved = resolveCapture(target, sessions, d);
