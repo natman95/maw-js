@@ -71,7 +71,10 @@ describe("queue-store default coverage", () => {
       sender: "old",
       target: "new",
       message: "still pending",
-      sentAt: "2026-05-20T00:00:00.000Z",
+      // ⚠️ ห้ามใส่วันที่ตายตัว — TTL คือ 30 วัน (TTL_MS) ⇒ fixture วันที่คงที่จะ "เน่า"
+      // ตามปฏิทิน: เขียนวันนี้เขียว อีก 31 วันแดงเอง โดยไม่มีใครแตะโค้ด
+      // (ของเดิม "2026-05-20" แดงมาตั้งแต่ ~19.06.2026 — จับได้ 15.08 ตอนไล่ว่าทำไม CI แดง)
+      sentAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
       status: "pending",
     }));
 
