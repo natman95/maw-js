@@ -75,10 +75,18 @@ describe("tmux-class twelfth-pass isolated coverage", () => {
     await expect(t.setEnvironment("alpha", "MAW_TEST", "1")).resolves.toBeUndefined();
 
     expect(t.calls).toEqual([
+      // Each of the three births below is preceded by the global ceiling and
+      // followed by a read-back — tmux reads history-limit only when a pane is
+      // born, so setting it afterwards is a silent no-op (f4cbdad9 / #1).
+      { subcommand: "set-option", args: ["-g", "history-limit", "50000"] },
       { subcommand: "new-session", args: ["-s", "alpha", "-n", "main", "-c", "/repo"] },
       { subcommand: "set-option", args: ["-t", "alpha", "renumber-windows", "on"] },
+      { subcommand: "display-message", args: ["-p", "-t", "alpha", "#{history_limit}|#{session_name}"] },
+      { subcommand: "set-option", args: ["-g", "history-limit", "50000"] },
       { subcommand: "new-window", args: ["-t", "alpha:", "-n", "logs", "-c", "/tmp"] },
-      { subcommand: "split-window", args: ["-t", "alpha:main.0"] },
+      { subcommand: "display-message", args: ["-p", "-t", "alpha:logs", "#{history_limit}|#{session_name}"] },
+      { subcommand: "set-option", args: ["-g", "history-limit", "50000"] },
+      { subcommand: "split-window", args: ["-P", "-F", "#{pane_id}", "-t", "alpha:main.0"] },
       { subcommand: "select-pane", args: ["-t", "alpha:main.0"] },
       { subcommand: "select-pane", args: ["-t", "alpha:main.0", "-T", "worker"] },
       { subcommand: "select-layout", args: ["-t", "alpha:main", "tiled"] },

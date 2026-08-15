@@ -102,9 +102,16 @@ describe("tmux-class tenth-pass isolated coverage", () => {
     await expect(t.newSession("alpha")).resolves.toBe("");
 
     expect(t.calls).toEqual([
+      // tmux reads history-limit only when a pane is BORN, so it is set globally
+      // before new-session and read back afterwards (f4cbdad9 / #1).
+      { subcommand: "set-option", args: ["-g", "history-limit", "50000"] },
       { subcommand: "new-session", args: ["-d", "-s", "alpha"] },
       { subcommand: "set-option", args: ["-t", "alpha", "renumber-windows", "on"] },
+      { subcommand: "display-message", args: ["-p", "-t", "alpha", "#{history_limit}|#{session_name}"] },
     ]);
+    // the ceiling must be set BEFORE the pane exists — after is a silent no-op
+    const order = t.calls.map(c => c.subcommand);
+    expect(order.indexOf("set-option")).toBeLessThan(order.indexOf("new-session"));
   });
 
   test("listSessions preserves blank window listings as empty sessions", async () => {

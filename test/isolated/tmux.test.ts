@@ -245,7 +245,10 @@ describe("Tmux", () => {
   describe("splitWindow", () => {
     test("generates split-window command", async () => {
       await t.splitWindow("oracles:page-1");
-      expect(commands[0]).toBe("tmux split-window -t oracles:page-1");
+      // `-P -F '#{pane_id}'` is not cosmetic: splitWindow reads the id back to
+      // check the new pane got the history-limit it asked for. Reading `-t <window>`
+      // instead would measure that window's FIRST pane (f4cbdad9 / #1).
+      expect(commands[0]).toBe("tmux split-window -P -F '#{pane_id}' -t oracles:page-1");
     });
 
     test("can print the new pane id while starting in a cwd with a command", async () => {
