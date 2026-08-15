@@ -169,11 +169,11 @@ describe("sessions, capture, and mirror routes", () => {
     expect(ok).toEqual({ content: "line one\nlast line" });
     expect(h.calls[0]).toEqual(["capture", "local:neo", 200]);
 
-    // ?lines= override, clamped to 1..2000
+    // ?lines= override, clamped to 1..50000 (matches tmux history-limit, Boss 2026-08-15)
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=300")));
     expect(h.calls[1]).toEqual(["capture", "local:neo", 300]);
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=99999")));
-    expect(h.calls[2]).toEqual(["capture", "local:neo", 10000]);
+    expect(h.calls[2]).toEqual(["capture", "local:neo", 50000]);
     await readJson(await h.app.handle(new Request("http://local/capture?target=neo&lines=bogus")));
     expect(h.calls[3]).toEqual(["capture", "local:neo", 200]);
 

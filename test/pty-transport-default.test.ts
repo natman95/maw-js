@@ -220,7 +220,7 @@ describe("createPtyHandlers", () => {
       opts: { cols: 200, rows: 1, window: "oracle" },
     });
     expect(h.setOptionCalls[0]).toEqual({ session: "maw-pty-123456-1", option: "status", value: "off" });
-    expect(h.spawnSyncCalls[0]).toEqual(["tmux", "capture-pane", "-t", "demo:oracle", "-p", "-e", "-J", "-S", "-10000"]);
+    expect(h.spawnSyncCalls[0]).toEqual(["tmux", "capture-pane", "-t", "demo:oracle", "-p", "-e", "-J", "-S", "-20000"]);
     expect(h.spawnCalls[0].args[0]).toBe("/usr/bin/expect");
     expect(h.spawnCalls[0].opts).toMatchObject({ stdin: "pipe", stdout: "pipe", stderr: "ignore", windowsHide: true });
     expect(h.spawnCalls[0].opts.env.TERM).toBe("xterm-256color");

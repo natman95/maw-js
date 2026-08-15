@@ -74,12 +74,16 @@ interface PtyHandlers {
 }
 
 function replayLinesFromControl(value: unknown): number {
-  // Default matches tmux history-limit (10000) + xterm.js scrollback in maw-ui;
+  // Default matches xterm.js scrollback in maw-ui (20000) — replaying more than
+  // the client can hold just burns mobile bytes. Ceiling matches tmux
+  // history-limit (50000) so a caller that wants the full buffer can ask.
   // Boss 2026-07-10: mobile viewer must scroll far enough back to re-read reports.
-  if (value === undefined) return 10_000;
+  // Boss 2026-08-15: 4-layer raise (tmux 50000 · replay/capture 50000 · xterm 20000)
+  // — the old comment claimed tmux was 10000; it was actually the tmux default 2000.
+  if (value === undefined) return 20_000;
   const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return 10_000;
-  return Math.max(0, Math.min(10_000, Math.floor(n)));
+  if (!Number.isFinite(n)) return 20_000;
+  return Math.max(0, Math.min(50_000, Math.floor(n)));
 }
 
 function replayCapture(ws: MawWS, target: string, lines: number, io: PtyDeps) {
