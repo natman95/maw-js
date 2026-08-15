@@ -851,11 +851,16 @@ describe("wake-cmd thirteenth-pass isolated coverage", () => {
     );
 
     expect(result).toBe("54-neo:neo-oracle");
-    expect(sentText).toEqual([{
-      target: "54-neo:neo-oracle",
-      text: `cd ${repoPath} && codex --agent neo-oracle`,
-    }]);
-    expect(respawnCalls).toContainEqual(["send-keys", "-t", "54-neo:neo-oracle", "plain 'prompt'", "Enter"]);
+    // The prompt rides the same verified sender as the command (df52632).
+    // It used to go out as a raw blind `send-keys … Enter`, which dropped the
+    // Enter whenever the pane was still booting the agent TUI — a cron wake
+    // once pasted its whole job and burned 0 tokens. Asserting the raw
+    // send-keys here pinned that bug in place as if it were the spec.
+    expect(sentText).toEqual([
+      { target: "54-neo:neo-oracle", text: `cd ${repoPath} && codex --agent neo-oracle` },
+      { target: "54-neo:neo-oracle", text: "plain 'prompt'" },
+    ]);
+    expect(respawnCalls).not.toContainEqual(["send-keys", "-t", "54-neo:neo-oracle", "plain 'prompt'", "Enter"]);
   });
 
   test("existing live windows offer attach and continue when tty answer is unavailable", async () => {
@@ -900,13 +905,15 @@ describe("wake-cmd thirteenth-pass isolated coverage", () => {
       expect(newWindows).toEqual([
         { session: "54-neo", window: "neo-alpha", opts: { cwd: "/tmp/neo-oracle.wt-2-alpha" } },
       ]);
+      // Prompt goes through the verified sender, not a raw blind send-keys.
       expect(sentText).toEqual([
         {
           target: "54-neo:neo-alpha",
           text: "cd /tmp/neo-oracle.wt-2-alpha && codex --agent neo-alpha",
         },
+        { target: "54-neo:neo-alpha", text: "selected" },
       ]);
-      expect(respawnCalls).toContainEqual(["send-keys", "-t", "54-neo:neo-alpha", "selected", "Enter"]);
+      expect(respawnCalls).not.toContainEqual(["send-keys", "-t", "54-neo:neo-alpha", "selected", "Enter"]);
     } finally {
       _wtPicker.isStdoutTTY = originalIsTTY;
       _wtPicker.readChoice = originalReadChoice;
@@ -994,13 +1001,15 @@ describe("wake-cmd thirteenth-pass isolated coverage", () => {
     expect(newWindows).toEqual([
       { session: "54-neo", window: "neo-alpha", opts: { cwd: "/tmp/neo-oracle.wt-1-alpha" } },
     ]);
+    // Prompt goes through the verified sender, not a raw blind send-keys.
     expect(sentText).toEqual([
       {
         target: "54-neo:neo-alpha",
         text: "cd /tmp/neo-oracle.wt-1-alpha && codex --agent neo-alpha",
       },
+      { target: "54-neo:neo-alpha", text: "ship now" },
     ]);
-    expect(respawnCalls).toContainEqual(["send-keys", "-t", "54-neo:neo-alpha", "ship now", "Enter"]);
+    expect(respawnCalls).not.toContainEqual(["send-keys", "-t", "54-neo:neo-alpha", "ship now", "Enter"]);
     expect(attachCalls).toEqual(["54-neo"]);
     expect(splitCalls).toEqual(["54-neo:neo-alpha"]);
     expect(openCalls).toEqual(["54-neo:neo-alpha"]);
