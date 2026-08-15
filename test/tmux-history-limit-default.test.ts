@@ -61,7 +61,7 @@ describe("tmux history-limit — กลไกตอนสร้าง pane", () 
 
   test("D-order: set -g ต้องมา **ก่อน** new-session ไม่ใช่หลัง", async () => {
     const t = new FakeTmux((sub, args) => {
-      if (sub === "list-panes" && args.includes("#{history_limit}")) return String(LIMIT);
+      if (sub === "display-message") return `${LIMIT}|oracle`;
       return "";
     });
     await t.newSession("oracle", { window: "main", cwd: "/repo" });
@@ -85,7 +85,7 @@ describe("tmux history-limit — กลไกตอนสร้าง pane", () 
 
   test("D-shadow ทาง new-window ด้วย — เคสนี้ยิงกับ tmux จริงแล้วเกิดขึ้นจริง (1234 ชนะ 50000)", async () => {
     const t = new FakeTmux((sub, args) => {
-      if (sub === "list-panes" && args.includes("#{history_limit}")) return "1234";
+      if (sub === "display-message") return "1234|oracle";
       return "";
     });
 
@@ -98,17 +98,48 @@ describe("tmux history-limit — กลไกตอนสร้าง pane", () 
     expect(warnings[0]).toContain("set-option -u -t oracle history-limit");
   });
 
-  test("อ่านค่าที่ pane ได้จริงด้วย list-panes ไม่ใช่ show-options", async () => {
-    const t = new FakeTmux((sub, args) => (sub === "list-panes" && args.includes("#{history_limit}") ? "50000\n50000" : ""));
+  test("split-window ก็เป็น pane ใหม่ — ต้องตั้งก่อน และอ่านกลับที่ **pane ที่เพิ่งเกิด** ไม่ใช่ที่หน้าต่าง", async () => {
+    // 📎 arc จับได้ 15.08: splitWindow() หลุดจากกลไกรอบแรก ทั้งที่คอมเมนต์ในไฟล์เดียวกัน
+    // เขียนไว้เองว่า "A new window is a new pane" — split ก็เป็น pane ใหม่เหมือนกัน
+    const t = new FakeTmux((sub, args) => {
+      if (sub === "split-window") return "%42";
+      if (sub === "display-message") return `${LIMIT}|oracle`;
+      return "";
+    });
+
+    await t.splitWindow("oracle:main", { direction: "horizontal" });
+
+    const order = t.callStrings();
+    expect(order[0]).toBe(`set-option -g history-limit ${LIMIT}`);
+    expect(order[1]).toStartWith("split-window");
+    // อ่านกลับต้องเล็งที่ %42 (pane ที่เพิ่งเกิด) ไม่ใช่ oracle:main ซึ่งคืน pane แรกของหน้าต่าง
+    expect(order[2]).toBe("display-message -p -t %42 #{history_limit}|#{session_name}");
+  });
+
+  test("split-window: ผู้เรียกที่ขอ format เองต้องได้ค่าเดิมกลับไป ไม่ถูกกลไกแย่งช่อง", async () => {
+    const t = new FakeTmux((sub) => (sub === "split-window" ? "custom-output" : ""));
+
+    const out = await t.splitWindow(undefined, { printFormat: "#{pane_pid}" });
+
+    expect(out).toBe("custom-output");
+    expect(t.callStrings().some(c => c.includes("-F #{pane_pid}"))).toBe(true);
+    expect(t.callStrings().some(c => c.startsWith("display-message"))).toBe(false);
+  });
+
+  test("อ่านค่าที่ pane ได้จริงด้วย display-message — ไม่ใช่ show-options และไม่ใช่ list-panes", async () => {
+    // historyLimitOf ถามค่าเดียว · ตัว warn ถามสองค่าคั่นด้วย | — fake ต้องแยกให้ออก
+    const t = new FakeTmux((sub, args) => (sub === "display-message" && args.includes("#{history_limit}") ? "50000" : ""));
 
     expect(await t.historyLimitOf("oracle")).toBe(50000);
     expect(t.callStrings().join("\n")).not.toContain("show-options");
+    // และห้ามใช้ list-panes -t <pane> — tmux คืนทุก pane ในหน้าต่าง ไม่ใช่ตัวที่ถาม
+    expect(t.callStrings().join("\n")).not.toContain("list-panes");
   });
 
   test("D-shadow: pane เกิดมาด้วยค่าอื่น (session override ชนะ) ⇒ ต้องเตือน ไม่ใช่ผ่านเงียบ", async () => {
     const t = new FakeTmux((sub, args) => {
       // global ตั้ง 50000 สำเร็จ แต่ pane เกิดมา 200000 — อาการเป๊ะของ 15.08
-      if (sub === "list-panes" && args.includes("#{history_limit}")) return "200000";
+      if (sub === "display-message") return "200000|oracle";
       return "";
     });
 
@@ -122,7 +153,7 @@ describe("tmux history-limit — กลไกตอนสร้าง pane", () 
   });
 
   test("ตรงกันแล้วต้องเงียบ — ไม่งั้นคนจะเรียนรู้ที่จะเมินคำเตือน", async () => {
-    const t = new FakeTmux((sub, args) => (sub === "list-panes" && args.includes("#{history_limit}") ? String(LIMIT) : ""));
+    const t = new FakeTmux((sub) => (sub === "display-message" ? `${LIMIT}|oracle` : ""));
 
     const { warnings } = await captureWarnings(() => t.newSession("oracle"));
     expect(warnings).toEqual([]);
@@ -130,7 +161,7 @@ describe("tmux history-limit — กลไกตอนสร้าง pane", () 
 
   test("อ่านค่ากลับไม่ได้ (tmux ล่ม/pane หาย) ⇒ ห้ามเตือนมั่ว และห้ามพัง", async () => {
     const t = new FakeTmux((sub) => {
-      if (sub === "list-panes") throw new Error("can't find pane");
+      if (sub === "display-message") throw new Error("can't find pane");
       return "";
     });
 

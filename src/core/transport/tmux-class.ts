@@ -169,7 +169,16 @@ export class Tmux {
    * which is a different question and disagrees whenever a narrower scope wins.
    */
   async historyLimitOf(target: string): Promise<number | undefined> {
-    const raw = await this.tryRun("list-panes", "-t", target, "-F", "#{history_limit}");
+    // `display-message -p -t <target>` resolves to exactly one pane.
+    //
+    // The obvious alternative is wrong: `list-panes -t %id` does NOT narrow to
+    // that pane — tmux reads the target as "the window this pane lives in" and
+    // lists every pane in it, so taking the first line answers about a
+    // different pane. Caught 2026-08-15 by probing real tmux: a split under a
+    // session-scoped limit of 777 reported 50000, because the window's first
+    // pane was older. The unit tests could not see it — they feed the fake
+    // whatever the assertion expects.
+    const raw = await this.tryRun("display-message", "-p", "-t", target, "#{history_limit}");
     const first = raw.split("\n").map(line => line.trim()).find(Boolean);
     const n = first === undefined ? NaN : Number(first);
     return Number.isFinite(n) ? n : undefined;
@@ -203,15 +212,26 @@ export class Tmux {
    * here without stomping on a deliberate choice, so we say so loudly instead
    * of letting the fleet quietly run on a ceiling nobody chose.
    */
-  private async warnOnHistoryLimitMismatch(target: string, session = target): Promise<void> {
+  private async warnOnHistoryLimitMismatch(target: string): Promise<void> {
     const want = cfgLimit("tmuxHistoryLimit");
     if (!Number.isFinite(want) || want <= 0) return;
-    const got = await this.historyLimitOf(target);
-    if (got === undefined || got === Math.floor(want)) return;
+    // Ask for the owning session in the same round-trip: the fix command below
+    // must name a *session*, because history-limit has no window or pane scope.
+    // Deriving it from the target string would emit `-t sess:window`, which
+    // tmux accepts and silently does nothing with — the very trap this warns about.
+    const raw = await this.tryRun("display-message", "-p", "-t", target, "#{history_limit}|#{session_name}");
+    const [limitText, sessionName] = (raw.split("\n").map(l => l.trim()).find(Boolean) ?? "").split("|");
+    // No read-back (tmux down, pane already gone) means "unknown", not "zero".
+    // `Number("")` is 0, which is finite — checking Number.isFinite alone would
+    // turn every failed probe into a confident false alarm.
+    if (!limitText) return;
+    const got = Number(limitText);
+    if (!Number.isFinite(got) || got === Math.floor(want)) return;
+    const fixTarget = sessionName || target;
     console.warn(
       `⚠️  tmux history-limit: asked for ${Math.floor(want)} but pane in '${target}' was born with ${got}. ` +
-      `A session-scoped option outranks the global one — check \`tmux show-options -t ${session} | grep history-limit\` ` +
-      `and clear it with \`tmux set-option -u -t ${session} history-limit\`.`,
+      `A session-scoped option outranks the global one — check \`tmux show-options -t ${fixTarget} | grep history-limit\` ` +
+      `and clear it with \`tmux set-option -u -t ${fixTarget} history-limit\`.`,
     );
   }
 
@@ -268,7 +288,7 @@ export class Tmux {
     // global value, so it needs the same read-back as newSession().
     await this.applyHistoryLimit();
     await this.run("new-window", ...args);
-    await this.warnOnHistoryLimitMismatch(`${session}:${name}`, session);
+    await this.warnOnHistoryLimitMismatch(`${session}:${name}`);
   }
 
   async selectWindow(target: string): Promise<void> {
@@ -432,15 +452,26 @@ export class Tmux {
     direction?: "horizontal" | "vertical";
     fullWindow?: boolean;
   } = {}): Promise<string> {
+    // A split is a new pane too — same birth rule as newSession()/newWindow().
+    // When the caller does not ask for a print format we ask for the new pane's
+    // id anyway: reading back `-t <window>` would measure the *first* pane of
+    // that window, which is a different object than the one just born.
+    const wantsOwnFormat = Boolean(opts.printFormat);
     const args: (string | number)[] = [];
-    if (opts.printFormat) args.push("-P", "-F", opts.printFormat);
+    args.push("-P", "-F", wantsOwnFormat ? opts.printFormat! : "#{pane_id}");
     if (opts.fullWindow) args.push("-f");
     if (opts.direction === "horizontal") args.push("-h");
     if (opts.direction === "vertical") args.push("-v");
     if (target) args.push("-t", target);
     if (opts.cwd) args.push("-c", opts.cwd);
     if (opts.command) args.push(opts.command);
-    return this.run("split-window", ...args);
+    await this.applyHistoryLimit();
+    const out = await this.run("split-window", ...args);
+    if (!wantsOwnFormat) {
+      const paneId = out.split("\n").map(line => line.trim()).find(Boolean);
+      if (paneId) await this.warnOnHistoryLimitMismatch(paneId);
+    }
+    return out;
   }
 
   async selectPane(target: string, opts: { title?: string } = {}): Promise<void> {
