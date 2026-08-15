@@ -268,10 +268,17 @@ export function createSessionsApi(deps: SessionsApiDeps = {}) {
     // so 1000 lines of history was paid for on every poll and thrown away. 200
     // matches the two sibling defaults: /captures (below) and
     // TMUX_STREAM_CAPTURE_LINES in api/tmux-stream.ts.
-    // ?lines= overrides, clamped to 1..10000 (tmux history-limit is 10000) —
-    // a caller that genuinely needs deep history asks for it explicitly.
+    //
+    // ชั้นที่ 3 ของเพดาน scrollback 4 ชั้น — ?lines= overrides, clamped to 1..50000
+    // 📎 Boss เคาะ 2026-08-15 (เดิม 10000) · ให้เท่ากับเพดาน tmux เพราะ /capture คือช่อง
+    // "ขอลึกสุดเท่าที่มี" — ไม่ใช่ช่องที่วิ่งเข้าจอมือถือทุกครั้งเหมือน replay ชั้น 2
+    // ⚠️ อ่าน history_limit ของจริงด้วย `tmux list-panes -a -F '#{history_limit}'` เท่านั้น
+    //
+    // ⚠️ สองเลขนี้มาจากคำสั่ง Boss คนละครั้ง และคุมคนละเรื่อง — ห้ามรวบเป็นเลขเดียว:
+    //   default 200  = จ่ายเท่าไรตอนไม่มีใครขอ (25.07)
+    //   ceiling 50000 = ขอลึกสุดได้เท่าไรตอนขอจริง (15.08)
     const requested = Number.parseInt(query.lines ?? "", 10);
-    const lines = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 200, 1), 10_000);
+    const lines = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 200, 1), 50_000);
     try {
       const sessions = await d.listSessions();
       const resolved = resolveCapture(target, sessions, d);

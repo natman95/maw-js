@@ -8,6 +8,60 @@ import {
 } from "../../sdk";
 import { Tmux } from "../../core/transport/tmux";
 import { AmbiguousMatchError } from "../../core/runtime/find-window";
+import { resolveSessionTarget } from "../../core/matcher/resolve-target";
+
+/**
+ * Is this oracle already running locally? Feeds the auto-wake decision — a
+ * false negative here does not merely waste a wake, it spawns a SECOND claude
+ * in that oracle's house which forks its context and writes to its shared
+ * state (2026-08-15: the duplicate marked two of arc's inbox letters read
+ * before arc ever saw them).
+ *
+ * Exported so the rule can be tested against real fleet-shaped session data
+ * instead of through a mocked cmdSend — the failure this guards against is a
+ * *naming* fact about tmux, and a fake that hands back tidy window names can
+ * never reproduce it.
+ *
+ * Liveness must NOT depend on a tmux window name. tmux owns that label:
+ * `automatic-rename` (a -gw window option, on by default) rewrites any window
+ * born without `-n` to whatever command is running. A live `01-arc` whose
+ * window was created unnamed therefore reads as `claude`, and the previous
+ * exact-match (`name === "arc-oracle" || name === "arc"`) called it dead.
+ * Worse, the duplicate window auto-wake then created IS named correctly — so
+ * closing the duplicate re-armed the bug and the loop never converged.
+ *
+ * Session names usually carry the identity (`NN-<oracle>`), and this repo
+ * already owns the canonical matcher for that convention — `maw view` resolves
+ * through resolveSessionTarget, and this site disagreeing with that one is the
+ * same split-brain class should-auto-wake.ts was written to end. So consult it
+ * FIRST: that alone fixes `01-arc`, whose session name carries the identity the
+ * renamed window lost.
+ *
+ * But the window check stays, as a union rather than a replacement. Identity
+ * does not always live in the session name — a session called `session` holding
+ * a window called `live-oracle` is a real shape in this codebase, and there the
+ * window is the ONLY place the oracle name appears. Replacing the window check
+ * instead of adding to it would not delete the false negative, it would move it
+ * onto that shape: exactly the failure this function exists to prevent, just
+ * relocated. (Caught in review by labubu, 2026-08-15, on the first version of
+ * this patch — which did replace it.)
+ *
+ * Union is safe in the direction that matters. Every input the old rule called
+ * live, this one still calls live, so no house that used to be reachable can
+ * start being declared dead — and being declared dead is the failure that
+ * spawns a duplicate. The added session-name path only ever converts a false
+ * "dead" into a correct "live".
+ */
+export function isOracleLiveLocally(
+  bareAgent: string,
+  sessions: readonly { name: string; windows?: readonly { name: string }[] }[],
+): boolean {
+  const bySessionName = resolveSessionTarget(bareAgent, sessions);
+  if (bySessionName.kind === "exact" || bySessionName.kind === "fuzzy") return true;
+  return sessions.some(s =>
+    (s.windows ?? []).some(w => w.name === `${bareAgent}-oracle` || w.name === bareAgent),
+  );
+}
 import { detectWindowMismatch } from "../../core/routing";
 import { loadConfig, cfgLimit } from "../../config";
 import { logMessage, emitFeed } from "./comm-log-feed";
@@ -642,10 +696,7 @@ export async function cmdSend(
     const isCanonical = parts.length >= 3 || (parts.length === 2 && (isTmuxSessionIdTarget(bareAgent) || isExplicitRemoteSession));
     const isLocalScope = !targetNode || targetNode === config.node || targetNode === "local";
     if (isLocalScope && bareAgent && !isCanonical) {
-      const hasLocalSession = sessions.some(s =>
-        s.name === bareAgent ||
-        s.windows.some(w => w.name === `${bareAgent}-oracle` || w.name === bareAgent)
-      );
+      const hasLocalSession = isOracleLiveLocally(bareAgent, sessions);
       try {
         // Sub-PR 4 of #841: use the unified OracleManifest as the source of
         // truth for `isFleetKnown`. We still derive `isLive` from the freshly

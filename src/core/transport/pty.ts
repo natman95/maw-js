@@ -73,13 +73,21 @@ interface PtyHandlers {
   sweepOrphanPtySessions: () => Promise<{ killed: string[]; checked: number }>;
 }
 
+// ชั้นที่ 2 ของเพดาน scrollback 4 ชั้น (tmux เก็บ → replay นี้ → /capture → xterm.js)
+// ชั้นที่เตี้ยที่สุดเป็นตัวชนะเสมอ — 📎 Boss เคาะ 2026-08-15: tmux 50000 · replay/xterm 20000
+// default = เท่ากับ xterm.js scrollback (20000) เพราะ replay ลึกกว่าที่ client เก็บได้ = เผา byte
+// มือถือ Boss ฟรี · เพดานเปิดไว้ 50000 ให้คนที่อยากได้ลึกจริงขอเองผ่าน control message
+// ⚠️ ห้ามเขียนคอมเมนต์ว่า "ตรงกับ tmux history-limit" โดยไม่ probe — ของเดิมเขียนไว้ว่า 10000
+//    แล้วค่าจริงเปลี่ยนไปโดยไม่มีใครตามมาแก้ (🔍 ค่าจริงกล่องนี้ 15.08 = 50000 ทาง
+//    `tmux list-panes -a -F '#{history_limit}'` ซึ่งเป็นทางเดียวที่อ่านของจริงได้)
+const REPLAY_DEFAULT_LINES = 20_000;
+const REPLAY_MAX_LINES = 50_000;
+
 function replayLinesFromControl(value: unknown): number {
-  // Default matches tmux history-limit (10000) + xterm.js scrollback in maw-ui;
-  // Boss 2026-07-10: mobile viewer must scroll far enough back to re-read reports.
-  if (value === undefined) return 10_000;
+  if (value === undefined) return REPLAY_DEFAULT_LINES;
   const n = typeof value === "number" ? value : Number(value);
-  if (!Number.isFinite(n)) return 10_000;
-  return Math.max(0, Math.min(10_000, Math.floor(n)));
+  if (!Number.isFinite(n)) return REPLAY_DEFAULT_LINES;
+  return Math.max(0, Math.min(REPLAY_MAX_LINES, Math.floor(n)));
 }
 
 function replayCapture(ws: MawWS, target: string, lines: number, io: PtyDeps) {

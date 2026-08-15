@@ -671,16 +671,26 @@ function isClaudeEngine(engine: string | undefined): boolean {
   return isClaudeLikeEngine(engine, config);
 }
 
-async function sendPromptViaTmux(target: string, prompt: string): Promise<void> {
-  const runner = (tmux as unknown as { run?: (subcommand: string, ...args: Array<string | number>) => Promise<string> }).run;
-  if (typeof runner === "function") {
-    await runner.call(tmux, "send-keys", "-t", target, prompt, "Enter");
-    return;
-  }
+/**
+ * Deliver a wake prompt to a pane.
+ *
+ * 🔴 Regression 2026-08-11 (volt): this used to fire a single blind
+ * `send-keys <prompt> Enter` whenever `tmux.run` existed — which is always,
+ * since `run` lives on Tmux.prototype. That is the exact pre-fix shape of
+ * finding #6 (see tmux-class.ts:11-17): one Enter, no settle, no confirmation,
+ * no warning. When the pane was still booting the agent TUI, the Enter was
+ * dropped and the prompt sat in the input box forever — a cron one-shot wake
+ * at 08:37 pasted its whole job and burned 0 tokens, silently doing nothing.
+ *
+ * `sendText` already solves this: settle, Enter, re-check the input line,
+ * retry up to MAX_SUBMIT_ATTEMPTS, warn loudly if it still looks pending.
+ * There is no reason for the prompt path to hand-roll a weaker version.
+ */
+export async function sendPromptViaTmux(target: string, prompt: string): Promise<void> {
   await tmux.sendText(target, prompt);
 }
 
-async function sendWakeCommandAndPrompt(target: string, prompt: string | undefined, command: string, _engine?: string): Promise<void> {
+export async function sendWakeCommandAndPrompt(target: string, prompt: string | undefined, command: string, _engine?: string): Promise<void> {
   await tmux.sendText(target, command);
   if (prompt) {
     await sendPromptViaTmux(target, prompt);

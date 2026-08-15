@@ -220,7 +220,8 @@ describe("createPtyHandlers", () => {
       opts: { cols: 200, rows: 1, window: "oracle" },
     });
     expect(h.setOptionCalls[0]).toEqual({ session: "maw-pty-123456-1", option: "status", value: "off" });
-    expect(h.spawnSyncCalls[0]).toEqual(["tmux", "capture-pane", "-t", "demo:oracle", "-p", "-e", "-J", "-S", "-10000"]);
+    // -20000 = default replay ชั้นที่ 2 (📎 Boss 2026-08-15) — เท่ากับ xterm.js scrollback ฝั่ง client
+    expect(h.spawnSyncCalls[0]).toEqual(["tmux", "capture-pane", "-t", "demo:oracle", "-p", "-e", "-J", "-S", "-20000"]);
     expect(h.spawnCalls[0].args[0]).toBe("/usr/bin/expect");
     expect(h.spawnCalls[0].opts).toMatchObject({ stdin: "pipe", stdout: "pipe", stderr: "ignore", windowsHide: true });
     expect(h.spawnCalls[0].opts.env.TERM).toBe("xterm-256color");
@@ -232,6 +233,20 @@ describe("createPtyHandlers", () => {
       JSON.stringify({ type: "detached", target: "demo:oracle" }),
     ]);
     expect(h.killSessionCalls).toContain("maw-pty-123456-1");
+  });
+
+  test("replayLines: ค่าที่ขอมาถูก clamp ที่เพดาน 50000 และค่าระหว่างกลางผ่านไปเต็ม", async () => {
+    // 📎 Boss 2026-08-15 — ชั้นที่ 2 ของเพดาน scrollback 4 ชั้น: default 20000 · เพดาน 50000
+    // สองเคสนี้ต้องอยู่คู่กัน: เคส 99999 อย่างเดียวบอกไม่ได้ว่าหั่นที่ 50000 หรือหั่นที่ 10000 เหมือนเดิม
+    const capped = makeHarness({ spawnPlans: [{ chunks: ["x"], autoEnd: true }] });
+    capped.handlePtyMessage(makeWs() as any, JSON.stringify({ type: "attach", target: "demo:oracle", replayLines: 99999 }));
+    await eventually(() => capped.spawnSyncCalls.length > 0, "capped replay capture");
+    expect(capped.spawnSyncCalls[0].at(-1)).toBe("-50000");
+
+    const mid = makeHarness({ spawnPlans: [{ chunks: ["x"], autoEnd: true }] });
+    mid.handlePtyMessage(makeWs() as any, JSON.stringify({ type: "attach", target: "demo:oracle", replayLines: 30000 }));
+    await eventually(() => mid.spawnSyncCalls.length > 0, "mid replay capture");
+    expect(mid.spawnSyncCalls[0].at(-1)).toBe("-30000");
   });
 
   test("reuses cached sessions, cancels cleanup, replays capture, forwards keystrokes, and timer-cleans empty sessions", async () => {
