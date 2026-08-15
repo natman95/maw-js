@@ -276,7 +276,8 @@ describe("tmux-class isolated coverage", () => {
       { subcommand: "list-panes", args: ["-t", "home:1", "-F", "#{pane_current_command}\t#{pane_current_path}"] },
       { subcommand: "resize-pane", args: ["-t", "home:0", "-x", 500, "-y", 1] },
       { subcommand: "resize-window", args: ["-t", "home:1", "-x", 1, "-y", 200] },
-      { subcommand: "split-window", args: ["-t", "home:0"] },
+      // asks for the new pane id so the history-limit read-back names that pane
+      { subcommand: "split-window", args: ["-P", "-F", "#{pane_id}", "-t", "home:0"] },
       { subcommand: "select-pane", args: ["-t", "home:0", "-T", "oracle"] },
       { subcommand: "select-layout", args: ["-t", "home", "tiled"] },
       { subcommand: "send-keys", args: ["-t", "home:0", "C-c", "Enter"] },
