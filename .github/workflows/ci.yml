@@ -1,10 +1,16 @@
 name: CI
 
+# Branch triggers — 🔍 ตรวจ 15.08.2026:
+#   · `alpha` **ไม่มีอยู่บน remote แล้ว** (`git ls-remote --heads` คืนว่าง)
+#   · `main` ตามหลังสายที่ทุกกล่องรันจริงอยู่ **2145 คอมมิต** และ CI ใบล่าสุดของมันคือ
+#     17.04.2026 ซึ่ง **แดง** — สี่เดือนไม่มีใครเปิดดู
+#   ⇒ CI จึงเฝ้า branch ที่ไม่มีอยู่ กับ branch ที่ไม่มีใครใช้ = เขียว/แดงไม่มีความหมาย
+# เพิ่มสายที่รันจริงเข้ามา เพื่อให้ PR ที่ยิงเข้าสายนั้นถูกตรวจจริง
 on:
   push:
-    branches: [alpha, main]
+    branches: [alpha, main, "deploy/**"]
   pull_request:
-    branches: [alpha, main]
+    branches: [alpha, main, "deploy/**"]
 
 jobs:
   plugin-coverage-gate:
