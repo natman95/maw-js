@@ -8,6 +8,41 @@ import {
 } from "../../sdk";
 import { Tmux } from "../../core/transport/tmux";
 import { AmbiguousMatchError } from "../../core/runtime/find-window";
+import { resolveSessionTarget } from "../../core/matcher/resolve-target";
+
+/**
+ * Is this oracle already running locally? Feeds the auto-wake decision — a
+ * false negative here does not merely waste a wake, it spawns a SECOND claude
+ * in that oracle's house which forks its context and writes to its shared
+ * state (2026-08-15: the duplicate marked two of arc's inbox letters read
+ * before arc ever saw them).
+ *
+ * Exported so the rule can be tested against real fleet-shaped session data
+ * instead of through a mocked cmdSend — the failure this guards against is a
+ * *naming* fact about tmux, and a fake that hands back tidy window names can
+ * never reproduce it.
+ *
+ * Liveness must NOT depend on a tmux window name. tmux owns that label:
+ * `automatic-rename` (a -gw window option, on by default) rewrites any window
+ * born without `-n` to whatever command is running. A live `01-arc` whose
+ * window was created unnamed therefore reads as `claude`, and the previous
+ * exact-match (`name === "arc-oracle" || name === "arc"`) called it dead.
+ * Worse, the duplicate window auto-wake then created IS named correctly — so
+ * closing the duplicate re-armed the bug and the loop never converged.
+ *
+ * Session names already carry the identity (`NN-<oracle>`), and this repo
+ * already owns the canonical matcher for that convention. Reuse it rather than
+ * hand-rolling a second comparison: `maw view` resolves through
+ * resolveSessionTarget, and this site disagreeing with that one is the same
+ * split-brain class should-auto-wake.ts was written to end.
+ */
+export function isOracleLiveLocally(
+  bareAgent: string,
+  sessions: readonly { name: string }[],
+): boolean {
+  const r = resolveSessionTarget(bareAgent, sessions);
+  return r.kind === "exact" || r.kind === "fuzzy";
+}
 import { detectWindowMismatch } from "../../core/routing";
 import { loadConfig, cfgLimit } from "../../config";
 import { logMessage, emitFeed } from "./comm-log-feed";
@@ -642,10 +677,7 @@ export async function cmdSend(
     const isCanonical = parts.length >= 3 || (parts.length === 2 && (isTmuxSessionIdTarget(bareAgent) || isExplicitRemoteSession));
     const isLocalScope = !targetNode || targetNode === config.node || targetNode === "local";
     if (isLocalScope && bareAgent && !isCanonical) {
-      const hasLocalSession = sessions.some(s =>
-        s.name === bareAgent ||
-        s.windows.some(w => w.name === `${bareAgent}-oracle` || w.name === bareAgent)
-      );
+      const hasLocalSession = isOracleLiveLocally(bareAgent, sessions);
       try {
         // Sub-PR 4 of #841: use the unified OracleManifest as the source of
         // truth for `isFleetKnown`. We still derive `isLive` from the freshly
