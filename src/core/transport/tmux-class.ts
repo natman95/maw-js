@@ -428,9 +428,16 @@ export class Tmux {
     return result;
   }
 
+  /**
+   * `lines = 0` ⇒ **จอปัจจุบันล้วน** ไม่เอาประวัติ (`-S 0` = เริ่มที่บรรทัดบนสุดของจอ)
+   *
+   * ⚠️ กับดักที่ต้องแก้พร้อมกัน 2 ที่เสมอ: ของเดิมเป็น `Math.max(1, …)` ⇒ ผู้เรียกที่ส่ง 0
+   * จะถูกยกเป็น 1 เงียบ ๆ แล้วได้ `-S -1` = **ติดประวัติมา 1 บรรทัด** ไม่ใช่จอปัจจุบัน
+   * ⇒ คนแก้ฝั่งผู้เรียกอย่างเดียวจะเห็นว่า "ส่ง 0 แล้วไม่เปลี่ยนอะไร" โดยไม่รู้ว่าโดนยกค่า
+   */
   async capture(target: string, lines = 80): Promise<string> {
-    const safeLines = Math.max(1, Math.floor(lines));
-    return this.run("capture-pane", "-t", target, "-e", "-p", "-S", -safeLines);
+    const safeLines = Math.max(0, Math.floor(lines));
+    return this.run("capture-pane", "-t", target, "-e", "-p", "-S", safeLines === 0 ? 0 : -safeLines);
   }
 
   async resizePane(target: string, cols: number, rows: number): Promise<void> {

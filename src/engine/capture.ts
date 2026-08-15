@@ -4,6 +4,19 @@ import type { MawWS } from "../core/types";
 
 type SessionInfo = { name: string; windows: { index: number; name: string; active: boolean }[] };
 
+/**
+ * จำนวนบรรทัดที่ push ให้จอ pane — **0 = จอปัจจุบันล้วน ไม่เอาประวัติ**
+ *
+ * เดิมเป็น 80 ⇒ ทุกรอบ push จะแนบ "ประวัติการวาดใหม่" ของ TUI มาด้วย
+ * TUI ของ Claude วาดแถบล่างทับที่เดิมตลอด ⇒ ทุกครั้งที่วาด ประวัติได้สำเนาเพิ่มอีกชุด
+ * ⇒ บนจอผู้ใช้เห็นเป็น "เนื้อซ้ำ ท่อนเก่าปนใหม่ + บรรทัดว่างเป็นพืด" (📎 Boss รายงาน 15.08)
+ * ซึ่ง **ไม่ใช่ของที่เพี้ยน — เป็นของที่เราขอมาเอง**
+ *
+ * ประวัติจริงมีทางของมันอยู่แล้ว 2 ทาง ไม่ต้องยัดมากับ push ที่ยิงทุก ~50ms:
+ *   `/api/capture?lines=N` (เพดาน 50000 · sessions.ts) และ replay ตอน attach ของ /ws/pty
+ */
+const PANE_PUSH_LINES = 0;
+
 /** Push terminal capture to a subscribed WebSocket client. */
 export async function pushCapture(
   ws: MawWS,
@@ -11,7 +24,7 @@ export async function pushCapture(
 ) {
   if (!ws.data.target) return;
   try {
-    const content = await capture(ws.data.target, 80);
+    const content = await capture(ws.data.target, PANE_PUSH_LINES);
     const prev = lastContent.get(ws);
     if (content !== prev) {
       lastContent.set(ws, content);

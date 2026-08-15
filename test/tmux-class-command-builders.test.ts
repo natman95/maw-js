@@ -251,6 +251,29 @@ describe("Tmux command wrapper coverage", () => {
     ]);
   });
 
+  test("capture with 0 lines asks tmux for the visible screen only (-S 0, ไม่ใช่ -S -1)", async () => {
+    const t = new FakeTmux(byCommand({
+      "capture-pane -t s:logs.0 -e -p -S 0": "current screen",
+    }));
+
+    expect(await t.capture("s:logs.0", 0)).toBe("current screen");
+    // ⚠️ ของเดิม Math.max(1,…) ทำให้ 0 กลายเป็น 1 เงียบ ๆ ⇒ ได้ `-S -1` = ติดประวัติมา 1 บรรทัด
+    expect(t.callStrings()).toEqual([
+      "capture-pane -t s:logs.0 -e -p -S 0",
+    ]);
+  });
+
+  test("capture ยังปัดค่าติดลบ/เศษส่วนเหมือนเดิม (ไม่ถอยของเก่า)", async () => {
+    const t = new FakeTmux(byCommand({
+      "capture-pane -t s:logs.0 -e -p -S 0": "current screen",
+    }));
+
+    expect(await t.capture("s:logs.0", -5)).toBe("current screen");
+    expect(t.callStrings()).toEqual([
+      "capture-pane -t s:logs.0 -e -p -S 0",
+    ]);
+  });
+
   test("sendText exits transient tmux mode, sends literal text, and stops after confirmed submit", async () => {
     const t = new FakeSubmitTmux();
     t.captureScript = [

@@ -160,7 +160,8 @@ describe("engine/capture extra runtime coverage", () => {
     const ws = makeWs({ target: "oracles:1" });
     captureBodies["oracles:1"] = "first capture";
     await pushCapture(ws as any, lastContent);
-    expect(captureCalls).toEqual([{ target: "oracles:1", lines: 80 }]);
+    // 0 = จอปัจจุบันล้วน — จอ pane ไม่ควรขอ "ประวัติการวาดใหม่" ของ TUI มาแสดง (📎 15.08)
+    expect(captureCalls).toEqual([{ target: "oracles:1", lines: 0 }]);
     expect(ws.sent).toEqual([{ type: "capture", target: "oracles:1", content: "first capture" }]);
 
     await pushCapture(ws as any, lastContent);
