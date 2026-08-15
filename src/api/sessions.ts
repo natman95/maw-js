@@ -263,9 +263,12 @@ export function createSessionsApi(deps: SessionsApiDeps = {}) {
     const target = query.target;
     if (!target) { set.status = 400; return { error: "target required" }; }
     // Scrollback: default 1000 lines (was 80 — one screen of history).
-    // ?lines= overrides, clamped to 1..10000 (tmux history-limit is 10000).
+    // ชั้นที่ 3 ของเพดาน scrollback 4 ชั้น — ?lines= overrides, clamped to 1..50000
+    // 📎 Boss เคาะ 2026-08-15 (เดิม 10000) · ให้เท่ากับเพดาน tmux เพราะ /capture คือช่อง
+    // "ขอลึกสุดเท่าที่มี" — ไม่ใช่ช่องที่วิ่งเข้าจอมือถือทุกครั้งเหมือน replay ชั้น 2
+    // ⚠️ อ่าน history_limit ของจริงด้วย `tmux list-panes -a -F '#{history_limit}'` เท่านั้น
     const requested = Number.parseInt(query.lines ?? "", 10);
-    const lines = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 1000, 1), 10_000);
+    const lines = Math.min(Math.max(Number.isFinite(requested) && requested > 0 ? requested : 1000, 1), 50_000);
     try {
       const sessions = await d.listSessions();
       const resolved = resolveCapture(target, sessions, d);
