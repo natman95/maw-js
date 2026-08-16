@@ -100,6 +100,29 @@ export interface MawLimits {
    * 50000 ≈ 105 MB/pane real, ≈321 MB/pane if every line fills 200 columns.
    */
   tmuxHistoryLimit?: number;
+  /**
+   * How many tail lines each `/ws` capture push carries (📎 Boss 2026-08-16).
+   *
+   * This is the ceiling a human actually hits first — `tmuxHistoryLimit` only
+   * says how much tmux *keeps*, this says how much ever leaves the box. It was
+   * hardcoded at 80, so a viewer could scroll ~80 lines back no matter how deep
+   * the pane's own scrollback ran (measured on `volt:0`: tmux held 257 lines,
+   * the viewer could reach ~90 of them).
+   *
+   * The client REPLACES its buffer on every `capture` message rather than
+   * appending, so this depth rides on every push at the `capture` interval —
+   * hence the companion byte cap below.
+   */
+  captureLines?: number;
+  /**
+   * Hard byte ceiling per capture push, applied after `captureLines`.
+   *
+   * Bounds the worst case (a pane with a very deep, very wide history) so the
+   * depth above can be raised without making the push cost unbounded. Measured
+   * on `volt:0` 2026-08-16: full 257-line scrollback = 33 KB raw / 4.3 KB
+   * deflated, vs 15 KB raw / 2.4 KB deflated for the old 80 lines.
+   */
+  captureBytes?: number;
 }
 
 export interface MawConfig {
@@ -272,6 +295,6 @@ export interface MawConfig {
 export const D = {
   intervals: { capture: 50, sessions: 5000, status: 3000, teams: 3000, preview: 2000, peerFetch: 10000, crashCheck: 30000, peerRetryBackoff: 300, ptySweep: 300000 } as const,
   timeouts: { http: 5000, health: 3000, ping: 5000, pty: 5000, workspace: 5000, shellInit: 3000, wakeRetry: 500, wakeVerify: 3000, wsIdleSec: 60 } as const,
-  limits: { feedMax: 500, feedDefault: 50, feedHistory: 50, logsMax: 500, logsDefault: 50, logsTruncate: 500, messageTruncate: 100, ptyCols: 500, ptyRows: 200, maxConcurrentAgents: 40, peerProbeRetries: 2, tmuxHistoryLimit: 50000 } as const,
+  limits: { feedMax: 500, feedDefault: 50, feedHistory: 50, logsMax: 500, logsDefault: 50, logsTruncate: 500, messageTruncate: 100, ptyCols: 500, ptyRows: 200, maxConcurrentAgents: 40, peerProbeRetries: 2, tmuxHistoryLimit: 50000, captureLines: 1000, captureBytes: 131072 } as const,
   hmacWindowSeconds: 300,
 } as const;
