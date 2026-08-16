@@ -1,24 +1,10 @@
 import { capture, isAgentCommand } from "../core/transport/ssh";
 import { tmux } from "../core/transport/tmux";
 import { cfgLimit } from "../config";
+import { capByBytes } from "./capture-cap";
 import type { MawWS } from "../core/types";
 
 type SessionInfo = { name: string; windows: { index: number; name: string; active: boolean }[] };
-
-/** Drop whole lines off the TOP until the payload fits `maxBytes`.
- *
- *  The client replaces its buffer with each `capture` message (it does not
- *  append), so the depth has to ride on every push — which makes an unbounded
- *  capture a per-tick cost at the 50ms interval. Trimming from the top keeps
- *  the newest lines, which are the ones a live viewer is watching. */
-export function capByBytes(content: string, maxBytes: number): string {
-  if (Buffer.byteLength(content, "utf8") <= maxBytes) return content;
-  let lines = content.split("\n");
-  while (lines.length > 1 && Buffer.byteLength(lines.join("\n"), "utf8") > maxBytes) {
-    lines = lines.slice(Math.max(1, Math.ceil(lines.length * 0.1)));
-  }
-  return lines.join("\n");
-}
 
 /** Push terminal capture to a subscribed WebSocket client. */
 export async function pushCapture(

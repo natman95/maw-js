@@ -145,9 +145,12 @@ const {
   pushPreviews,
   broadcastSessions,
   sendBusyAgents,
-  capByBytes,
 } = await import("../../src/engine/capture.ts?engine-capture-runtime-extra");
 const { cfgLimit } = await import("../../src/config");
+// นำเข้าจากโมดูลของตัวเอง ไม่ใช่ผ่าน src/engine/capture — ไฟล์เทสต์อีก 3 ใบ
+// mock.module ทับโมดูลนั้นทั้งใบแบบ process-global (ของที่ export จากที่นั่นจะหาย
+// เมื่อรันรวม แต่เขียวเมื่อรันไฟล์เดียว)
+const { capByBytes } = await import("../../src/engine/capture-cap");
 
 describe("engine/capture extra runtime coverage", () => {
   beforeEach(() => resetCaptureState());
