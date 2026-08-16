@@ -123,6 +123,16 @@ export interface MawLimits {
    * deflated, vs 15 KB raw / 2.4 KB deflated for the old 80 lines.
    */
   captureBytes?: number;
+  /**
+   * Shortest run of byte-identical lines that counts as redraw duplication and
+   * gets collapsed before a capture is sent (📎 Boss 2026-08-16). `0` disables.
+   *
+   * A TUI that repaints its transcript pushes the whole visible frame into
+   * scrollback again on every paint, so a fixed line budget spends much of
+   * itself re-showing frames the reader already passed. Measured on this box:
+   * `volt:0` 166 non-empty lines / 88 distinct · `01-arc` 433 / 170.
+   */
+  captureCollapseMinBlock?: number;
 }
 
 export interface MawConfig {
@@ -295,6 +305,6 @@ export interface MawConfig {
 export const D = {
   intervals: { capture: 50, sessions: 5000, status: 3000, teams: 3000, preview: 2000, peerFetch: 10000, crashCheck: 30000, peerRetryBackoff: 300, ptySweep: 300000 } as const,
   timeouts: { http: 5000, health: 3000, ping: 5000, pty: 5000, workspace: 5000, shellInit: 3000, wakeRetry: 500, wakeVerify: 3000, wsIdleSec: 60 } as const,
-  limits: { feedMax: 500, feedDefault: 50, feedHistory: 50, logsMax: 500, logsDefault: 50, logsTruncate: 500, messageTruncate: 100, ptyCols: 500, ptyRows: 200, maxConcurrentAgents: 40, peerProbeRetries: 2, tmuxHistoryLimit: 50000, captureLines: 1000, captureBytes: 131072 } as const,
+  limits: { feedMax: 500, feedDefault: 50, feedHistory: 50, logsMax: 500, logsDefault: 50, logsTruncate: 500, messageTruncate: 100, ptyCols: 500, ptyRows: 200, maxConcurrentAgents: 40, peerProbeRetries: 2, tmuxHistoryLimit: 50000, captureLines: 1000, captureBytes: 131072, captureCollapseMinBlock: 4 } as const,
   hmacWindowSeconds: 300,
 } as const;
