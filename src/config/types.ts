@@ -115,12 +115,30 @@ export interface MawLimits {
    */
   captureLines?: number;
   /**
-   * Hard byte ceiling per capture push, applied after `captureLines`.
+   * Byte ceiling per capture push, applied after `captureLines`.
+   *
+   * NOT a hard guarantee: `capByBytes` trims whole lines, so a single line
+   * longer than the cap is returned intact (its test asserts exactly that).
+   * 📎 labubu 2026-08-16 — the comment said "Hard", the code never was.
    *
    * Bounds the worst case (a pane with a very deep, very wide history) so the
    * depth above can be raised without making the push cost unbounded. Measured
    * on `volt:0` 2026-08-16: full 257-line scrollback = 33 KB raw / 4.3 KB
    * deflated, vs 15 KB raw / 2.4 KB deflated for the old 80 lines.
+   */
+  /**
+   * ⚠️ ค่านี้คุมขนาด **ต่อ push** เท่านั้น — ไม่มีอะไรคุม **อัตราต่อวินาที**
+   * ตัวคูณคือ `intervals.capture` (50ms) ⇒ เพดานราคาต่อผู้ชม 1 คน = captureBytes / 0.050
+   *
+   * 🔍 วัดจริงบนกล่อง white 2026-08-16 09:34 (labubu) — เพดานนี้ **ชนแล้ววันนี้ ไม่ใช่ของเผื่ออนาคต**:
+   *   01-labubu 8,589 → 117,236 B (13.6x) · 02-neo 13,315 → 107,513 (8.1x)
+   *   03-pulse 10,947 → 96,931 (8.9x) · 04-echo 19,854 → 130,679 (6.6x)
+   *   05-nari  17,705 → **141,738** (8.0x)  ⇐ ทะลุ 131,072 ไปแล้ว
+   * ⇒ บนจอที่ยุ่ง ความลึกที่คนได้จริงคือ **~900 บรรทัดตามไบต์ ไม่ใช่ 1000** — ไม่ใช่บั๊ก
+   * ⇒ เพดานราคา 131,072/0.050 = **2.50 MB/s ดิบ** เทียบของเดิม ~15 KB ⇒ **8.7 เท่า**
+   *    (เป็น *เพดาน* ไม่ใช่ค่าที่วัดได้ · ประตูเดิม `content !== prev` ยังอยู่ ⇒ จอนิ่ง = ไม่มีราคา)
+   * ⚠️ `permessage-deflate` **มีชีวิตเฉพาะบน srv1809016 บน commit ที่ยังไม่ merge**
+   *    ใครเอาใบนี้ไปใช้ที่อื่นได้ 2.50 MB/s เต็ม ไม่มีตัวหาร
    */
   captureBytes?: number;
 }
