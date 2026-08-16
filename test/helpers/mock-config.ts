@@ -26,7 +26,7 @@ const LIMITS: Record<keyof MawLimits, number> = {
   maxConcurrentAgents: 40, peerProbeRetries: 2,
   // ⚠️ ตารางนี้เป็นสำเนามือของ D.limits — คีย์ที่ลืมเติมจะกลายเป็น undefined
   // เงียบ ๆ ใต้ mock แล้วโค้ดจะตกไปใช้ default ที่ฝังใน signature แทน
-  captureLines: 1000, captureBytes: 131072,
+  captureLines: 1000, captureBytes: 131072, captureCollapseMinBlock: 4,
   // 🔍 16.08: `tmuxHistoryLimit` ก็หายจากตารางนี้เหมือนกัน (หายตั้งแต่ตอนเพิ่ม 15.08)
   // แต่ **จงใจไม่เติมในใบนี้** — เติมแล้วทำ 2 ใบแดงใน tmux-class ที่ assert ว่า
   // "ค่าที่ไม่ได้ตั้ง ต้องไม่ถูกส่งเป็น argument" ⇒ เป็นหนี้คนละก้อน ต้องแยกใบแก้

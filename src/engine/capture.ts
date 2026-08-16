@@ -2,6 +2,7 @@ import { capture, isAgentCommand } from "../core/transport/ssh";
 import { tmux } from "../core/transport/tmux";
 import { cfgLimit } from "../config";
 import { capByBytes } from "./capture-cap";
+import { collapseRedraws } from "./capture-dedup";
 import type { MawWS } from "../core/types";
 
 type SessionInfo = { name: string; windows: { index: number; name: string; active: boolean }[] };
@@ -14,7 +15,10 @@ export async function pushCapture(
   if (!ws.data.target) return;
   try {
     const raw = await capture(ws.data.target, cfgLimit("captureLines"));
-    const content = capByBytes(raw, cfgLimit("captureBytes"));
+    // collapse first, then cap: the byte ceiling should be spent on distinct
+    // content, not on frames the repaint duplicated.
+    const deduped = collapseRedraws(raw, cfgLimit("captureCollapseMinBlock")).text;
+    const content = capByBytes(deduped, cfgLimit("captureBytes"));
     const prev = lastContent.get(ws);
     if (content !== prev) {
       lastContent.set(ws, content);
