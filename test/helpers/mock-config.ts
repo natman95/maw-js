@@ -24,6 +24,10 @@ const LIMITS: Record<keyof MawLimits, number> = {
   logsMax: 500, logsDefault: 50, logsTruncate: 500,
   messageTruncate: 100, ptyCols: 500, ptyRows: 200,
   maxConcurrentAgents: 40, peerProbeRetries: 2,
+  // ⚠️ ตารางนี้เป็นสำเนามือของ D.limits — คีย์ที่ลืมเติมจะกลายเป็น undefined
+  // เงียบ ๆ ใต้ mock แล้วโค้ดจะตกไปใช้ default ที่ฝังใน signature แทน
+  // (tmuxHistoryLimit หายไปตั้งแต่ตอนเพิ่ม 15.08 — เติมคืนพร้อมกันตรงนี้)
+  tmuxHistoryLimit: 50000, captureLines: 1000, captureBytes: 131072,
 };
 
 export const TEST_D = {
