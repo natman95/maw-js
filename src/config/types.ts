@@ -100,6 +100,47 @@ export interface MawLimits {
    * 50000 ≈ 105 MB/pane real, ≈321 MB/pane if every line fills 200 columns.
    */
   tmuxHistoryLimit?: number;
+  /**
+   * How many tail lines each `/ws` capture push carries (📎 Boss 2026-08-16).
+   *
+   * This is the ceiling a human actually hits first — `tmuxHistoryLimit` only
+   * says how much tmux *keeps*, this says how much ever leaves the box. It was
+   * hardcoded at 80, so a viewer could scroll ~80 lines back no matter how deep
+   * the pane's own scrollback ran (measured on `volt:0`: tmux held 257 lines,
+   * the viewer could reach ~90 of them).
+   *
+   * The client REPLACES its buffer on every `capture` message rather than
+   * appending, so this depth rides on every push at the `capture` interval —
+   * hence the companion byte cap below.
+   */
+  captureLines?: number;
+  /**
+   * Byte ceiling per capture push, applied after `captureLines`.
+   *
+   * NOT a hard guarantee: `capByBytes` trims whole lines, so a single line
+   * longer than the cap is returned intact (its test asserts exactly that).
+   * 📎 labubu 2026-08-16 — the comment said "Hard", the code never was.
+   *
+   * Bounds the worst case (a pane with a very deep, very wide history) so the
+   * depth above can be raised without making the push cost unbounded. Measured
+   * on `volt:0` 2026-08-16: full 257-line scrollback = 33 KB raw / 4.3 KB
+   * deflated, vs 15 KB raw / 2.4 KB deflated for the old 80 lines.
+   */
+  /**
+   * ⚠️ ค่านี้คุมขนาด **ต่อ push** เท่านั้น — ไม่มีอะไรคุม **อัตราต่อวินาที**
+   * ตัวคูณคือ `intervals.capture` (50ms) ⇒ เพดานราคาต่อผู้ชม 1 คน = captureBytes / 0.050
+   *
+   * 🔍 วัดจริงบนกล่อง white 2026-08-16 09:34 (labubu) — เพดานนี้ **ชนแล้ววันนี้ ไม่ใช่ของเผื่ออนาคต**:
+   *   01-labubu 8,589 → 117,236 B (13.6x) · 02-neo 13,315 → 107,513 (8.1x)
+   *   03-pulse 10,947 → 96,931 (8.9x) · 04-echo 19,854 → 130,679 (6.6x)
+   *   05-nari  17,705 → **141,738** (8.0x)  ⇐ ทะลุ 131,072 ไปแล้ว
+   * ⇒ บนจอที่ยุ่ง ความลึกที่คนได้จริงคือ **~900 บรรทัดตามไบต์ ไม่ใช่ 1000** — ไม่ใช่บั๊ก
+   * ⇒ เพดานราคา 131,072/0.050 = **2.50 MB/s ดิบ** เทียบของเดิม ~15 KB ⇒ **8.7 เท่า**
+   *    (เป็น *เพดาน* ไม่ใช่ค่าที่วัดได้ · ประตูเดิม `content !== prev` ยังอยู่ ⇒ จอนิ่ง = ไม่มีราคา)
+   * ⚠️ `permessage-deflate` **มีชีวิตเฉพาะบน srv1809016 บน commit ที่ยังไม่ merge**
+   *    ใครเอาใบนี้ไปใช้ที่อื่นได้ 2.50 MB/s เต็ม ไม่มีตัวหาร
+   */
+  captureBytes?: number;
 }
 
 export interface MawConfig {
@@ -272,6 +313,6 @@ export interface MawConfig {
 export const D = {
   intervals: { capture: 50, sessions: 5000, status: 3000, teams: 3000, preview: 2000, peerFetch: 10000, crashCheck: 30000, peerRetryBackoff: 300, ptySweep: 300000 } as const,
   timeouts: { http: 5000, health: 3000, ping: 5000, pty: 5000, workspace: 5000, shellInit: 3000, wakeRetry: 500, wakeVerify: 3000, wsIdleSec: 60 } as const,
-  limits: { feedMax: 500, feedDefault: 50, feedHistory: 50, logsMax: 500, logsDefault: 50, logsTruncate: 500, messageTruncate: 100, ptyCols: 500, ptyRows: 200, maxConcurrentAgents: 40, peerProbeRetries: 2, tmuxHistoryLimit: 50000 } as const,
+  limits: { feedMax: 500, feedDefault: 50, feedHistory: 50, logsMax: 500, logsDefault: 50, logsTruncate: 500, messageTruncate: 100, ptyCols: 500, ptyRows: 200, maxConcurrentAgents: 40, peerProbeRetries: 2, tmuxHistoryLimit: 50000, captureLines: 1000, captureBytes: 131072 } as const,
   hmacWindowSeconds: 300,
 } as const;

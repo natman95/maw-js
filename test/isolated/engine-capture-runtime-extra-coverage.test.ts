@@ -146,6 +146,11 @@ const {
   broadcastSessions,
   sendBusyAgents,
 } = await import("../../src/engine/capture.ts?engine-capture-runtime-extra");
+const { cfgLimit } = await import("../../src/config");
+// นำเข้าจากโมดูลของตัวเอง ไม่ใช่ผ่าน src/engine/capture — ไฟล์เทสต์อีก 3 ใบ
+// mock.module ทับโมดูลนั้นทั้งใบแบบ process-global (ของที่ export จากที่นั่นจะหาย
+// เมื่อรันรวม แต่เขียวเมื่อรันไฟล์เดียว)
+const { capByBytes } = await import("../../src/engine/capture-cap");
 
 describe("engine/capture extra runtime coverage", () => {
   beforeEach(() => resetCaptureState());
@@ -160,7 +165,9 @@ describe("engine/capture extra runtime coverage", () => {
     const ws = makeWs({ target: "oracles:1" });
     captureBodies["oracles:1"] = "first capture";
     await pushCapture(ws as any, lastContent);
-    expect(captureCalls).toEqual([{ target: "oracles:1", lines: 80 }]);
+    expect(captureCalls).toEqual([{ target: "oracles:1", lines: cfgLimit("captureLines") }]);
+    // ตัวเลขต้องมาจาก config ไม่ใช่ค่าฝังในโค้ด — 80 คือเพดานเดิมที่ตัดจอผู้ใช้
+    expect(cfgLimit("captureLines")).toBeGreaterThan(80);
     expect(ws.sent).toEqual([{ type: "capture", target: "oracles:1", content: "first capture" }]);
 
     await pushCapture(ws as any, lastContent);
@@ -169,6 +176,26 @@ describe("engine/capture extra runtime coverage", () => {
     captureFailures.add("oracles:1");
     await pushCapture(ws as any, lastContent);
     expect(ws.sent.at(-1)).toEqual({ type: "error", error: "capture failed for oracles:1" });
+  });
+
+  test("capByBytes keeps the newest lines, is a no-op under the cap, and counts BYTES not characters", () => {
+    const small = "a\nb\nc";
+    expect(capByBytes(small, 1024)).toBe(small);
+
+    // 500 บรรทัด — ตัดหัวออก ท้ายต้องรอด (ท้าย = ของใหม่ที่คนกำลังดู)
+    const many = Array.from({ length: 500 }, (_, i) => `line-${i}`).join("\n");
+    const capped = capByBytes(many, 500);
+    expect(Buffer.byteLength(capped, "utf8")).toBeLessThanOrEqual(500);
+    expect(capped.endsWith("line-499")).toBe(true);
+    expect(capped.includes("line-0\n")).toBe(false);
+
+    // ไทย: 1 อักษร = 3 ไบต์ — ถ้านับด้วย .length เพดานจะทะลุ 3 เท่าโดยเงียบ
+    const thai = Array.from({ length: 200 }, () => "กระแสไม่ไหลเอง").join("\n");
+    const thaiCapped = capByBytes(thai, 600);
+    expect(Buffer.byteLength(thaiCapped, "utf8")).toBeLessThanOrEqual(600);
+
+    // บรรทัดเดียวที่ใหญ่เกินเพดาน: ต้องคืนของ ไม่ใช่วนไม่จบ/คืนค่าว่าง
+    expect(capByBytes("x".repeat(5000), 100)).toBe("x".repeat(5000));
   });
 
   test("pushPreviews batches changed preview captures, ignores failed panes, and suppresses unchanged previews", async () => {
