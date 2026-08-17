@@ -80,8 +80,10 @@ interface PtyHandlers {
 // ⚠️ ห้ามเขียนคอมเมนต์ว่า "ตรงกับ tmux history-limit" โดยไม่ probe — ของเดิมเขียนไว้ว่า 10000
 //    แล้วค่าจริงเปลี่ยนไปโดยไม่มีใครตามมาแก้ (🔍 ค่าจริงกล่องนี้ 15.08 = 50000 ทาง
 //    `tmux list-panes -a -F '#{history_limit}'` ซึ่งเป็นทางเดียวที่อ่านของจริงได้)
-const REPLAY_DEFAULT_LINES = 20_000;
-const REPLAY_MAX_LINES = 50_000;
+// exported เพื่อให้เทสต์ประกอบ argv จากค่าจริง แทนการพิมพ์ตัวเลขซ้ำ — ของเดิมพิมพ์ `-2000`
+// ไว้ในเทสต์ พอค่าจริงขยับเป็น 20000 (📎 Boss 2026-08-15) เทสต์ก็แดงโดยที่ของไม่ได้พัง
+export const REPLAY_DEFAULT_LINES = 20_000;
+export const REPLAY_MAX_LINES = 50_000;
 
 function replayLinesFromControl(value: unknown): number {
   if (value === undefined) return REPLAY_DEFAULT_LINES;
@@ -98,7 +100,11 @@ function replayCapture(ws: MawWS, target: string, lines: number, io: PtyDeps) {
       ws.send(cap.stdout);
       ws.send(new TextEncoder().encode("\r\n"));
     }
-  } catch { /* expected: capture-pane may fail if target gone or tmux missing */ }
+  } catch (e) {
+    // ห้ามเงียบ: ถ้า capture-pane ล้ม คนใช้จะเห็น "จอเปิดได้แต่ไม่มีประวัติ" ซึ่งหน้าตา
+    // เหมือน "pane นี้ไม่มีอะไร" เป๊ะ — ไม่มีทางแยกสองอย่างนี้ออกจากกันถ้าไม่มีบรรทัดนี้
+    console.warn(`[pty] replay capture failed for ${target} (${lines} lines): ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 export function createPtyHandlers(overrides: Partial<PtyDeps> = {}): PtyHandlers {

@@ -64,7 +64,7 @@ afterAll(() => {
 });
 
 describe("PTY attach scrollback replay (#1588)", async () => {
-  const { handlePtyMessage } = await import("../../src/core/transport/pty.ts?pty-attach-replay");
+  const { handlePtyMessage, REPLAY_DEFAULT_LINES, REPLAY_MAX_LINES } = await import("../../src/core/transport/pty.ts?pty-attach-replay");
 
   async function createCachedSession(target: string) {
     const ws = makeWs();
@@ -80,7 +80,9 @@ describe("PTY attach scrollback replay (#1588)", async () => {
     await createCachedSession(target);
 
     spawnSyncImpl = (args) => {
-      expect(args).toEqual(["tmux", "capture-pane", "-t", target, "-p", "-e", "-J", "-S", "-2000"]);
+      // ประกอบจากค่าจริง ไม่พิมพ์ตัวเลขซ้ำ — ตัวเลขที่พิมพ์ไว้เองคือเหตุที่ใบนี้แดงค้างมาทั้งวัน
+      // (ค่าจริงขยับ 2000 → 20000 แต่ไม่มีใครตามมาแก้ที่นี่ · ค่านโยบายมีเทสต์ปักหมุดแยกด้านล่าง)
+      expect(args).toEqual(["tmux", "capture-pane", "-t", target, "-p", "-e", "-J", "-S", `-${REPLAY_DEFAULT_LINES}`]);
       return { stdout: encode("cached screen") };
     };
 
@@ -92,6 +94,13 @@ describe("PTY attach scrollback replay (#1588)", async () => {
       "\r\n",
       JSON.stringify({ type: "attached", target }),
     ]);
+  });
+
+  // ปักหมุดค่านโยบายไว้จุดเดียว: ใครขยับต้องมาแก้ตรงนี้พร้อมเหตุผล
+  // ไม่ใช่ให้เทสต์ที่ตรวจ argv แดงแทนแล้วเข้าใจผิดว่าฟีเจอร์พัง (ซึ่งเกิดขึ้นมาแล้ว 15.08)
+  test("ค่า replay ตรงกับที่ Boss เคาะ 2026-08-15 (default 20000 · เพดาน 50000)", () => {
+    expect(REPLAY_DEFAULT_LINES).toBe(20_000);
+    expect(REPLAY_MAX_LINES).toBe(50_000);
   });
 
   test("fresh attach sends capture-pane bytes before spawning the live PTY", async () => {
