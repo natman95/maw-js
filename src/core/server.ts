@@ -447,9 +447,16 @@ export async function startBunGatewayServer(
       const enginePlugin = findEnginePluginRegistration(url.pathname);
       if (enginePlugin) return logAccess(await proxyEnginePluginRequest(req, enginePlugin));
       if (isProtected(apiPath, req.method)) {
-        const authOrLegacyRoute = await api.handle(req.clone());
+        // 🔴 16.08 — ตัวจริงต้องเข้าด่าน สำเนาไปฝั่ง fallback (ไม่ใช่กลับกัน)
+        // `req.clone()` สร้าง Request ใบใหม่ที่ไม่ผูกกับ TCP connection เดิม
+        // ⇒ server.requestIP(clonedReq) คืน **null** (ไม่ใช่ "127.0.0.1")
+        // ⇒ isLoopback(null) เป็นเท็จ ⇒ ด่านตอบ 401 ให้ทุกคน **รวมทั้ง loopback เอง**
+        // วัดจริงก่อนแพตช์: 10 เส้นทางใน PROTECTED ตอบ 401 ให้ curl จาก 127.0.0.1
+        // สำเนายังจำเป็นอยู่ เพราะ api.handle() กิน body ⇒ ฝั่งปลั๊กอินต้องได้ใบที่ยังไม่ถูกอ่าน
+        const fallbackReq = req.clone();
+        const authOrLegacyRoute = await api.handle(req);
         if (authOrLegacyRoute.status !== 404) return logAccess(authOrLegacyRoute);
-        const servedByPlugin = await serveRoutes.handle(req);
+        const servedByPlugin = await serveRoutes.handle(fallbackReq);
         return logAccess(servedByPlugin ? addCors(servedByPlugin) : authOrLegacyRoute);
       }
       const servedByPlugin = await serveRoutes.handle(req);
