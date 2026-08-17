@@ -46,6 +46,14 @@ const PROTECTED_POST = new Set([
 // Note: GET-only read endpoints (/sessions, /capture, /mirror)
 // are intentionally public — the Office UI on LAN needs them.
 // HMAC protects write operations from unauthenticated remote peers.
+//
+// …but that exemption is for *metadata*. `/files` serves the bytes of files a
+// human put on the box, so it belongs with the artifact rule below, not with
+// /sessions. Two lines already in this file decide it:
+//   • line ~44 "HMAC protects write operations"      → DELETE /files/:name is a write
+//   • the /plugin/download/ rule below, word for word → GET that serves artifact bytes
+// This is not a new policy; it is the policy this file already applies to the
+// same kind of thing (📎 labubu 2026-08-16, after morse found /files open).
 
 export function isProtected(path: string, method: string): boolean {
   if (PROTECTED.has(path)) return true;
@@ -58,6 +66,14 @@ export function isProtected(path: string, method: string): boolean {
   // download is not — an anonymous GET would expose plugin artifacts to
   // anyone who can reach the node.
   if (method === "GET" && path.startsWith("/plugin/download/")) return true;
+  // Protect the inbox file surface — same reasoning as the tarball above:
+  //   GET /files            → lists every filename on the box (discovery of what exists)
+  //   GET /files/:name      → serves the full bytes of a user's file
+  //   DELETE /files/:name   → a write; the note above says writes need HMAC
+  // Anonymous access here exposed real conversation transcripts on srv1809016
+  // (found 2026-08-16 by morse). Kept as an exact + prefix match so a future
+  // sibling route under /files/ cannot slip through unprotected.
+  if (path === "/files" || path.startsWith("/files/")) return true;
   return false;
 }
 
