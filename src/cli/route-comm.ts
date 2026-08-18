@@ -46,9 +46,34 @@ export async function routeComm(cmd: string, args: string[]): Promise<boolean> {
     const approve = args.includes("--approve");
     const trust = args.includes("--trust");
     const target = args[1];
-    const msgArgs = args
-      .slice(2)
-      .filter(a => a !== "--force" && a !== "--inbox" && a !== "--approve" && a !== "--trust");
+    // #maw-hey-flag-guard — a token that matches none of the flags above used to fall through
+    // this filter and become MESSAGE CONTENT, with `delivered` printed and rc=0. So a mistyped
+    // `maw hey <target> --file /path/msg.md` sent the receiver one line reading `--file
+    // /path/msg.md` and nothing anywhere reported a problem.
+    // 📎 Volt hit this 3 times in 4 days on srv1809016 with the guard-in-a-loop shape of this
+    //    same function (deploy line, cb004647); morse named it: fail-open ⇒ typing discipline
+    //    cannot defend against it, the machine has to refuse.
+    // Scoped to the FIRST message token so a `--word` in mid-sentence keeps working, and
+    // `--` is honoured as end-of-flags for anyone who means to send a leading double dash.
+    // 🔍 `---` deliberately does NOT fire: it is the opening line of YAML frontmatter, and a
+    //    sweep of 3,913 delivered message lines found 4 real documents that begin that way
+    //    (morse 2 · volt 1 · echo 1). A real flag always has a letter after the dashes.
+    const KNOWN_COMM_FLAGS = ["--force", "--inbox", "--approve", "--trust"];
+    const msgArgs: string[] = [];
+    let endOfFlags = false;
+    for (const a of args.slice(2)) {
+      if (!endOfFlags && a === "--") { endOfFlags = true; continue; }
+      if (endOfFlags) { msgArgs.push(a); continue; }
+      if (KNOWN_COMM_FLAGS.includes(a)) continue;
+      if (/^--[A-Za-z]/.test(a) && msgArgs.length === 0) {
+        console.error(`\x1b[31m✗\x1b[0m unknown flag: ${a}`);
+        console.error(`  \x1b[33mhint\x1b[0m: maw ${cmd} accepts ${KNOWN_COMM_FLAGS.join(" ")}`);
+        console.error(`  to send a message that starts with ${a}, separate it with --: maw ${cmd} <target> -- "${a} ..."`);
+        printCommUsage(cmd, console.error);
+        throw new UserError(`unknown flag: ${a}`);
+      }
+      msgArgs.push(a);
+    }
 
     // Distinguish: zero-args usage error vs missing-message error (#388.3)
     // A user who typed `maw hey mawjs` (just the target, no message) was
