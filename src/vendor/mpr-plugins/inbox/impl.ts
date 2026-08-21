@@ -730,12 +730,19 @@ export async function cmdInboxLs(opts: { unread?: boolean; from?: string; last?:
  * the frontmatter. The discriminator is context, not shape: they count as
  * frontmatter only while still inside a block that a `key:` opened and that no
  * blank line has ended. A body always arrives after a blank line.
+ *
+ * Known and deliberately not chased: an unclosed head whose body opens with a
+ * `key:`-shaped line and NO blank line between them is still accepted. That is
+ * byte-for-byte a valid frontmatter continuation, so nothing here can tell the
+ * two apart — it needs the head to be closed, not a cleverer predicate.
  */
 function keyishRun(lines: string[]): boolean {
   let sawKey = false, blanked = false;
   for (const l of lines) {
     if (l === "") { blanked = true; continue; }
-    if (/^[A-Za-z_][\w-]*\s*:/.test(l)) { sawKey = true; blanked = false; continue; }
+    // a blank line ends the block for good: without this, a body line that happens
+    // to read as `Word: text` reopens it and the prose is back inside the head
+    if (/^[A-Za-z_][\w-]*\s*:/.test(l)) { if (blanked) return false; sawKey = true; continue; }
     if (/^\s+\S/.test(l) && sawKey && !blanked) continue;
     if (/^(- |#)/.test(l) && sawKey && !blanked) continue;
     return false;

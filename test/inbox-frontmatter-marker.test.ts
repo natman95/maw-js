@@ -206,3 +206,26 @@ describe("markInboxFrontmatterRead — valid YAML that happens to look like pros
     expect(out).toContain("# a comment");
   });
 });
+
+/**
+ * A blank line ends the frontmatter block permanently. Without that, a body
+ * line that happens to read as `Word: text` reopens the block and the prose is
+ * back inside the head — and a message body opening that way is not exotic:
+ * 147 of 8,606 live messages start their body with a `key:`-shaped line.
+ *
+ * The cost is the opposite shape — a blank line *between* two real keys, which
+ * this now refuses. Measured on the same 8,606: 0 messages. Both counts come
+ * from a sieve that passes 5 planted controls first, because a sieve that
+ * cannot find a case it was handed reports a blind zero rather than a real one.
+ */
+describe("markInboxFrontmatterRead — a blank line closes the block for good", () => {
+  test("REAL: unclosed head, blank, body opens `Note: …` (147 live messages open this way)", () => {
+    const content = "---\nfrom: echo\nstatus: delivered\n\nNote: สำคัญมาก\n\n---\n\ntail\n";
+    expect(mark(content)).toBe(content);
+  });
+
+  test("declared cost: a blank line between two real keys is refused (0 live messages)", () => {
+    const content = "---\nfrom: echo\n\nto: neo\nread: false\n---\n\nbody\n";
+    expect(mark(content)).toBe(content);
+  });
+});
