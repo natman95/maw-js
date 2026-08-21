@@ -125,10 +125,16 @@ export function resolveInboxDir(): string {
 }
 
 function parseFrontmatter(content: string): { frontmatter: InboxFrontmatter; body: string } {
-  const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
   const fm: InboxFrontmatter = { from: "unknown", to: "unknown", timestamp: "", read: false };
-  if (!match) return { frontmatter: fm, body: content };
-  for (const line of match[1].split("\n")) {
+  // Same definition as the writer above and as wake-inbox-drain: a non-greedy
+  // /^---\n([\s\S]*?)\n---/ stops at the FIRST `---` line, and in a message whose
+  // head was never closed that line belongs to the BODY — so the prose above it
+  // was promoted into the frontmatter and the body served truncated.
+  if (!content.startsWith("---\n")) return { frontmatter: fm, body: content };
+  const end = findFrontmatterClose(content);
+  if (end < 0) return { frontmatter: fm, body: content };
+  const head = content.slice(0, end + "\n---".length);
+  for (const line of head.slice(4, -4).split("\n")) {
     const colon = line.indexOf(":");
     if (colon < 0) continue;
     const k = line.slice(0, colon).trim();
@@ -138,7 +144,7 @@ function parseFrontmatter(content: string): { frontmatter: InboxFrontmatter; bod
     else if (k === "timestamp" || k === "date") fm.timestamp = v;
     else if (k === "read") fm.read = v === "true";
   }
-  return { frontmatter: fm, body: match[2].trim() };
+  return { frontmatter: fm, body: content.slice(end + "\n---".length).replace(/^\s*\n/, "").trim() };
 }
 
 function buildFrontmatter(fm: InboxFrontmatter): string {
