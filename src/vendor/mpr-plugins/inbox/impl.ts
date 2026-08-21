@@ -724,7 +724,11 @@ function findFrontmatterClose(content: string): number {
   const lines = content.split("\n");
   for (let i = 1; i < lines.length; i++) {
     if (lines[i] !== "---") continue;
-    const keyish = lines.slice(1, i).every(l => /^[A-Za-z_][\w-]*\s*:/.test(l) || /^(\s+\S|- |#|$)/.test(l));
+    // `key: value`, or an indented continuation of the key above it (a YAML block
+    // scalar — 4 messages in the live corpus use `ref_inbox: |`). Nothing else:
+    // a bullet, a heading and a blank line are all shapes that a BODY starts with,
+    // and admitting them puts the body back inside the frontmatter.
+    const keyish = lines.slice(1, i).every(l => /^[A-Za-z_][\w-]*\s*:/.test(l) || /^\s+\S/.test(l));
     if (!keyish) return -1;
     // byte offset of the "\n" that precedes this delimiter line
     return lines.slice(0, i).join("\n").length;

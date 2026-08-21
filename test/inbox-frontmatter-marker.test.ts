@@ -141,3 +141,45 @@ describe("markInboxFrontmatterRead — MUST stay quiet on well-formed letters", 
     expect(mark(content)).toBe(content);
   });
 });
+
+/**
+ * Narrowing found by a second reader (Labubu, 2026-08-21): the first cut of
+ * `keyish` also admitted `# heading`, `- bullet` and blank lines — which is
+ * exactly how a message BODY starts, so an unclosed head followed by prose was
+ * still being rewritten. Measured on 8,595 live messages (8,544 with a closed
+ * head): heads containing a bullet 0 · a heading 0 · a blank line 0 · an
+ * indented continuation 4 (`ref_inbox: |`). So the narrowing costs nothing real
+ * and the continuation must stay.
+ */
+describe("markInboxFrontmatterRead — a body shape is not a frontmatter shape", () => {
+  const HEAD_UNCLOSED_2 = "---\nfrom: echo\nto: neo\nstatus: delivered\n";
+
+  // REAL body opener — headings start the body of essentially every letter we send.
+  test("REAL: unclosed head, body opens with a # heading, then a --- rule", () => {
+    // no prose line between the heading and the rule: the heading must be what
+    // gets rejected, not a bare word further down that happens to fail anyway
+    const content = `${HEAD_UNCLOSED_2}\n# ผมผิดเรื่อง timestamp\n\n---\n\ntail\n`;
+    expect(mark(content)).toBe(content);
+  });
+
+  // REAL body opener — bullet lists.
+  test("REAL: unclosed head, body opens with a - bullet, then a --- rule", () => {
+    const content = `${HEAD_UNCLOSED_2}\n- first point\n- second point\n\n---\n\ntail\n`;
+    expect(mark(content)).toBe(content);
+  });
+
+  // REAL body opener — a blank line then an indented block (fenced/indented code).
+  test("REAL: unclosed head, blank line then an indented paragraph, then a --- rule", () => {
+    const content = `${HEAD_UNCLOSED_2}\n    indented block\n\n---\n\ntail\n`;
+    expect(mark(content)).toBe(content);
+  });
+
+  // REAL — 4 live messages carry a YAML block scalar in the head; it must survive.
+  test("REAL: closed head with a `ref_inbox: |` block scalar still gets marked", () => {
+    const content = "---\nfrom: echo\nto: neo\nref_inbox: |\n  a.md\n  b.md\nread: false\n---\n\nbody\n\n---\n\ntail\n";
+    const out = mark(content);
+    expect(out).toContain("read: true");
+    expect(out).toContain("ref_inbox: |\n  a.md\n  b.md");
+    expect(out.endsWith("\n\nbody\n\n---\n\ntail\n")).toBe(true);
+  });
+});
