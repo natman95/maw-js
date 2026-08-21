@@ -707,9 +707,34 @@ export async function cmdInboxLs(opts: { unread?: boolean; from?: string; last?:
   console.log();
 }
 
-function markInboxFrontmatterRead(content: string, timestamp = new Date().toISOString()): string {
+/**
+ * Index of the "\n" that precedes the frontmatter's closing delimiter, or -1.
+ *
+ * A bare `content.indexOf("\n---", 4)` accepts two things that are not a
+ * closing delimiter: a `---` run with text after it (`--- section two ---`,
+ * `----`), and — the one that corrupts letters — a horizontal rule in the BODY
+ * of a message whose frontmatter block was never closed. In that case the
+ * marker writes `read:`/`readAt:` into the middle of the prose and promotes a
+ * real body line into the frontmatter, then reports success. So the delimiter
+ * must be a whole line, AND every line above it must look like a `key:` pair.
+ * Anything else means "this file has no frontmatter" — the caller's loud
+ * "could not mark read" path, never a silent rewrite.
+ */
+function findFrontmatterClose(content: string): number {
+  const lines = content.split("\n");
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] !== "---") continue;
+    const keyish = lines.slice(1, i).every(l => /^[A-Za-z_][\w-]*\s*:/.test(l) || /^(\s+\S|- |#|$)/.test(l));
+    if (!keyish) return -1;
+    // byte offset of the "\n" that precedes this delimiter line
+    return lines.slice(0, i).join("\n").length;
+  }
+  return -1;
+}
+
+export function markInboxFrontmatterRead(content: string, timestamp = new Date().toISOString()): string {
   if (!content.startsWith("---\n")) return content;
-  const end = content.indexOf("\n---", 4);
+  const end = findFrontmatterClose(content);
   if (end < 0) return content;
   let frontmatter = content.slice(0, end + "\n---".length);
   if (/^read:\s*false\s*$/im.test(frontmatter)) {
