@@ -1,4 +1,5 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
+import { findFrontmatterClose } from "../../shared/frontmatter-bounds";
 import { join } from "path";
 import type { MawConfig } from "../../config/types";
 import { isClaudeLikeEngine } from "../../core/engine/is-claude-like";
@@ -38,7 +39,7 @@ function utf8Bytes(value: string): number {
 
 function parseFrontmatter(raw: string): { meta: Record<string, string>; body: string; frontmatter: string | null } {
   if (!raw.startsWith("---\n")) return { meta: {}, body: raw.trim(), frontmatter: null };
-  const end = raw.indexOf("\n---", 4);
+  const end = findFrontmatterClose(raw);
   if (end < 0) return { meta: {}, body: raw.trim(), frontmatter: null };
   const frontmatter = raw.slice(0, end + "\n---".length);
   const body = raw.slice(end + "\n---".length).replace(/^\s*\n/, "").trim();
@@ -57,7 +58,10 @@ function isUnread(meta: Record<string, string>): boolean {
 
 function markFrontmatterRead(raw: string, timestamp: string): string {
   if (!raw.startsWith("---\n")) return raw;
-  const end = raw.indexOf("\n---", 4);
+  // Shared with the maw CLI and the psi-mail API — a bare indexOf("\n---") takes a
+  // horizontal rule in the BODY of a message whose head was never closed as the
+  // closing delimiter, and stamps read:/readAt: into the middle of the prose.
+  const end = findFrontmatterClose(raw);
   if (end < 0) return raw;
   let fm = raw.slice(0, end + "\n---".length);
   if (/^read:\s*false\s*$/im.test(fm)) fm = fm.replace(/^read:\s*false\s*$/im, "read: true");
@@ -115,7 +119,11 @@ export function drainWakeInbox(repoPath: string, deps: WakeInboxDrainDeps = {}):
     messages.push(message);
     if (markRead) {
       try {
-        fsWriteFile(path, markFrontmatterRead(raw, new Date().toISOString()));
+        // Fail-closed, same discipline as the psi-mail route: when there is no
+        // editable frontmatter the marker returns the content unchanged, and a
+        // no-op write into someone else's inbox is still a write.
+        const updated = markFrontmatterRead(raw, new Date().toISOString());
+        if (updated !== raw) fsWriteFile(path, updated);
       } catch {
         // Draining is best-effort: a read-only inbox should not prevent wake.
       }
