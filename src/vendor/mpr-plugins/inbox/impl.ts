@@ -707,9 +707,68 @@ export async function cmdInboxLs(opts: { unread?: boolean; from?: string; last?:
   console.log();
 }
 
-function markInboxFrontmatterRead(content: string, timestamp = new Date().toISOString()): string {
+/**
+ * Index of the "\n" that precedes the frontmatter's closing delimiter, or -1.
+ *
+ * A bare `content.indexOf("\n---", 4)` accepts two things that are not a
+ * closing delimiter: a `---` run with text after it (`--- section two ---`,
+ * `----`), and — the one that corrupts letters — a horizontal rule in the BODY
+ * of a message whose frontmatter block was never closed. In that case the
+ * marker writes `read:`/`readAt:` into the middle of the prose and promotes a
+ * real body line into the frontmatter, then reports success. So the delimiter
+ * must be a whole line, AND every line above it must look like a `key:` pair.
+ * Anything else means "this file has no frontmatter" — the caller's loud
+ * "could not mark read" path, never a silent rewrite.
+ */
+/**
+ * True when `lines` reads as a frontmatter block rather than as prose.
+ *
+ * `#` and `- ` are valid in BOTH languages — a YAML comment and a YAML list
+ * item, and a Markdown heading and a bullet — so no per-line shape test can
+ * separate them at column 0. Rejecting them outright defends the letter but
+ * refuses genuinely valid YAML; accepting them lets a message body back into
+ * the frontmatter. The discriminator is context, not shape: they count as
+ * frontmatter only while still inside a block that a `key:` opened and that no
+ * blank line has ended. A body always arrives after a blank line.
+ *
+ * Known and deliberately not chased: an unclosed head whose body opens with a
+ * `key:`-shaped line and NO blank line between them is still accepted. That is
+ * byte-for-byte a valid frontmatter continuation, so nothing here can tell the
+ * two apart — it needs the head to be closed, not a cleverer predicate.
+ */
+function keyishRun(lines: string[]): boolean {
+  let sawKey = false, blanked = false;
+  for (const l of lines) {
+    if (l === "") { blanked = true; continue; }
+    // a blank line ends the block for good: without this, a body line that happens
+    // to read as `Word: text` reopens it and the prose is back inside the head
+    if (/^[A-Za-z_][\w-]*\s*:/.test(l)) { if (blanked) return false; sawKey = true; continue; }
+    if (/^\s+\S/.test(l) && sawKey && !blanked) continue;
+    if (/^(- |#)/.test(l) && sawKey && !blanked) continue;
+    return false;
+  }
+  return sawKey;
+}
+
+function findFrontmatterClose(content: string): number {
+  const lines = content.split("\n");
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] !== "---") continue;
+    // `key: value`, or an indented continuation of the key above it (a YAML block
+    // scalar — 4 messages in the live corpus use `ref_inbox: |`). Nothing else:
+    // a bullet, a heading and a blank line are all shapes that a BODY starts with,
+    // and admitting them puts the body back inside the frontmatter.
+    const keyish = keyishRun(lines.slice(1, i));
+    if (!keyish) return -1;
+    // byte offset of the "\n" that precedes this delimiter line
+    return lines.slice(0, i).join("\n").length;
+  }
+  return -1;
+}
+
+export function markInboxFrontmatterRead(content: string, timestamp = new Date().toISOString()): string {
   if (!content.startsWith("---\n")) return content;
-  const end = content.indexOf("\n---", 4);
+  const end = findFrontmatterClose(content);
   if (end < 0) return content;
   let frontmatter = content.slice(0, end + "\n---".length);
   if (/^read:\s*false\s*$/im.test(frontmatter)) {
