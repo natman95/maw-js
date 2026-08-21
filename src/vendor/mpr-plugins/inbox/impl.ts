@@ -720,6 +720,29 @@ export async function cmdInboxLs(opts: { unread?: boolean; from?: string; last?:
  * Anything else means "this file has no frontmatter" — the caller's loud
  * "could not mark read" path, never a silent rewrite.
  */
+/**
+ * True when `lines` reads as a frontmatter block rather than as prose.
+ *
+ * `#` and `- ` are valid in BOTH languages — a YAML comment and a YAML list
+ * item, and a Markdown heading and a bullet — so no per-line shape test can
+ * separate them at column 0. Rejecting them outright defends the letter but
+ * refuses genuinely valid YAML; accepting them lets a message body back into
+ * the frontmatter. The discriminator is context, not shape: they count as
+ * frontmatter only while still inside a block that a `key:` opened and that no
+ * blank line has ended. A body always arrives after a blank line.
+ */
+function keyishRun(lines: string[]): boolean {
+  let sawKey = false, blanked = false;
+  for (const l of lines) {
+    if (l === "") { blanked = true; continue; }
+    if (/^[A-Za-z_][\w-]*\s*:/.test(l)) { sawKey = true; blanked = false; continue; }
+    if (/^\s+\S/.test(l) && sawKey && !blanked) continue;
+    if (/^(- |#)/.test(l) && sawKey && !blanked) continue;
+    return false;
+  }
+  return sawKey;
+}
+
 function findFrontmatterClose(content: string): number {
   const lines = content.split("\n");
   for (let i = 1; i < lines.length; i++) {
@@ -728,7 +751,7 @@ function findFrontmatterClose(content: string): number {
     // scalar — 4 messages in the live corpus use `ref_inbox: |`). Nothing else:
     // a bullet, a heading and a blank line are all shapes that a BODY starts with,
     // and admitting them puts the body back inside the frontmatter.
-    const keyish = lines.slice(1, i).every(l => /^[A-Za-z_][\w-]*\s*:/.test(l) || /^\s+\S/.test(l));
+    const keyish = keyishRun(lines.slice(1, i));
     if (!keyish) return -1;
     // byte offset of the "\n" that precedes this delimiter line
     return lines.slice(0, i).join("\n").length;

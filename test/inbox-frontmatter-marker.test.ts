@@ -183,3 +183,26 @@ describe("markInboxFrontmatterRead — a body shape is not a frontmatter shape",
     expect(out.endsWith("\n\nbody\n\n---\n\ntail\n")).toBe(true);
   });
 });
+
+/**
+ * `#` and `- ` are valid YAML as well as valid Markdown, so a per-line shape
+ * test cannot tell a comment from a heading or a list item from a bullet. The
+ * two cases below are the ones that separate "reject the shape outright" from
+ * "reject it only outside an open key block" — both must keep working.
+ */
+describe("markInboxFrontmatterRead — valid YAML that happens to look like prose", () => {
+  test("closed head with a column-0 list under a key still gets marked", () => {
+    const content = "---\nfrom: echo\ntags:\n- a\n- b\nread: false\n---\n\nbody\n\n---\n\ntail\n";
+    const out = mark(content);
+    expect(out).toContain("read: true");
+    expect(out).toContain("tags:\n- a\n- b");
+    expect(out.endsWith("\n\nbody\n\n---\n\ntail\n")).toBe(true);
+  });
+
+  test("closed head with a # comment under a key still gets marked", () => {
+    const content = "---\nfrom: echo\n# a comment\nread: false\n---\n\nbody\n";
+    const out = mark(content);
+    expect(out).toContain("read: true");
+    expect(out).toContain("# a comment");
+  });
+});
