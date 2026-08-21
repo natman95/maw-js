@@ -2,6 +2,7 @@ import { Elysia, t } from "elysia";
 import { readdirSync, readFileSync, writeFileSync, statSync } from "fs";
 import { join } from "path";
 import { loadConfig } from "../config";
+import { findFrontmatterClose } from "../shared/frontmatter-bounds";
 
 // ψ-Mail — read the inter-Oracle mail (ψ/inbox/*.md) that the family uses to
 // coordinate (labubu-send, completion-report, coordination). Distinct from
@@ -228,7 +229,10 @@ export function createPsymailApi(deps: PsyMailDeps = {
   // content UNCHANGED so the caller detects the no-op and refuses to write.
   function injectRead(content: string, iso: string): string {
     if (!content.startsWith("---\n")) return content;
-    const end = content.indexOf("\n---", 3);
+    // Shared with the maw CLI's mark-read path — a bare indexOf("\n---") accepts
+    // a horizontal rule in the BODY of a message whose head was never closed,
+    // and stamps read:/readAt: into the middle of the prose. One definition.
+    const end = findFrontmatterClose(content);
     if (end < 0) return content;
     let header = content.slice(0, end);
     const footer = content.slice(end);
