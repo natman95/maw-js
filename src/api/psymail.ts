@@ -91,16 +91,22 @@ interface ParsedMail extends PsyMailItem {
 // pulling gray-matter/js-yaml; see src/vendor/mpr-plugins/inbox/impl.ts). ──
 function splitFrontmatter(content: string): { fm: Record<string, string>; body: string } {
   const fm: Record<string, string> = {};
-  const m = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-  if (!m) return { fm, body: content.trim() };
-  for (const line of m[1].split("\n")) {
+  // Same definition as the writer below and as wake-inbox-drain: a non-greedy
+  // /^---\n([\s\S]*?)\n---/ stops at the FIRST `---` line, and in a message whose
+  // head was never closed that line belongs to the BODY — so the prose above it
+  // was promoted into the frontmatter and the body served truncated.
+  if (!content.startsWith("---\n")) return { fm, body: content.trim() };
+  const end = findFrontmatterClose(content);
+  if (end < 0) return { fm, body: content.trim() };
+  const head = content.slice(0, end + "\n---".length);
+  for (const line of head.slice(4, -4).split("\n")) {
     const c = line.indexOf(":");
     if (c < 0) continue;
     const k = line.slice(0, c).trim().toLowerCase();
     const v = line.slice(c + 1).trim();
     if (k && !(k in fm)) fm[k] = v;
   }
-  return { fm, body: m[2].trim() };
+  return { fm, body: content.slice(end + "\n---".length).replace(/^\s*\n/, "").trim() };
 }
 
 // A message is UNREAD iff it has no `read` value or it is empty / "false" /
